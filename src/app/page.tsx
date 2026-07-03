@@ -89,7 +89,7 @@ export default function Page() {
   // via the live store subscription below.
 
   return (
-    <div className="min-h-screen flex flex-col items-center" style={{ background: "var(--desk)" }}>
+    <div id="app-root" className="min-h-screen flex flex-col items-center" style={{ background: "var(--desk)" }}>
       <div className="nb-page w-full max-w-[420px] flex-1 flex flex-col relative">
         <main className="flex-1 relative" style={{ paddingLeft: "50px", paddingRight: "18px", paddingTop: "20px" }}>
           {tab === "home" && (
@@ -129,8 +129,19 @@ export default function Page() {
 
       {/* Settings as an overlay screen rather than a tab */}
       {settingsOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto nb-page" style={{ maxWidth: "420px", margin: "0 auto" }}>
-          <div className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between no-print" style={{ paddingLeft: "50px", paddingRight: "18px", borderBottom: "1.5px dashed var(--ruled-line)" }}>
+        <div
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-full overflow-y-auto z-50 nb-page"
+          style={{ maxWidth: "420px" }}
+        >
+          <div
+            className="sticky top-0 z-10 py-3 flex items-center justify-between no-print"
+            style={{
+              paddingLeft: "50px",
+              paddingRight: "18px",
+              borderBottom: "1.5px dashed var(--ruled-line)",
+              background: "var(--paper)",
+            }}
+          >
             <button
               onClick={() => setSettingsOpen(false)}
               className="font-display text-xl font-semibold underline"

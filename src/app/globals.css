@@ -324,23 +324,27 @@
 
 /* Print styles — clean functional output, no hand-drawn flourishes */
 @media print {
-  body {
+  html, body {
     background: white !important;
     color: black !important;
+    background-image: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  .no-print {
+  /* Hide the entire app; only the portaled print report shows */
+  #app-root {
     display: none !important;
   }
-  .print-clean {
-    border: 1px solid #999 !important;
-    border-radius: 0 !important;
-    background: white !important;
-    box-shadow: none !important;
-    transform: none !important;
+  /* Show only the print report */
+  .print-only {
+    display: block !important;
   }
-  .print-clean * {
-    font-family: "Times New Roman", Times, serif !important;
-    color: black !important;
+}
+
+/* On screen, hide print-only content */
+@media screen {
+  .print-only {
+    display: none !important;
   }
 }
 

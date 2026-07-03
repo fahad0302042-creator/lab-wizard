@@ -35,10 +35,10 @@ export function stockCaption(item: Chemical | Apparatus): string {
   const pct = percentRemaining(item);
   const status = stockStatus(item);
   if (status === "empty") return "0% — (empty!)";
-  if (status === "critical") return `${pct}% — order more!`;
-  if (status === "low") return `${pct}% — getting low`;
-  if (pct >= 85) return `${pct}% full — plenty ✓`;
-  return `${pct}% full`;
+  if (status === "critical") return `${pct}% left — order more!`;
+  if (status === "low") return `${pct}% left — getting low`;
+  if (pct >= 85) return `${pct}% left — plenty ✓`;
+  return `${pct}% left`;
 }
 
 /** Map a stock status to its tailwind color class. */
