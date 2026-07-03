@@ -96,7 +96,7 @@ export const NotebookCard = forwardRef<HTMLDivElement, NotebookCardProps>(
         {paperclip && (
           <div
             className="absolute"
-            style={{ top: "-6px", right: "12px", color: "var(--ink-muted)" }}
+            style={{ top: "-14px", right: "24px", color: "#8a8578", zIndex: 3 }}
           >
             <PaperclipDoodle />
           </div>
@@ -120,12 +120,13 @@ export function HandDrawnBar({ status, percent, className }: HandDrawnBarProps) 
   return (
     <div
       className={clsx(
-        "relative w-full h-4 overflow-hidden",
+        "relative w-full overflow-hidden",
         className
       )}
       style={{
-        border: "1.5px solid var(--border)",
-        borderRadius: "3px 6px 2px 7px / 6px 2px 7px 3px",
+        height: "16px",
+        border: "2px solid var(--ink)",
+        borderRadius: "255px 15px 225px 15px / 15px 225px 15px 255px",
         background: "transparent",
       }}
       role="progressbar"
@@ -295,12 +296,15 @@ export function MarginNote({ text, className, arrow = true }: MarginNoteProps) {
   return (
     <div
       className={clsx("flex items-start gap-1", className)}
-      style={{ color: "var(--margin-red)" }}
+      style={{
+        color: "var(--margin-red)",
+        transform: "rotate(-8deg)",
+      }}
     >
-      <div className="font-display text-lg font-semibold leading-tight max-w-[80px]">
+      <div className="font-display font-bold leading-tight" style={{ fontSize: "17px", maxWidth: "70px" }}>
         {text}
       </div>
-      {arrow && <MarginArrow width="50" height="36" />}
+      {arrow && <MarginArrow width="40" height="24" />}
     </div>
   );
 }

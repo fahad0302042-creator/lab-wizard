@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LabVault — Notebook</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Kalam:wght@400;700&family=Architects+Daughter&display=swap" rel="stylesheet">
+<style>
+  :root{ --paper:#FBF7EC; --ink:#2B2A28; --pencil:#4A5C8A; --red:#B23A2E; --yellow:#F3D96B; --green:#5E8C5A; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:#D9D2BE; display:flex; justify-content:center; padding:30px 12px; }
+  .page{
+    width:380px; background:var(--paper);
+    background-image:
+      linear-gradient(90deg, transparent 38px, #E6B8AE 38px, #E6B8AE 39.5px, transparent 39.5px),
+      linear-gradient(#D8D2C0 1px, transparent 1px);
+    background-size: 100% 100%, 100% 27px;
+    box-shadow:0 24px 55px rgba(0,0,0,.35);
+    position:relative; min-height:780px; padding:20px 18px 34px 50px;
+    font-family:'Kalam', cursive; color:var(--ink);
+  }
+  .torn{ position:absolute; top:0; left:0; right:0; height:10px;
+    background:linear-gradient(135deg, var(--paper) 50%, transparent 50%), linear-gradient(45deg, var(--paper) 50%, transparent 50%);
+    background-size:12px 12px; background-color:#D9D2BE; transform:translateY(-9px);
+  }
+
+  h1{ font-family:'Caveat', cursive; font-weight:700; font-size:42px; margin:6px 0 0; color:var(--ink); transform:rotate(-1.2deg); }
+  .dateline{ font-size:14px; color:#6b6559; margin-top:-4px; margin-bottom:14px; transform:rotate(-0.6deg); }
+  .underline{ width:150px; height:6px; margin-top:-6px; }
+
+  .tape{
+    position:absolute; width:60px; height:22px; background:rgba(240,214,150,0.55);
+    box-shadow:0 1px 2px rgba(0,0,0,.15); z-index:2;
+  }
+
+  .card{
+    background:#FEFCF5; border:1.5px solid #3a362e; padding:12px 14px 10px;
+    margin-bottom:26px; position:relative;
+    border-radius:2px 8px 3px 9px / 8px 3px 9px 2px;
+    box-shadow:2px 3px 6px rgba(0,0,0,.12);
+  }
+  .card:nth-child(odd){ transform:rotate(-0.8deg); }
+  .card:nth-child(even){ transform:rotate(0.9deg); }
+
+  .card-top{ display:flex; justify-content:space-between; align-items:baseline; }
+  .name{ font-family:'Architects Daughter', cursive; font-size:19px; font-weight:400; }
+  .formula{ font-size:13px; color:#7a7568; margin-top:-2px; }
+  .qty{ font-family:'Kalam',cursive; font-weight:700; font-size:17px; }
+
+  .hand-bar{
+    margin-top:8px; height:16px; border:2px solid var(--ink);
+    border-radius:255px 15px 225px 15px/15px 225px 15px 255px;
+    position:relative; overflow:hidden;
+  }
+  .hand-bar .fill{ position:absolute; left:0; top:0; bottom:0; }
+  .hand-bar .fill.green{ background:repeating-linear-gradient(115deg, var(--green) 0 4px, #6d9a68 4px 8px); }
+  .hand-bar .fill.amber{ background:repeating-linear-gradient(115deg, #D89A3E 0 4px, #cf8f30 4px 8px); }
+  .hand-bar .fill.red{ background:repeating-linear-gradient(115deg, var(--red) 0 4px, #9c3226 4px 8px); }
+  .pct-scrawl{ font-family:'Caveat',cursive; font-weight:700; font-size:16px; margin-top:2px; }
+
+  .highlight{ background:linear-gradient(120deg, transparent 0%, var(--yellow) 0%); padding:0 3px; }
+
+  .flask{ width:26px; height:26px; flex-shrink:0; }
+
+  .margin-note{
+    position:absolute; left:-42px; width:150px; font-family:'Caveat',cursive; font-size:17px;
+    color:var(--red); line-height:1.1; transform:rotate(-8deg);
+  }
+  .margin-note svg{ position:absolute; }
+
+  .paperclip{ position:absolute; top:-14px; right:24px; width:28px; height:46px; z-index:3; }
+
+  .add-doodle{ text-align:center; margin-top:10px; }
+  .add-doodle .circle{
+    width:56px; height:56px; border:2.5px solid var(--ink); border-radius:50%; margin:0 auto;
+    display:flex; align-items:center; justify-content:center; font-family:'Caveat',cursive; font-size:34px;
+    background:#FEFCF5;
+  }
+  .add-doodle .caption{ font-family:'Caveat',cursive; font-size:16px; color:#6b6559; margin-top:6px; transform:rotate(-1deg); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="torn"></div>
+
+  <h1>chemicals shelf</h1>
+  <svg class="underline" viewBox="0 0 150 6"><path d="M2 4 Q40 0 78 3 T148 2" stroke="#B23A2E" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>
+  <div class="dateline">— fri, jul 3 · restocked tues —</div>
+
+  <div class="tape" style="top:82px; left:70px; transform:rotate(-4deg);"></div>
+  <div class="card">
+    <div class="card-top">
+      <div><span class="name">Ammonia (aq.)</span><div class="formula">NH₃</div></div>
+      <div class="qty">90 mL</div>
+    </div>
+    <div class="hand-bar"><div class="fill green" style="width:86%"></div></div>
+    <div class="pct-scrawl">86% full — plenty ✓</div>
+  </div>
+
+  <div class="tape" style="top:198px; right:36px; transform:rotate(5deg);"></div>
+  <div class="card">
+    <svg class="paperclip" viewBox="0 0 28 46"><path d="M8 8 C8 3 20 3 20 10 L20 32 C20 38 12 38 12 32 L12 14" fill="none" stroke="#8a8578" stroke-width="2.5" stroke-linecap="round"/></svg>
+    <div class="card-top">
+      <div><span class="name">Barium Chloride</span><div class="formula">BaCl₂</div></div>
+      <div class="qty">3.1 g</div>
+    </div>
+    <div class="hand-bar"><div class="fill amber" style="width:31%"></div></div>
+    <div class="pct-scrawl">31% — getting low!</div>
+    <div class="margin-note" style="top:6px;">
+      order more!
+      <svg width="40" height="24" viewBox="0 0 40 24"><path d="M2 4 Q20 4 34 16" stroke="#B23A2E" stroke-width="2" fill="none" marker-end="url(#arrow)"/><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#B23A2E"/></marker></defs></svg>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
+      <div><span class="name">Sodium Carbonate</span><div class="formula">Na₂CO₃ · anhydrous</div></div>
+      <div class="qty">1010 g</div>
+    </div>
+    <div class="hand-bar"><div class="fill green" style="width:99%"></div></div>
+    <div class="pct-scrawl">99% — good</div>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
+      <div><span class="name">Thymol Blue <span class="highlight">(empty!)</span></span><div class="formula">C₂₇H₃₀O₅S</div></div>
+      <div class="qty">0 g</div>
+    </div>
+    <div class="hand-bar"><div class="fill red" style="width:3%"></div></div>
+    <div class="pct-scrawl">0% — need to reorder asap 🧪</div>
+  </div>
+
+  <div class="add-doodle">
+    <div class="circle">+</div>
+    <div class="caption">~ add new reagent ~</div>
+  </div>
+
+</div>
+</body>
+</html>

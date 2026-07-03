@@ -23,12 +23,13 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Notebook-specific tokens */
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-paper: var(--paper);
+  --color-desk: var(--desk);
   --color-card-fill: var(--card-fill);
   --color-margin-red: var(--margin-red);
+  --color-margin-line: var(--margin-line);
   --color-ruled-line: var(--ruled-line);
   --color-stock-healthy: var(--stock-healthy);
   --color-stock-low: var(--stock-low);
@@ -53,9 +54,10 @@
   --radius: 0.625rem;
 
   /* Notebook palette — light "paper" mode */
-  --background: #FBF7EC;
+  --background: #D9D2BE; /* desk surface (darker tan) */
   --foreground: #2B2A28;
-  --paper: #FBF7EC;
+  --paper: #FBF7EC; /* the notebook page itself */
+  --desk: #D9D2BE;
   --ink: #2B2A28;
   --ink-muted: #6b6559;
   --card: #FEFCF5;
@@ -72,11 +74,12 @@
   --accent: #F3EEDF;
   --accent-foreground: #2B2A28;
   --destructive: #B23A2E;
-  --border: #2B2A28;
+  --border: #3a362e; /* darker card border */
   --input: transparent;
   --ring: #B23A2E;
 
   --margin-red: #B23A2E;
+  --margin-line: #E6B8AE; /* the vertical red margin rule */
   --ruled-line: #D8D2C0;
   --stock-healthy: #5E8C5A;
   --stock-low: #D89A3E;
@@ -84,16 +87,17 @@
   --highlighter: #F3D96B;
 
   --tape-pink: rgba(232, 159, 168, 0.55);
-  --tape-yellow: rgba(243, 217, 107, 0.55);
+  --tape-yellow: rgba(240, 214, 150, 0.55);
   --tape-blue: rgba(159, 197, 224, 0.55);
   --tape-green: rgba(178, 213, 158, 0.55);
 }
 
 .dark {
   /* "Under desk lamp at night" — warm low-light, not a flat invert */
-  --background: #211E19;
+  --background: #15120E;
   --foreground: #EDE6D6;
-  --paper: #211E19;
+  --paper: #221E18;
+  --desk: #15120E;
   --ink: #EDE6D6;
   --ink-muted: #A89E89;
   --card: #2B2621;
@@ -102,7 +106,7 @@
   --popover: #2B2621;
   --popover-foreground: #EDE6D6;
   --primary: #EDE6D6;
-  --primary-foreground: #211E19;
+  --primary-foreground: #221E18;
   --secondary: #3A332B;
   --secondary-foreground: #EDE6D6;
   --muted: #3A332B;
@@ -110,19 +114,20 @@
   --accent: #3A332B;
   --accent-foreground: #EDE6D6;
   --destructive: #D86A5C;
-  --border: #EDE6D6;
+  --border: #5A5247;
   --input: transparent;
   --ring: #D86A5C;
 
   --margin-red: #D86A5C;
-  --ruled-line: #4A4239;
+  --margin-line: #6B4A44;
+  --ruled-line: #3D362E;
   --stock-healthy: #7BAE74;
   --stock-low: #E8B558;
   --stock-critical: #D86A5C;
   --highlighter: #C9A842;
 
   --tape-pink: rgba(180, 110, 120, 0.45);
-  --tape-yellow: rgba(180, 155, 70, 0.45);
+  --tape-yellow: rgba(200, 175, 100, 0.45);
   --tape-blue: rgba(110, 145, 175, 0.45);
   --tape-green: rgba(120, 160, 105, 0.45);
 }
@@ -138,12 +143,50 @@
     font-family: var(--font-body), system-ui, sans-serif;
   }
   body {
-    background-color: var(--paper);
-    background-image:
-      linear-gradient(to bottom, transparent 0, transparent calc(27px - 1px), var(--ruled-line) calc(27px - 1px), var(--ruled-line) 27px);
-    background-size: 100% 27px;
-    background-attachment: local;
+    /* The desk surface — darker tan, the notebook page sits on top */
+    background-color: var(--desk);
   }
+}
+
+/* ============ Notebook page (the centered page) ============ */
+
+/* The .nb-page wrapper looks like a single torn notebook page:
+   - cream paper background
+   - vertical red margin line on the left
+   - horizontal ruled lines (27px repeat)
+   - torn top edge
+   - big drop shadow (page floating on desk) */
+.nb-page {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, transparent 38px, var(--margin-line) 38px, var(--margin-line) 39.5px, transparent 39.5px),
+    linear-gradient(var(--ruled-line) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 27px;
+  background-position: 0 0, 0 0;
+  box-shadow: 0 24px 55px rgba(0, 0, 0, 0.35);
+  position: relative;
+  min-height: 100vh;
+}
+
+.dark .nb-page {
+  box-shadow: 0 24px 55px rgba(0, 0, 0, 0.6);
+}
+
+/* Torn top edge of the page */
+.nb-page::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background-image:
+    linear-gradient(135deg, var(--desk) 50%, transparent 50%),
+    linear-gradient(45deg, var(--desk) 50%, transparent 50%);
+  background-size: 12px 12px;
+  background-color: var(--paper);
+  transform: translateY(-9px);
+  z-index: 1;
 }
 
 /* ============ Notebook utility classes ============ */
@@ -158,97 +201,54 @@
   font-family: var(--font-accent), cursive;
 }
 
-/* Hand-tilted display text */
 .tilt-left {
   transform: rotate(-1.5deg);
 }
 .tilt-right {
   transform: rotate(1.2deg);
 }
-.tilt-slight-left {
-  transform: rotate(-0.8deg);
-}
-.tilt-slight-right {
-  transform: rotate(0.9deg);
-}
 
-/* Notebook card — irregular corners */
+/* Notebook card — irregular corners + drop shadow */
 .nb-card {
   background-color: var(--card-fill);
   border: 1.5px solid var(--border);
   border-radius: 2px 8px 3px 9px / 8px 3px 9px 2px;
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.12);
   position: relative;
 }
 .nb-card-alt {
   background-color: var(--card-fill);
   border: 1.5px solid var(--border);
   border-radius: 8px 3px 9px 2px / 2px 8px 3px 9px;
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.12);
   position: relative;
 }
 
-/* Hatched fill for stock bars */
+/* Hatched fill for stock bars — thicker 4px stripes like the reference */
 .hatch-healthy {
-  background-color: color-mix(in srgb, var(--stock-healthy) 22%, transparent);
-  background-image: repeating-linear-gradient(115deg, var(--stock-healthy) 0, var(--stock-healthy) 1.5px, transparent 1.5px, transparent 6px);
+  background: repeating-linear-gradient(115deg, var(--stock-healthy) 0 4px, color-mix(in srgb, var(--stock-healthy) 80%, #000) 4px 8px);
 }
 .hatch-low {
-  background-color: color-mix(in srgb, var(--stock-low) 22%, transparent);
-  background-image: repeating-linear-gradient(115deg, var(--stock-low) 0, var(--stock-low) 1.5px, transparent 1.5px, transparent 6px);
+  background: repeating-linear-gradient(115deg, var(--stock-low) 0 4px, color-mix(in srgb, var(--stock-low) 85%, #000) 4px 8px);
 }
 .hatch-critical {
-  background-color: color-mix(in srgb, var(--stock-critical) 22%, transparent);
-  background-image: repeating-linear-gradient(115deg, var(--stock-critical) 0, var(--stock-critical) 1.5px, transparent 1.5px, transparent 6px);
+  background: repeating-linear-gradient(115deg, var(--stock-critical) 0 4px, color-mix(in srgb, var(--stock-critical) 85%, #000) 4px 8px);
 }
 
 /* Highlighter swipe behind inline text */
 .highlighter {
-  background-image: linear-gradient(180deg, transparent 40%, var(--highlighter) 40%, var(--highlighter) 92%, transparent 92%);
-  padding: 0 2px;
+  background: linear-gradient(120deg, transparent 0%, var(--highlighter) 0%);
+  padding: 0 3px;
 }
 
-/* Washi tape strip */
+/* Washi tape strip — cleaner, sharper */
 .washi-tape {
   position: absolute;
-  width: 64px;
+  width: 60px;
   height: 22px;
   background-color: var(--tape-yellow);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-.washi-tape::before,
-.washi-tape::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  background-image: linear-gradient(135deg, transparent 50%, var(--card-fill) 50%),
-    linear-gradient(45deg, transparent 50%, var(--card-fill) 50%);
-  background-size: 6px 6px;
-}
-.washi-tape::before {
-  left: 0;
-}
-.washi-tape::after {
-  right: 0;
-  transform: scaleX(-1);
-}
-
-/* Torn paper edge — zigzag top */
-.torn-top {
-  position: relative;
-}
-.torn-top::before {
-  content: "";
-  position: absolute;
-  top: -10px;
-  left: 0;
-  right: 0;
-  height: 11px;
-  background-image: linear-gradient(135deg, transparent 50%, var(--paper) 50%),
-    linear-gradient(225deg, transparent 50%, var(--paper) 50%);
-  background-size: 16px 16px;
-  background-position: 0 0;
-  background-repeat: repeat-x;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  z-index: 2;
 }
 
 /* Ruled-line input — no box, just a bottom rule */
@@ -261,6 +261,7 @@
   width: 100%;
   color: var(--ink);
   font-family: var(--font-body), cursive;
+  font-size: 16px;
 }
 .ruled-input:focus {
   border-bottom-color: var(--margin-red);
@@ -268,13 +269,6 @@
 .ruled-input::placeholder {
   color: var(--ink-muted);
   opacity: 0.6;
-}
-
-/* Ruled paper background for sections that should look like notebook paper */
-.ruled-bg {
-  background-color: var(--card-fill);
-  background-image: linear-gradient(to bottom, transparent 0, transparent calc(27px - 1px), var(--ruled-line) calc(27px - 1px), var(--ruled-line) 27px);
-  background-size: 100% 27px;
 }
 
 /* Circled hand-written button */
@@ -285,10 +279,11 @@
   padding: 6px 16px;
   font-family: var(--font-display), cursive;
   font-weight: 700;
+  font-size: 20px;
   color: var(--ink);
   border: 2px solid var(--ink);
   border-radius: 999px;
-  background: transparent;
+  background: var(--card-fill);
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease;
 }
@@ -303,7 +298,7 @@
 /* Hand-drawn dashed border */
 .dashed-hand {
   border: 2px dashed var(--ink);
-  border-radius: 6px 14px 5px 12px / 12px 5px 14px 6px;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
 }
 
 /* Hide scrollbar for horizontal chip rows */
@@ -332,7 +327,6 @@
   body {
     background: white !important;
     color: black !important;
-    background-image: none !important;
   }
   .no-print {
     display: none !important;
@@ -341,7 +335,7 @@
     border: 1px solid #999 !important;
     border-radius: 0 !important;
     background: white !important;
-    background-image: none !important;
+    box-shadow: none !important;
     transform: none !important;
   }
   .print-clean * {

@@ -57,7 +57,7 @@ export function ApparatusScreen({
   ]];
 
   return (
-    <div className="px-4 pb-24 pt-4 max-w-3xl mx-auto">
+    <div className="pb-24">
       <div className="mb-4">
         <SectionTitle>apparatus shelf</SectionTitle>
       </div>
@@ -118,26 +118,41 @@ export function ApparatusScreen({
         </div>
       )}
 
-      {/* Add FAB */}
-      <button
-        onClick={onAdd}
-        aria-label="add apparatus"
-        className="fixed bottom-24 right-5 sm:right-1/2 sm:translate-x-[280px] z-30"
-        style={{
-          background: "var(--card-fill)",
-          border: "2px solid var(--ink)",
-          borderRadius: "999px",
-          width: "56px",
-          height: "56px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--ink)",
-          boxShadow: "2px 3px 0 var(--ink)",
-        }}
-      >
-        <PlusIcon width="24" height="24" />
-      </button>
+      {/* Add doodle */}
+      <div className="text-center mt-6">
+        <button
+          onClick={onAdd}
+          aria-label="add apparatus"
+          className="inline-flex flex-col items-center gap-1"
+        >
+          <div
+            style={{
+              width: "56px",
+              height: "56px",
+              border: "2.5px solid var(--ink)",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: "var(--font-display), cursive",
+              fontSize: "34px",
+              fontWeight: 700,
+              background: "var(--card-fill)",
+              color: "var(--ink)",
+              lineHeight: 1,
+              paddingBottom: "4px",
+            }}
+          >
+            +
+          </div>
+          <span
+            className="font-display"
+            style={{ fontSize: "16px", color: "var(--ink-muted)", transform: "rotate(-1deg)" }}
+          >
+            ~ add new apparatus ~
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -167,8 +182,12 @@ function ApparatusCard({
     >
       {isFlagged && (
         <div
-          className="absolute -left-1 sm:-left-12 top-4 z-10"
-          style={{ color: "var(--margin-red)" }}
+          className="absolute z-10"
+          style={{
+            left: "-42px",
+            top: "6px",
+            color: "var(--margin-red)",
+          }}
         >
           <MarginNote text={status === "empty" ? "out!" : "low!"} />
         </div>

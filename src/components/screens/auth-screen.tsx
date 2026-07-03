@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLabStore } from "@/lib/store";
 import { BigFlaskDoodle } from "@/components/notebook/icons";
-import { RuledInput, CircledButton, TornEdge } from "@/components/notebook/primitives";
+import { RuledInput, CircledButton } from "@/components/notebook/primitives";
 
 export function AuthScreen() {
   const signIn = useLabStore((s) => s.signIn);
@@ -37,7 +37,7 @@ export function AuthScreen() {
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: "var(--paper)" }}
+      style={{ background: "var(--desk)" }}
     >
       <motion.div
         initial={{ opacity: 0, y: 12, rotate: -2 }}
@@ -45,7 +45,6 @@ export function AuthScreen() {
         transition={{ type: "spring", stiffness: 120, damping: 14 }}
         className="nb-card w-full max-w-sm p-7 relative"
       >
-        <TornEdge />
 
         <div className="flex flex-col items-center text-center mb-5">
           <div style={{ color: "var(--margin-red)" }}>

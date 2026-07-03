@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useLabStore } from "@/lib/store";
 import type { TabKey, Chemical, Apparatus } from "@/lib/types";
 import { AuthScreen } from "@/components/screens/auth-screen";
@@ -24,7 +24,6 @@ import {
   ApparatusLogModal,
   EditApparatusModal,
 } from "@/components/modals/apparatus-modals";
-import { TornEdge } from "@/components/notebook/primitives";
 
 export default function Page() {
   const user = useLabStore((s) => s.user);
@@ -90,48 +89,48 @@ export default function Page() {
   // via the live store subscription below.
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--paper)" }}>
-      <TornEdge className="no-print" />
-
-      <main className="flex-1">
-        {tab === "home" && (
-          <DashboardScreen
-            onNavigate={setTab}
-            onSearch={handleSearch}
-            onQuickAdd={handleQuickAdd}
-            onScan={handleScan}
-          />
-        )}
-        {tab === "chemicals" && (
-          <ChemicalsScreen
-            searchQuery={search}
-            onSearchChange={setSearch}
-            onAdd={() => setAddChemOpen(true)}
-            onOpenDetail={openChemDetail}
-          />
-        )}
-        {tab === "apparatus" && (
-          <ApparatusScreen
-            searchQuery={search}
-            onSearchChange={setSearch}
-            onAdd={() => setAddAppOpen(true)}
-            onOpenDetail={openAppDetail}
-          />
-        )}
-        {tab === "scan" && (
-          <ScannerScreen
-            onScanned={(c) => {
-              openChemDetail(c);
-            }}
-          />
-        )}
-        {tab === "reports" && <ReportsScreen />}
-      </main>
+    <div className="min-h-screen flex flex-col items-center" style={{ background: "var(--desk)" }}>
+      <div className="nb-page w-full max-w-[420px] flex-1 flex flex-col relative">
+        <main className="flex-1 relative" style={{ paddingLeft: "50px", paddingRight: "18px", paddingTop: "20px" }}>
+          {tab === "home" && (
+            <DashboardScreen
+              onNavigate={setTab}
+              onSearch={handleSearch}
+              onQuickAdd={handleQuickAdd}
+              onScan={handleScan}
+            />
+          )}
+          {tab === "chemicals" && (
+            <ChemicalsScreen
+              searchQuery={search}
+              onSearchChange={setSearch}
+              onAdd={() => setAddChemOpen(true)}
+              onOpenDetail={openChemDetail}
+            />
+          )}
+          {tab === "apparatus" && (
+            <ApparatusScreen
+              searchQuery={search}
+              onSearchChange={setSearch}
+              onAdd={() => setAddAppOpen(true)}
+              onOpenDetail={openAppDetail}
+            />
+          )}
+          {tab === "scan" && (
+            <ScannerScreen
+              onScanned={(c) => {
+                openChemDetail(c);
+              }}
+            />
+          )}
+          {tab === "reports" && <ReportsScreen />}
+        </main>
+      </div>
 
       {/* Settings as an overlay screen rather than a tab */}
       {settingsOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "var(--paper)" }}>
-          <div className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between no-print" style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--ruled-line)" }}>
+        <div className="fixed inset-0 z-50 overflow-y-auto nb-page" style={{ maxWidth: "420px", margin: "0 auto" }}>
+          <div className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between no-print" style={{ paddingLeft: "50px", paddingRight: "18px", borderBottom: "1.5px dashed var(--ruled-line)" }}>
             <button
               onClick={() => setSettingsOpen(false)}
               className="font-display text-xl font-semibold underline"

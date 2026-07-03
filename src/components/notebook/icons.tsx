@@ -253,21 +253,21 @@ export function MarginArrow(props: IconProps) {
   );
 }
 
-/** Simple paperclip doodle. */
+/** Simple paperclip doodle — matches reference: tall, top-right of card. */
 export function PaperclipDoodle(props: IconProps) {
   return (
     <svg
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={2.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      viewBox="0 0 24 32"
-      width="20"
-      height="28"
+      viewBox="0 0 28 46"
+      width="28"
+      height="46"
       {...props}
     >
-      <path d="M8 4v18a4 4 0 0 0 8 0V8a2.5 2.5 0 0 0-5 0v13a1 1 0 0 0 2 0V10" />
+      <path d="M8 8 C8 3 20 3 20 10 L20 32 C20 38 12 38 12 32 L12 14" />
     </svg>
   );
 }

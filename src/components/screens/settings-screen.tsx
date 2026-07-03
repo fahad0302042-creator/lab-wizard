@@ -39,7 +39,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="px-4 pb-24 pt-4 max-w-3xl mx-auto">
+    <div className="pb-24">
       <div className="mb-4">
         <SectionTitle>settings</SectionTitle>
       </div>
