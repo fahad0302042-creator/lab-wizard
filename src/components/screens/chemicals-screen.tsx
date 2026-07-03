@@ -1,0 +1,243 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import { useLabStore } from "@/lib/store";
+import type { Chemical } from "@/lib/types";
+import {
+  percentRemaining,
+  stockStatus,
+  stockCaption,
+  statusColor,
+} from "@/lib/utils";
+import {
+  NotebookCard,
+  SectionTitle,
+  HandDrawnBar,
+  FilterPill,
+  MarginNote,
+  Highlighter,
+  CircledButton,
+} from "@/components/notebook/primitives";
+import { PlusIcon, SearchIcon } from "@/components/notebook/icons";
+
+type Filter = "all" | "low" | "critical";
+
+interface ChemicalsProps {
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  onAdd: () => void;
+  onOpenDetail: (c: Chemical) => void;
+}
+
+const TAPE_CYCLE = ["yellow", "blue", "green", "pink", "none", "none"] as const;
+
+export function ChemicalsScreen({
+  searchQuery,
+  onSearchChange,
+  onAdd,
+  onOpenDetail,
+}: ChemicalsProps) {
+  const chemicals = useLabStore((s) => s.chemicals);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+
+  const effectiveSearch = (searchQuery || localSearch).toLowerCase().trim();
+
+  const filtered = useMemo(() => {
+    return chemicals.filter((c) => {
+      const status = stockStatus(c);
+      if (filter === "low" && !(status === "low" || status === "critical")) return false;
+      if (filter === "critical" && status !== "critical" && status !== "empty") return false;
+      if (effectiveSearch) {
+        const hay = `${c.name} ${c.formula} ${c.notes}`.toLowerCase();
+        if (!hay.includes(effectiveSearch)) return false;
+      }
+      return true;
+    });
+  }, [chemicals, filter, effectiveSearch]);
+
+  return (
+    <div className="px-4 pb-24 pt-4 max-w-3xl mx-auto">
+      <div className="mb-4">
+        <SectionTitle>chemicals shelf</SectionTitle>
+      </div>
+
+      {/* Search */}
+      <div className="mb-3 flex items-center gap-2 border-b-2 pb-1" style={{ borderColor: "var(--ruled-line)" }}>
+        <SearchIcon width="18" height="18" style={{ color: "var(--ink-muted)" }} />
+        <input
+          value={localSearch}
+          onChange={(e) => {
+            setLocalSearch(e.target.value);
+            onSearchChange(e.target.value);
+          }}
+          placeholder="search by name, formula, note…"
+          className="flex-1 bg-transparent border-none outline-none font-body text-base"
+          style={{ color: "var(--ink)" }}
+        />
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-4 mb-5">
+        <FilterPill active={filter === "all"} onClick={() => setFilter("all")}>
+          all
+        </FilterPill>
+        <FilterPill active={filter === "low"} onClick={() => setFilter("low")}>
+          low
+        </FilterPill>
+        <FilterPill active={filter === "critical"} onClick={() => setFilter("critical")}>
+          critical
+        </FilterPill>
+        <span
+          className="font-body text-sm ml-auto"
+          style={{ color: "var(--ink-muted)" }}
+        >
+          {filtered.length} of {chemicals.length}
+        </span>
+      </div>
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <NotebookCard tilt={0} className="text-center py-10">
+          <p
+            className="font-display text-2xl font-bold mb-2"
+            style={{ color: "var(--ink)" }}
+          >
+            empty shelf
+          </p>
+          <p className="font-body text-sm" style={{ color: "var(--ink-muted)" }}>
+            {chemicals.length === 0
+              ? "tap the + below to add your first reagent."
+              : "nothing matches your filter — try “all”."}
+          </p>
+        </NotebookCard>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {filtered.map((c, i) => (
+            <ChemicalCard
+              key={c.id}
+              chemical={c}
+              index={i}
+              onOpen={() => onOpenDetail(c)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Add FAB */}
+      <button
+        onClick={onAdd}
+        aria-label="add chemical"
+        className="fixed bottom-24 right-5 sm:right-1/2 sm:translate-x-[280px] z-30"
+        style={{
+          background: "var(--card-fill)",
+          border: "2px solid var(--ink)",
+          borderRadius: "999px",
+          width: "56px",
+          height: "56px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--ink)",
+          boxShadow: "2px 3px 0 var(--ink)",
+        }}
+      >
+        <PlusIcon width="24" height="24" />
+      </button>
+    </div>
+  );
+}
+
+function ChemicalCard({
+  chemical,
+  index,
+  onOpen,
+}: {
+  chemical: Chemical;
+  index: number;
+  onOpen: () => void;
+}) {
+  const status = stockStatus(chemical);
+  const pct = percentRemaining(chemical);
+  const caption = stockCaption(chemical);
+  const tape = TAPE_CYCLE[index % TAPE_CYCLE.length];
+  const isFlagged = status === "low" || status === "critical" || status === "empty";
+  const tilt = index % 2 === 0 ? -0.8 : 0.9;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.04, 0.3) }}
+      className="relative"
+    >
+      {isFlagged && (
+        <div
+          className="absolute -left-1 sm:-left-12 top-4 z-10"
+          style={{ color: "var(--margin-red)" }}
+        >
+          <MarginNote text={status === "empty" ? "empty!" : "order!"} />
+        </div>
+      )}
+      <NotebookCard
+        tape={tape}
+        paperclip={status === "critical" || status === "empty"}
+        tilt={tilt}
+        onClick={onOpen}
+        className="cursor-pointer hover:translate-y-[-2px] transition-transform"
+      >
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="min-w-0 flex-1">
+            <h3
+              className="font-accent font-bold leading-tight truncate"
+              style={{ fontSize: "22px", color: "var(--ink)" }}
+            >
+              {chemical.name}
+            </h3>
+            {chemical.formula && (
+              <p
+                className="font-body text-base"
+                style={{ color: "var(--ink-muted)" }}
+              >
+                {chemical.formula}
+              </p>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <div
+              className="font-body font-bold"
+              style={{ fontSize: "20px", color: "var(--ink)" }}
+            >
+              {chemical.quantity}
+              <span style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
+                {" "}{chemical.unit}
+              </span>
+            </div>
+            <div
+              className="font-body text-xs"
+              style={{ color: "var(--ink-muted)" }}
+            >
+              of {chemical.initial_quantity}
+            </div>
+          </div>
+        </div>
+
+        <HandDrawnBar status={status} percent={pct} className="mt-2" />
+
+        <p
+          className="font-display text-base font-semibold mt-1"
+          style={{ color: statusColor(status) }}
+        >
+          {status === "empty" ? (
+            <>
+              <Highlighter>0% — (empty!)</Highlighter>
+            </>
+          ) : (
+            caption
+          )}
+        </p>
+      </NotebookCard>
+    </motion.div>
+  );
+}

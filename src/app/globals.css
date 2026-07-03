@@ -6,37 +6,43 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Notebook-specific tokens */
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-paper: var(--paper);
+  --color-card-fill: var(--card-fill);
+  --color-margin-red: var(--margin-red);
+  --color-ruled-line: var(--ruled-line);
+  --color-stock-healthy: var(--stock-healthy);
+  --color-stock-low: var(--stock-low);
+  --color-stock-critical: var(--stock-critical);
+  --color-highlighter: var(--highlighter);
+  --color-tape-pink: var(--tape-pink);
+  --color-tape-yellow: var(--tape-yellow);
+  --color-tape-blue: var(--tape-blue);
+  --color-tape-green: var(--tape-green);
+
+  --font-display: var(--font-caveat);
+  --font-body: var(--font-kalam);
+  --font-accent: var(--font-architects);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -45,78 +51,325 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Notebook palette — light "paper" mode */
+  --background: #FBF7EC;
+  --foreground: #2B2A28;
+  --paper: #FBF7EC;
+  --ink: #2B2A28;
+  --ink-muted: #6b6559;
+  --card: #FEFCF5;
+  --card-fill: #FEFCF5;
+  --card-foreground: #2B2A28;
+  --popover: #FEFCF5;
+  --popover-foreground: #2B2A28;
+  --primary: #2B2A28;
+  --primary-foreground: #FEFCF5;
+  --secondary: #F3EEDF;
+  --secondary-foreground: #2B2A28;
+  --muted: #F3EEDF;
+  --muted-foreground: #6b6559;
+  --accent: #F3EEDF;
+  --accent-foreground: #2B2A28;
+  --destructive: #B23A2E;
+  --border: #2B2A28;
+  --input: transparent;
+  --ring: #B23A2E;
+
+  --margin-red: #B23A2E;
+  --ruled-line: #D8D2C0;
+  --stock-healthy: #5E8C5A;
+  --stock-low: #D89A3E;
+  --stock-critical: #B23A2E;
+  --highlighter: #F3D96B;
+
+  --tape-pink: rgba(232, 159, 168, 0.55);
+  --tape-yellow: rgba(243, 217, 107, 0.55);
+  --tape-blue: rgba(159, 197, 224, 0.55);
+  --tape-green: rgba(178, 213, 158, 0.55);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* "Under desk lamp at night" — warm low-light, not a flat invert */
+  --background: #211E19;
+  --foreground: #EDE6D6;
+  --paper: #211E19;
+  --ink: #EDE6D6;
+  --ink-muted: #A89E89;
+  --card: #2B2621;
+  --card-fill: #2B2621;
+  --card-foreground: #EDE6D6;
+  --popover: #2B2621;
+  --popover-foreground: #EDE6D6;
+  --primary: #EDE6D6;
+  --primary-foreground: #211E19;
+  --secondary: #3A332B;
+  --secondary-foreground: #EDE6D6;
+  --muted: #3A332B;
+  --muted-foreground: #A89E89;
+  --accent: #3A332B;
+  --accent-foreground: #EDE6D6;
+  --destructive: #D86A5C;
+  --border: #EDE6D6;
+  --input: transparent;
+  --ring: #D86A5C;
+
+  --margin-red: #D86A5C;
+  --ruled-line: #4A4239;
+  --stock-healthy: #7BAE74;
+  --stock-low: #E8B558;
+  --stock-critical: #D86A5C;
+  --highlighter: #C9A842;
+
+  --tape-pink: rgba(180, 110, 120, 0.45);
+  --tape-yellow: rgba(180, 155, 70, 0.45);
+  --tape-blue: rgba(110, 145, 175, 0.45);
+  --tape-green: rgba(120, 160, 105, 0.45);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+    outline-color: var(--ring);
   }
+  html,
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body), system-ui, sans-serif;
   }
+  body {
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(to bottom, transparent 0, transparent calc(27px - 1px), var(--ruled-line) calc(27px - 1px), var(--ruled-line) 27px);
+    background-size: 100% 27px;
+    background-attachment: local;
+  }
+}
+
+/* ============ Notebook utility classes ============ */
+
+.font-display {
+  font-family: var(--font-display), cursive;
+}
+.font-body {
+  font-family: var(--font-body), cursive;
+}
+.font-accent {
+  font-family: var(--font-accent), cursive;
+}
+
+/* Hand-tilted display text */
+.tilt-left {
+  transform: rotate(-1.5deg);
+}
+.tilt-right {
+  transform: rotate(1.2deg);
+}
+.tilt-slight-left {
+  transform: rotate(-0.8deg);
+}
+.tilt-slight-right {
+  transform: rotate(0.9deg);
+}
+
+/* Notebook card — irregular corners */
+.nb-card {
+  background-color: var(--card-fill);
+  border: 1.5px solid var(--border);
+  border-radius: 2px 8px 3px 9px / 8px 3px 9px 2px;
+  position: relative;
+}
+.nb-card-alt {
+  background-color: var(--card-fill);
+  border: 1.5px solid var(--border);
+  border-radius: 8px 3px 9px 2px / 2px 8px 3px 9px;
+  position: relative;
+}
+
+/* Hatched fill for stock bars */
+.hatch-healthy {
+  background-color: color-mix(in srgb, var(--stock-healthy) 22%, transparent);
+  background-image: repeating-linear-gradient(115deg, var(--stock-healthy) 0, var(--stock-healthy) 1.5px, transparent 1.5px, transparent 6px);
+}
+.hatch-low {
+  background-color: color-mix(in srgb, var(--stock-low) 22%, transparent);
+  background-image: repeating-linear-gradient(115deg, var(--stock-low) 0, var(--stock-low) 1.5px, transparent 1.5px, transparent 6px);
+}
+.hatch-critical {
+  background-color: color-mix(in srgb, var(--stock-critical) 22%, transparent);
+  background-image: repeating-linear-gradient(115deg, var(--stock-critical) 0, var(--stock-critical) 1.5px, transparent 1.5px, transparent 6px);
+}
+
+/* Highlighter swipe behind inline text */
+.highlighter {
+  background-image: linear-gradient(180deg, transparent 40%, var(--highlighter) 40%, var(--highlighter) 92%, transparent 92%);
+  padding: 0 2px;
+}
+
+/* Washi tape strip */
+.washi-tape {
+  position: absolute;
+  width: 64px;
+  height: 22px;
+  background-color: var(--tape-yellow);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.washi-tape::before,
+.washi-tape::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background-image: linear-gradient(135deg, transparent 50%, var(--card-fill) 50%),
+    linear-gradient(45deg, transparent 50%, var(--card-fill) 50%);
+  background-size: 6px 6px;
+}
+.washi-tape::before {
+  left: 0;
+}
+.washi-tape::after {
+  right: 0;
+  transform: scaleX(-1);
+}
+
+/* Torn paper edge — zigzag top */
+.torn-top {
+  position: relative;
+}
+.torn-top::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 11px;
+  background-image: linear-gradient(135deg, transparent 50%, var(--paper) 50%),
+    linear-gradient(225deg, transparent 50%, var(--paper) 50%);
+  background-size: 16px 16px;
+  background-position: 0 0;
+  background-repeat: repeat-x;
+}
+
+/* Ruled-line input — no box, just a bottom rule */
+.ruled-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--ruled-line);
+  outline: none;
+  padding: 4px 2px;
+  width: 100%;
+  color: var(--ink);
+  font-family: var(--font-body), cursive;
+}
+.ruled-input:focus {
+  border-bottom-color: var(--margin-red);
+}
+.ruled-input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.6;
+}
+
+/* Ruled paper background for sections that should look like notebook paper */
+.ruled-bg {
+  background-color: var(--card-fill);
+  background-image: linear-gradient(to bottom, transparent 0, transparent calc(27px - 1px), var(--ruled-line) calc(27px - 1px), var(--ruled-line) 27px);
+  background-size: 100% 27px;
+}
+
+/* Circled hand-written button */
+.circled-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-family: var(--font-display), cursive;
+  font-weight: 700;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.circled-btn:hover {
+  background: var(--ink);
+  color: var(--card-fill);
+}
+.circled-btn:active {
+  transform: scale(0.96);
+}
+
+/* Hand-drawn dashed border */
+.dashed-hand {
+  border: 2px dashed var(--ink);
+  border-radius: 6px 14px 5px 12px / 12px 5px 14px 6px;
+}
+
+/* Hide scrollbar for horizontal chip rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar for vertical lists */
+.nb-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.nb-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nb-scroll::-webkit-scrollbar-thumb {
+  background: var(--ruled-line);
+  border-radius: 3px;
+}
+
+/* Print styles — clean functional output, no hand-drawn flourishes */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    background-image: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-clean {
+    border: 1px solid #999 !important;
+    border-radius: 0 !important;
+    background: white !important;
+    background-image: none !important;
+    transform: none !important;
+  }
+  .print-clean * {
+    font-family: "Times New Roman", Times, serif !important;
+    color: black !important;
+  }
+}
+
+/* Subtle entrance animation */
+@keyframes tapeStick {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--tape-rot, 5deg)) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--tape-rot, 5deg)) translateY(0);
+  }
+}
+.animate-tape {
+  animation: tapeStick 0.4s ease-out both;
+}
+
+@keyframes barFill {
+  from {
+    width: 0;
+  }
+}
+.animate-bar {
+  animation: barFill 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
