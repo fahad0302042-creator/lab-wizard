@@ -118,12 +118,40 @@ export function ReportsScreen() {
 <meta charset="utf-8">
 <title>Lab Wizard — ${tab === "chemical" ? "Chemicals" : "Apparatus"} Report — ${monthLabel(selectedMonth)}</title>
 <style>
-  @page { size: A4; margin: 0; }
-  html, body { margin: 0; padding: 0; background: white; font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; }
+  @page { size: A4; margin: 12mm; }
+  html, body { margin: 0; padding: 0; background: #f0f0f0; font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; }
   * { box-sizing: border-box; }
+  .report-page { background: white; max-width: 210mm; margin: 20px auto; padding: 36px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+  .print-toolbar { position: sticky; top: 0; background: #1a1a1a; color: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; z-index: 100; }
+  .print-btn { background: #fff; color: #1a1a1a; border: none; padding: 8px 20px; font-size: 14px; font-weight: 600; border-radius: 4px; cursor: pointer; font-family: inherit; }
+  .print-btn:hover { background: #f0f0f0; }
+  .print-hint { font-size: 12px; opacity: 0.7; }
+  @media print {
+    body { background: white; }
+    .print-toolbar { display: none !important; }
+    .report-page { margin: 0; padding: 0; box-shadow: none; max-width: none; }
+    @page { size: A4; margin: 12mm; }
+  }
 </style>
 </head>
-<body>${reportHTML}</body>
+<body>
+  <div class="print-toolbar">
+    <span style="font-size: 14px; font-weight: 600;">Lab Wizard Report</span>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <span class="print-hint">click to print / save as PDF</span>
+      <button class="print-btn" onclick="window.print()">🖨 Print</button>
+    </div>
+  </div>
+  <div class="report-page">${reportHTML}</div>
+  <script>
+    // Auto-trigger print after a short delay, but the button is always available
+    window.onload = function() {
+      setTimeout(function() {
+        try { window.print(); } catch(e) {}
+      }, 600);
+    };
+  </script>
+</body>
 </html>`;
 
     // Try opening a new window first (works outside iframes)
@@ -132,14 +160,7 @@ export function ReportsScreen() {
       win.document.write(fullHTML);
       win.document.close();
       win.focus();
-      setTimeout(() => {
-        try {
-          win.print();
-        } catch {
-          // ignore
-        }
-      }, 400);
-      toast.success("report opened in a new tab — use Ctrl/Cmd+P or your browser's print dialog to save as PDF");
+      toast.success("report opened — click the Print button to save as PDF");
     } else {
       // Pop-up blocked (common in iframes) — download the HTML file instead
       const blob = new Blob([fullHTML], { type: "text/html" });
@@ -151,7 +172,7 @@ export function ReportsScreen() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("report downloaded — open the HTML file and print to PDF (Ctrl/Cmd+P)");
+      toast.success("report downloaded — open the HTML file and click Print to save as PDF");
     }
   };
 
