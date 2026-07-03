@@ -127,30 +127,36 @@ export default function Page() {
         </main>
       </div>
 
-      {/* Settings as an overlay screen rather than a tab */}
+      {/* Settings as a full-screen overlay */}
       {settingsOpen && (
         <div
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-full overflow-y-auto z-50 nb-page"
-          style={{ maxWidth: "420px" }}
+          className="fixed inset-0 z-[100] overflow-y-auto"
+          style={{ background: "var(--desk)" }}
         >
           <div
-            className="sticky top-0 z-10 py-3 flex items-center justify-between no-print"
-            style={{
-              paddingLeft: "50px",
-              paddingRight: "18px",
-              borderBottom: "1.5px dashed var(--ruled-line)",
-              background: "var(--paper)",
-            }}
+            className="nb-page w-full max-w-[420px] mx-auto min-h-screen relative"
           >
-            <button
-              onClick={() => setSettingsOpen(false)}
-              className="font-display text-xl font-semibold underline"
-              style={{ color: "var(--ink-muted)", textUnderlineOffset: "3px" }}
+            <div
+              className="sticky top-0 z-10 py-3 flex items-center justify-between no-print"
+              style={{
+                paddingLeft: "50px",
+                paddingRight: "18px",
+                borderBottom: "1.5px dashed var(--ruled-line)",
+                background: "var(--paper)",
+              }}
             >
-              ← back
-            </button>
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="font-display text-xl font-semibold underline"
+                style={{ color: "var(--ink-muted)", textUnderlineOffset: "3px" }}
+              >
+                ← back
+              </button>
+            </div>
+            <div style={{ paddingLeft: "50px", paddingRight: "18px", paddingTop: "20px" }}>
+              <SettingsScreen />
+            </div>
           </div>
-          <SettingsScreen />
         </div>
       )}
 

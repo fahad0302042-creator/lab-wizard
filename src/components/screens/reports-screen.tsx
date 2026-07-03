@@ -103,6 +103,58 @@ export function ReportsScreen() {
     return "";
   };
 
+  const handlePrint = () => {
+    // Find the print-only report element and open it in a new window for printing.
+    // This is more robust in iframe/sandbox environments than window.print().
+    const reportEl = document.querySelector(".print-only");
+    if (!reportEl) {
+      toast.error("no report data to print");
+      return;
+    }
+    const reportHTML = reportEl.innerHTML;
+    const fullHTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lab Wizard — ${tab === "chemical" ? "Chemicals" : "Apparatus"} Report — ${monthLabel(selectedMonth)}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin: 0; padding: 0; background: white; font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>${reportHTML}</body>
+</html>`;
+
+    // Try opening a new window first (works outside iframes)
+    const win = window.open("", "_blank", "width=800,height=900");
+    if (win && !win.closed) {
+      win.document.write(fullHTML);
+      win.document.close();
+      win.focus();
+      setTimeout(() => {
+        try {
+          win.print();
+        } catch {
+          // ignore
+        }
+      }, 400);
+      toast.success("report opened in a new tab — use Ctrl/Cmd+P or your browser's print dialog to save as PDF");
+    } else {
+      // Pop-up blocked (common in iframes) — download the HTML file instead
+      const blob = new Blob([fullHTML], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lab-wizard-report-${selectedMonth}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("report downloaded — open the HTML file and print to PDF (Ctrl/Cmd+P)");
+    }
+  };
+
   return (
     <>
       {/* ============ On-screen notebook version ============ */}
@@ -168,7 +220,7 @@ export function ReportsScreen() {
 
         {/* Actions */}
         <div className="flex items-center gap-3 mb-5">
-          <CircledButton onClick={() => window.print()}>
+          <CircledButton onClick={handlePrint}>
             generate report (PDF)
           </CircledButton>
           <button
