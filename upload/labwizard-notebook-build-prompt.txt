@@ -1,0 +1,300 @@
+# Lab Wizard — Build Prompt (Notebook Edition)
+
+## PROJECT OVERVIEW
+
+Build "Lab Wizard" — a mobile-first chemistry lab inventory app for school/college
+chemistry lab technicians and teachers who manage chemical and apparatus stock
+on their phones. Tracks chemicals, apparatus, consumption, and breakages with
+QR code scanning.
+
+The design language is "Notebook" — a handwritten chemistry lab journal:
+washi tape, hand-drawn progress bars, margin scribbles, ruled paper. Personal
+and organic rather than systematic or templated. No 3D navigation — Classic
+bottom-nav only, kept simple and fast for daily use.
+
+---
+
+## TECH STACK
+
+- Framework: Next.js 16 with App Router (TypeScript), or Vite + React if
+  SSR isn't needed — no functional loss for this app either way
+- Styling: Tailwind CSS 4 (custom tokens per Design System below)
+- Database/Auth: Supabase (PostgreSQL + Auth)
+- Animations: Framer Motion (card tilt-in, hand-bar fill, tape "stick down")
+- QR Codes: qrcode.react (generation) + html5-qrcode (scanning)
+- Fonts: Caveat (weight 600-700, large display text/titles) + Kalam (weight
+  400-700, body and data — names, quantities, all readable content) +
+  Architects Daughter (item names in list context, sparingly — one accent
+  face, not a third body font)
+- Theme: next-themes (dark mode — see Dark Mode note below)
+- Toasts: sonner
+- Icons: lucide-react for utility icons (search, settings, chevrons); hand-
+  drawn SVG doodles for the two signature marks (see Design System)
+
+---
+
+## DESIGN SYSTEM — "NOTEBOOK"
+
+### Color Palette
+
+Light mode (primary — this design is built for a light "paper" feel first):
+- Background: #FBF7EC (cream notebook paper)
+- Card fill: #FEFCF5 (slightly brighter, like a stuck-on index card)
+- Ink (text): #2B2A28 (soft black, not pure black — like ballpoint)
+- Muted ink: #6b6559
+- Red margin rule + annotation pen: #B23A2E
+- Ruled line color: #D8D2C0 (faint horizontal lines, 27px repeat)
+- Healthy stock (hand-bar fill): #5E8C5A green, hatched texture
+- Low stock: #D89A3E amber, hatched texture
+- Critical stock: #B23A2E red, hatched texture
+- Highlighter accent: #F3D96B (used sparingly, only to flag one critical
+  word/status per card — never a full background)
+
+Dark mode: treat as a "under desk lamp at night" variant rather than a true
+inverted theme — deep warm brown-black (#211E19) background, cream ink
+(#EDE6D6) text, cards become a slightly lighter warm charcoal (#2B2621).
+Keep the hand-drawn textures and washi tape (desaturate tape color for
+dark backgrounds). Do not do a flat black/white invert — it breaks the
+"paper" illusion.
+
+### Typography
+
+- Display/headers: Caveat, weight 700, large size (36-44px for page titles),
+  slight rotation (-1 to -2deg) applied via CSS transform for a natural
+  handwritten tilt — never perfectly horizontal
+- Body/data (quantities, formulas, dates, all functional text that must
+  stay legible): Kalam, weight 400-700 — legible handwriting-style but
+  still clearly readable at a glance, this is the workhorse font
+- Item names in list cards: Architects Daughter as an accent, used only
+  for the primary name field in each card — not for buttons, labels, or
+  data
+- A hand-drawn underline SVG squiggle (wavy path, red ink) accompanies
+  major section titles instead of a straight rule
+
+### Card Style — "Notebook Card"
+
+- Off-white index-card fill (#FEFCF5), 1.5px solid dark border, slightly
+  irregular border-radius per corner (e.g.
+  `border-radius: 2px 8px 3px 9px / 8px 3px 9px 2px`) so no two corners
+  match exactly — reads as hand-cut/imperfect, not a design-system rounded
+  rect
+- Each card has a very slight independent rotation (alternate between
+  -0.8deg and +0.9deg, or randomize slightly per item) — cards should
+  never appear perfectly grid-aligned
+- A washi-tape strip (semi-transparent color block, ~60x22px, rotated
+  4-6deg) visually "sticks" a subset of cards to the page — apply to
+  roughly 1 in 3 cards, not all, so it reads as an intentional accent, not
+  a repeated pattern
+- Occasional paperclip doodle (simple SVG line-art) clipped to a card
+  corner, sparingly (e.g. only on cards the user has starred/flagged)
+
+### Stock Indicator — "Hand-Drawn Bar"
+
+- Replaces both the progress-bar and fill-rail patterns from other design
+  explorations — a wobbly-bordered horizontal bar (irregular border-radius,
+  same trick as the card) filled with a diagonal hatched texture
+  (`repeating-linear-gradient(115deg, ...)`) in the status color, NOT a
+  flat solid fill — the hatching is what sells "colored in by hand"
+- Percentage shown as a short handwritten caption below the bar in Caveat,
+  e.g. "86% full — plenty ✓" or "31% — getting low!" — the caption itself
+  carries tone, not just a number
+
+### Margin Annotations
+
+- For flagged items (low/critical stock), a red-ink margin note appears
+  to the left of the card in Caveat script (e.g. "order more!") with a
+  simple hand-drawn curved arrow (SVG path with arrowhead marker) pointing
+  at the relevant card
+- Use sparingly — only for genuinely actionable items (below 50%), never
+  decorative on healthy-stock cards, or it stops meaning anything
+
+### Highlighter Accent
+
+- A single highlighter-yellow swipe (CSS `background: linear-gradient`
+  behind inline text) may be used on ONE short phrase per card maximum
+  (e.g. "(empty!)") to flag the single most important word — not full
+  sentences, not full cards
+
+### Torn Paper Edge
+
+- Top of scrollable pages has a torn/perforated edge effect (zigzag
+  triangle pattern via repeating linear-gradient background trick) in the
+  page background color against the surrounding chrome color
+
+---
+
+## NAVIGATION
+
+Classic bottom nav bar only — 5 tabs: Home, Chemicals, Apparatus, Scan,
+Reports. No 3D navigation mode. Desktop: left sidebar equivalent, same tab
+set. Icons are simple hand-drawn line doodles matching the notebook style
+(flask, beaker, clipboard, scan-brackets, chart) rather than default lucide
+icons, since the nav bar is persistent chrome and benefits most from
+carrying the design language.
+
+---
+
+## SCREENS & FEATURES
+
+### 1. Login / Auth
+- Centered notebook-card on cream paper background, slight rotation
+- Hand-drawn flask doodle above the form
+- Email + password fields with a simple underline-only style (no boxed
+  input) — like writing on ruled paper
+- "sign in" button styled as a circled hand-written word, matching the
+  add-doodle button style
+- Errors: red Caveat annotation below the field, not a boxed alert
+- Supabase auth.signInWithPassword / auth.signUp
+- Session check on mount via supabase.auth.getSession(), listen via
+  onAuthStateChange
+
+### 2. Dashboard
+- Header: handwritten date line + "good morning, [Name]" in Caveat, tilted
+- Global search styled as a ruled-paper search line, not a boxed input
+- 4 KPI notebook-cards (2x2 mobile): Chemicals count, Apparatus count, Low
+  Stock count, This Week consumed — each with a small hand-drawn icon and
+  the number in large Kalam bold
+- 7-Day Activity: hand-drawn-style bar chart (bars have the same hatched
+  fill texture as stock bars), amber (used) / green (added)
+- Quick actions (Scan / Add Chemical / Add Apparatus): circled hand-drawn
+  icon buttons, like the add-doodle button
+- Recent activity feed: informal one-line entries in Kalam, e.g. "used 15mL
+  Ammonia — 2 hours ago"
+- Low stock callout: appears as a margin-note-style annotation at the top
+  of the feed, not a boxed banner
+
+### 3. Chemicals
+- Header "chemicals shelf" in Caveat with hand-drawn underline squiggle
+- Filter pills styled as small circled/underlined handwritten words rather
+  than boxed pills: "all", "low", "critical"
+- List of Notebook Cards as built in the mockup: name (Architects
+  Daughter) + formula (Kalam, muted), quantity top-right, hand-drawn bar +
+  handwritten percentage caption, washi tape on ~1/3 of cards, margin
+  annotations on flagged items
+- Swipe left → quick consume (reveals a torn-edge action strip)
+- "add new reagent" circled-plus doodle button (bottom, centered or FAB
+  position on mobile)
+
+**Add Chemical Modal / Chemical Detail Modal / Consume / Restock / Edit /
+QR View**: same functional flow as original spec (fields, confirm buttons,
+sticky footer, undo toast, backdating with date picker + red-ink warning
+for past dates), restyled as a notebook card overlay — torn-edge top,
+handwritten field labels, circled confirm button.
+
+### 4. Apparatus
+- Same structure as Chemicals, but:
+  - No QR codes
+  - No condition field — only quantity + breakage log
+  - Category filter pills: glassware, balances, heating, measurement, other
+  - Detail modal has 3 actions (log breakage / restock / edit), no QR
+  - Breakage form: red-ink theme, "−1 unit" in Caveat, note field styled
+    as a ruled-line for a written explanation, date picker with backdating
+    warning
+
+### 5. Scanner
+- Camera viewport with a hand-drawn dashed-border viewfinder frame
+  (rounded, imperfect, like chalk on a lens) instead of sharp corner
+  brackets
+- html5-qrcode integration: dynamic import, facingMode "environment",
+  adaptive qrbox (70% of min edge, min 150px), fps 10
+- Camera requires HTTPS
+- Scan result opens the Chemical Detail Modal (notebook-card style) with
+  3 actions (Consume/Breakage, Restock, Dismiss) — does not auto-consume
+- Recently scanned chips: small torn-paper tags, horizontal scroll,
+  localStorage-backed
+- Manual search fallback
+- Print QR labels: kept clean/functional for print (not hand-drawn — a
+  printed label needs to scan reliably), 40 per A4, chemicals only
+
+### 6. Reports
+- Month selector styled as a handwritten dated tab
+- Tab toggle Chemicals/Apparatus as underlined words
+- "generate report" and "clear [month] data" (red ink, underlined not
+  boxed — destructive actions stay text-only, no filled button) actions
+- Table: ruled-paper rows (Kalam data), Name | Stock | −Used | =Left,
+  =Left column color-coded per the status palette
+- Only shows items with usage in the selected month
+- Export as PDF via window.print() — the print stylesheet renders a clean
+  printed page (functional, high-contrast, minimal hand-drawn flourish —
+  same principle as QR labels: printed output prioritizes legibility over
+  personality)
+
+### 7. Settings
+- Dark mode toggle (styled as a simple hand-drawn switch, "day" / "night"
+  handwritten labels)
+- User info + sign out
+- About section (version, GitHub link)
+
+---
+
+## DATA MODEL (unchanged from core spec)
+
+- chemicals: id, name, formula, unit, quantity, initial_quantity, notes,
+  qr_code (uuid), created_at
+- apparatus: id, name, category, quantity, initial_quantity, notes,
+  created_at (no qr_code, no condition field)
+- consumption_logs: id, item_id, item_type (chemical/apparatus), action
+  (consume/restock/breakage), amount, note, logged_at, created_at
+
+Backdating: date picker on every consume/restock/breakage form, default
+today, max today, converts to noon-local ISO timestamp
+(new Date(`${date}T12:00:00`).toISOString()) to avoid timezone edge cases.
+Reports and activity feed respect logged_at.
+
+---
+
+## RULES (carried over from core spec)
+
+1. Apparatus has no QR codes — chemicals only
+2. Apparatus has no condition field — quantity + breakage log only
+3. No seed data — app starts empty; bulk-insert script available separately
+   with real starting quantities if importing existing inventory
+4. All text readable — Kalam is used for anything functional/data-bearing
+   specifically because it stays legible at small sizes; Caveat is
+   reserved for large display text only, never for numbers a user must
+   read quickly under time pressure
+5. No 3D navigation, no glassmorphism, no soft rounded-card defaults —
+   Notebook system throughout, Classic bottom-nav only
+6. Dark mode is a "warm low-light" variant, not a flat color invert — see
+   Dark Mode note above
+7. Camera scanning requires HTTPS
+8. QR labels and printed reports stay clean/functional — hand-drawn
+   flourish is for the in-app experience, not printed output that needs
+   to scan or be filed
+9. Reports show only used items for the selected month
+10. Backdating supported on every logging action
+11. Undo toasts last 5 seconds, restore quantity + remove log entry
+12. Haptic feedback on key interactions (Android only)
+13. Offline mode caches last-known data in localStorage
+14. Hand-drawn/rotation effects (card tilt, washi tape, margin notes) are
+    applied with intentional restraint per the ratios specified above
+    (e.g. tape on ~1/3 of cards) — the goal is "personal notebook," not
+    visual noise; if every element is decorated, nothing reads as special
+
+---
+
+## DEPLOYMENT
+
+1. Push to GitHub, import to Vercel
+2. Env vars: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+3. Create user in Supabase Auth
+4. Test on a real phone — camera requires HTTPS, Vercel provides this
+   automatically
+
+---
+
+## SUMMARY
+
+Lab Wizard, rebuilt with a "Notebook" design system: handwriting typography
+(Caveat + Kalam + Architects Daughter), washi-tape-accented index cards
+with independent tilt, hand-drawn hatched-fill progress bars with
+handwritten captions, red-ink margin annotations with hand-drawn arrows
+on flagged items, and a torn-paper page edge — evoking an actual chemistry
+lab notebook rather than a templated productivity app. 3D ring navigation
+has been dropped entirely in favor of a simple, fast Classic bottom-nav.
+All core functionality — chemicals/apparatus CRUD, QR scanning,
+consumption and breakage logging, backdating, undo toasts, month-based
+reports, offline caching — is preserved from the original spec, with
+printed/exported output (QR labels, PDF reports) deliberately kept clean
+and functional rather than hand-drawn, since those need to stay legible
+and scannable outside the app.
