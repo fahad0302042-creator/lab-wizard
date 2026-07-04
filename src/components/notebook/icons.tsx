@@ -98,6 +98,28 @@ export function SearchIcon(props: IconProps) {
   );
 }
 
+export function ShareIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <circle cx="18" cy="18" r="2.5" />
+      <path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" />
+    </svg>
+  );
+}
+
+export function PrintIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M7 9V3h10v6" />
+      <path d="M5 9h14a2 2 0 0 1 2 2v6h-4" />
+      <path d="M5 17H3v-6a2 2 0 0 1 2-2" />
+      <path d="M7 14h10v7H7z" />
+    </svg>
+  );
+}
+
 export function MinusIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

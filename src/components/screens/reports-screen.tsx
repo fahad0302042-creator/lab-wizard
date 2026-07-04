@@ -16,6 +16,7 @@ import {
   percentRemaining,
   stockStatus,
 } from "@/lib/utils";
+import { ShareIcon, PrintIcon } from "@/components/notebook/icons";
 import type { ItemType } from "@/lib/types";
 
 interface ReportRow {
@@ -103,20 +104,18 @@ export function ReportsScreen() {
     return "";
   };
 
-  const handlePrint = () => {
-    // Find the print-only report element and open it in a new window for printing.
-    // This is more robust in iframe/sandbox environments than window.print().
+  const buildReportHTML = () => {
     const reportEl = document.querySelector(".print-only");
-    if (!reportEl) {
-      toast.error("no report data to print");
-      return;
-    }
+    if (!reportEl) return null;
     const reportHTML = reportEl.innerHTML;
-    const fullHTML = `<!DOCTYPE html>
+    const title = `Lab Wizard — ${tab === "chemical" ? "Chemicals" : "Apparatus"} Report — ${monthLabel(selectedMonth)}`;
+    return {
+      title,
+      html: `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Lab Wizard — ${tab === "chemical" ? "Chemicals" : "Apparatus"} Report — ${monthLabel(selectedMonth)}</title>
+<title>${title}</title>
 <style>
   @page { size: A4; margin: 12mm; }
   html, body { margin: 0; padding: 0; background: #f0f0f0; font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; }
@@ -143,27 +142,35 @@ export function ReportsScreen() {
     </div>
   </div>
   <div class="report-page">${reportHTML}</div>
-  <script>
-    // Auto-trigger print after a short delay, but the button is always available
-    window.onload = function() {
-      setTimeout(function() {
-        try { window.print(); } catch(e) {}
-      }, 600);
-    };
-  </script>
 </body>
-</html>`;
+</html>`,
+    };
+  };
+
+  const handlePrint = () => {
+    const built = buildReportHTML();
+    if (!built) {
+      toast.error("no report data to print");
+      return;
+    }
 
     // Try opening a new window first (works outside iframes)
     const win = window.open("", "_blank", "width=800,height=900");
     if (win && !win.closed) {
-      win.document.write(fullHTML);
+      win.document.write(built.html);
       win.document.close();
       win.focus();
+      setTimeout(() => {
+        try {
+          win.print();
+        } catch {
+          // ignore
+        }
+      }, 600);
       toast.success("report opened — click the Print button to save as PDF");
     } else {
       // Pop-up blocked (common in iframes) — download the HTML file instead
-      const blob = new Blob([fullHTML], { type: "text/html" });
+      const blob = new Blob([built.html], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -174,6 +181,64 @@ export function ReportsScreen() {
       URL.revokeObjectURL(url);
       toast.success("report downloaded — open the HTML file and click Print to save as PDF");
     }
+  };
+
+  const handleShare = async () => {
+    const built = buildReportHTML();
+    if (!built) {
+      toast.error("no report data to share");
+      return;
+    }
+
+    const filename = `lab-wizard-report-${selectedMonth}.html`;
+    const file = new File([built.html], filename, { type: "text/html" });
+    const shareData = {
+      title: built.title,
+      text: `${tab === "chemical" ? "Chemicals" : "Apparatus"} usage report for ${monthLabel(selectedMonth)} — ${rows.length} items, ${totalUsed} used.`,
+    };
+
+    // Try Web Share API with file (works on mobile — WhatsApp, email, etc.)
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        // Some browsers support file sharing, others only text
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ ...shareData, files: [file] });
+          toast.success("report shared");
+        } else {
+          // Fallback: share text + download the file
+          await navigator.share(shareData);
+          // Also trigger a download so the user has the file
+          const blob = new Blob([built.html], { type: "text/html" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          toast.success("report shared — HTML file also saved to your device");
+        }
+        return;
+      } catch (err) {
+        // User cancelled or share failed — fall through to download
+        if (err instanceof Error && err.name === "AbortError") {
+          return; // user cancelled, no toast
+        }
+      }
+    }
+
+    // Fallback: download the HTML file (desktop / no Web Share API)
+    const blob = new Blob([built.html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("report downloaded — share the HTML file via WhatsApp or email");
   };
 
   return (
@@ -240,10 +305,15 @@ export function ReportsScreen() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 mb-5">
-          <CircledButton onClick={handlePrint}>
-            generate report (PDF)
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <CircledButton onClick={handleShare}>
+            <ShareIcon width="16" height="16" /> share
           </CircledButton>
+          <CircledButton onClick={handlePrint}>
+            <PrintIcon width="16" height="16" /> print / PDF
+          </CircledButton>
+        </div>
+        <div className="flex items-center gap-3 mb-5">
           <button
             onClick={handleClear}
             className="font-display text-lg font-semibold underline"
@@ -334,7 +404,7 @@ export function ReportsScreen() {
           className="font-body text-xs mt-4 text-center"
           style={{ color: "var(--ink-muted)" }}
         >
-          only items with usage this month are shown. "generate report" opens your browser's print dialog — save as PDF for a clean copy.
+          only items with usage this month are shown. tap "share" to send via WhatsApp/email, or "print / PDF" to save as PDF.
         </p>
       </div>
 
