@@ -70,7 +70,7 @@ function AddApparatusForm({ onClose }: { onClose: () => void }) {
   const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) {
       toast.error("give it a name first");
       return;
@@ -80,9 +80,13 @@ function AddApparatusForm({ onClose }: { onClose: () => void }) {
       toast.error("quantity needs to be a number ≥ 0");
       return;
     }
-    addApparatus({ name, category, quantity: qty, notes });
-    toast.success(`added ${name}`);
-    onClose();
+    try {
+      await addApparatus({ name, category, quantity: qty, notes });
+      toast.success(`added ${name}`);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't add apparatus");
+    }
   };
 
   return (
@@ -280,7 +284,7 @@ function ApparatusLogForm({
   const today = todayLocalDate();
   const isBackdated = date !== today;
 
-  const submit = () => {
+  const submit = async () => {
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error("amount must be > 0");
@@ -290,28 +294,32 @@ function ApparatusLogForm({
       toast.error(`only ${apparatus.quantity} on hand`);
       return;
     }
-    const undo = logAction({
-      itemId: apparatus.id,
-      itemType: "apparatus",
-      action,
-      amount: amt,
-      note,
-      date,
-    });
-    toast.success(
-      `${isBreakage ? "logged breakage of" : "restocked"} ${amt} ${apparatus.name}`,
-      {
-        duration: 5000,
-        action: {
-          label: "undo",
-          onClick: () => {
-            undo();
-            toast.info("undone");
+    try {
+      const undo = await logAction({
+        itemId: apparatus.id,
+        itemType: "apparatus",
+        action,
+        amount: amt,
+        note,
+        date,
+      });
+      toast.success(
+        `${isBreakage ? "logged breakage of" : "restocked"} ${amt} ${apparatus.name}`,
+        {
+          duration: 5000,
+          action: {
+            label: "undo",
+            onClick: async () => {
+              await undo();
+              toast.info("undone");
+            },
           },
-        },
-      }
-    );
-    onClose();
+        }
+      );
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't log action");
+    }
   };
 
   return (
@@ -416,24 +424,32 @@ function EditApparatusForm({
   const [category, setCategory] = useState<ApparatusCategory>(apparatus.category);
   const [notes, setNotes] = useState(apparatus.notes);
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) {
       toast.error("name can't be empty");
       return;
     }
-    updateApparatus(apparatus.id, {
-      name: name.trim(),
-      category,
-      notes: notes.trim(),
-    });
-    toast.success("updated");
-    onClose();
+    try {
+      await updateApparatus(apparatus.id, {
+        name: name.trim(),
+        category,
+        notes: notes.trim(),
+      });
+      toast.success("updated");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't update");
+    }
   };
 
-  const remove = () => {
-    deleteApparatus(apparatus.id);
-    toast.success(`removed ${apparatus.name}`);
-    onClose();
+  const remove = async () => {
+    try {
+      await deleteApparatus(apparatus.id);
+      toast.success(`removed ${apparatus.name}`);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't delete");
+    }
   };
 
   return (

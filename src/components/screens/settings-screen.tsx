@@ -22,20 +22,28 @@ export function SettingsScreen() {
 
   const isDark = theme === "dark";
 
-  const handleSignOut = () => {
-    signOut();
-    toast.success("signed out — see you soon");
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success("signed out — see you soon");
+    } catch {
+      toast.error("couldn't sign out");
+    }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (
       !confirm(
-        "Reset ALL data? This wipes chemicals, apparatus, and logs from your browser. Cannot be undone."
+        "Reset ALL data? This wipes chemicals, apparatus, and logs. Cannot be undone."
       )
     )
       return;
-    resetAll();
-    toast.success("all data wiped — fresh notebook");
+    try {
+      await resetAll();
+      toast.success("all data wiped — fresh notebook");
+    } catch {
+      toast.error("couldn't reset data");
+    }
   };
 
   return (

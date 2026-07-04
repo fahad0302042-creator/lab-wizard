@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLabStore } from "@/lib/store";
 import type { TabKey, Chemical, Apparatus } from "@/lib/types";
 import { AuthScreen } from "@/components/screens/auth-screen";
@@ -27,6 +27,21 @@ import {
 
 export default function Page() {
   const user = useLabStore((s) => s.user);
+  const restoreSession = useLabStore((s) => s.restoreSession);
+  const [restoring, setRestoring] = useState(true);
+
+  // Restore Supabase session on mount (if configured)
+  useEffect(() => {
+    const restore = async () => {
+      try {
+        await restoreSession();
+      } catch {
+        // ignore
+      }
+      setRestoring(false);
+    };
+    restore();
+  }, [restoreSession]);
 
   const [tab, setTab] = useState<TabKey>("home");
   const [search, setSearch] = useState("");
@@ -54,10 +69,6 @@ export default function Page() {
   const [editAppOpen, setEditAppOpen] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  if (!user) {
-    return <AuthScreen />;
-  }
 
   const openChemDetail = (c: Chemical) => {
     setDetailChem(c);
@@ -87,6 +98,31 @@ export default function Page() {
   // After a log action, refresh the detail modal's chemical reference so
   // quantities stay in sync. We pull fresh from the store on each render
   // via the live store subscription below.
+
+  if (restoring) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--desk)" }}
+      >
+        <div
+          className="nb-card p-8"
+          style={{ textAlign: "center" }}
+        >
+          <p
+            className="font-display text-2xl font-bold"
+            style={{ color: "var(--ink)" }}
+          >
+            opening your notebook…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
 
   return (
     <div id="app-root" className="min-h-screen flex flex-col items-center" style={{ background: "var(--desk)" }}>

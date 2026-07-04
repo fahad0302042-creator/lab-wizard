@@ -34,7 +34,7 @@ function AddChemicalForm({ onClose }: { onClose: () => void }) {
   const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) {
       toast.error("give it a name first");
       return;
@@ -44,9 +44,13 @@ function AddChemicalForm({ onClose }: { onClose: () => void }) {
       toast.error("quantity needs to be a number ≥ 0");
       return;
     }
-    addChemical({ name, formula, unit, quantity: qty, notes });
-    toast.success(`added ${name} to the shelf`);
-    onClose();
+    try {
+      await addChemical({ name, formula, unit, quantity: qty, notes });
+      toast.success(`added ${name} to the shelf`);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't add chemical");
+    }
   };
 
   return (
@@ -265,7 +269,7 @@ function ChemicalLogForm({
   const today = todayLocalDate();
   const isBackdated = date !== today;
 
-  const submit = () => {
+  const submit = async () => {
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error("amount must be > 0");
@@ -275,25 +279,29 @@ function ChemicalLogForm({
       toast.error(`only ${chemical.quantity} ${chemical.unit} on hand`);
       return;
     }
-    const undo = logAction({
-      itemId: chemical.id,
-      itemType: "chemical",
-      action,
-      amount: amt,
-      note,
-      date,
-    });
-    toast.success(`${verbPast} ${amt} ${chemical.unit} of ${chemical.name}`, {
-      duration: 5000,
-      action: {
-        label: "undo",
-        onClick: () => {
-          undo();
-          toast.info("undone — quantity restored");
+    try {
+      const undo = await logAction({
+        itemId: chemical.id,
+        itemType: "chemical",
+        action,
+        amount: amt,
+        note,
+        date,
+      });
+      toast.success(`${verbPast} ${amt} ${chemical.unit} of ${chemical.name}`, {
+        duration: 5000,
+        action: {
+          label: "undo",
+          onClick: async () => {
+            await undo();
+            toast.info("undone — quantity restored");
+          },
         },
-      },
-    });
-    onClose();
+      });
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't log action");
+    }
   };
 
   return (
@@ -382,25 +390,33 @@ function EditChemicalForm({
   const [unit, setUnit] = useState<ChemicalUnit>(chemical.unit);
   const [notes, setNotes] = useState(chemical.notes);
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) {
       toast.error("name can't be empty");
       return;
     }
-    updateChemical(chemical.id, {
-      name: name.trim(),
-      formula: formula.trim(),
-      unit,
-      notes: notes.trim(),
-    });
-    toast.success("updated");
-    onClose();
+    try {
+      await updateChemical(chemical.id, {
+        name: name.trim(),
+        formula: formula.trim(),
+        unit,
+        notes: notes.trim(),
+      });
+      toast.success("updated");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't update");
+    }
   };
 
-  const remove = () => {
-    deleteChemical(chemical.id);
-    toast.success(`removed ${chemical.name}`);
-    onClose();
+  const remove = async () => {
+    try {
+      await deleteChemical(chemical.id);
+      toast.success(`removed ${chemical.name}`);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't delete");
+    }
   };
 
   return (

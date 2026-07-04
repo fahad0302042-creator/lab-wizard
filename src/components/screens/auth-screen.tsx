@@ -4,18 +4,23 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLabStore } from "@/lib/store";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { BigFlaskDoodle } from "@/components/notebook/icons";
 import { RuledInput, CircledButton } from "@/components/notebook/primitives";
 
 export function AuthScreen() {
   const signIn = useLabStore((s) => s.signIn);
+  const signUp = useLabStore((s) => s.signUp);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const usingSupabase = isSupabaseConfigured();
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!email.trim() || !email.includes("@")) {
@@ -30,8 +35,21 @@ export function AuthScreen() {
       setError("add your name so we can say hi properly");
       return;
     }
-    signIn(email.trim(), mode === "signup" ? name.trim() : undefined);
-    toast.success("welcome to your lab notebook!");
+
+    setBusy(true);
+    try {
+      if (mode === "signin") {
+        await signIn(email.trim(), password);
+      } else {
+        await signUp(email.trim(), password, name.trim());
+      }
+      toast.success("welcome to your lab notebook!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "something went wrong";
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -115,8 +133,8 @@ export function AuthScreen() {
             >
               {mode === "signin" ? "need an account?" : "have one already?"}
             </button>
-            <CircledButton type="submit">
-              {mode === "signin" ? "sign in" : "sign up"}
+            <CircledButton type="submit" disabled={busy}>
+              {busy ? "…" : mode === "signin" ? "sign in" : "sign up"}
             </CircledButton>
           </div>
         </form>
@@ -125,9 +143,9 @@ export function AuthScreen() {
           className="font-body text-xs text-center mt-5"
           style={{ color: "var(--ink-muted)" }}
         >
-          demo mode — any email + password works.
-          <br />
-          data is saved in your browser.
+          {usingSupabase
+            ? "sign in with your email + password."
+            : "demo mode — any email + password works. data is saved in your browser."}
         </p>
       </motion.div>
     </div>
