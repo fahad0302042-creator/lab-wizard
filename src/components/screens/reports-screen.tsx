@@ -86,15 +86,19 @@ export function ReportsScreen() {
   const totalAdded = rows.reduce((s, r) => s + r.added, 0);
   const criticalCount = rows.filter((r) => r.pct < 20).length;
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (
       !confirm(
         `Clear all log entries for ${monthLabel(selectedMonth)}? This cannot be undone.`
       )
     )
       return;
-    clearMonth(selectedMonth);
-    toast.success(`cleared ${monthLabel(selectedMonth)} data`);
+    try {
+      await clearMonth(selectedMonth);
+      toast.success(`cleared ${monthLabel(selectedMonth)} data`);
+    } catch {
+      toast.error("couldn't clear month data");
+    }
   };
 
   // Determine asterisk for a row: ** below 20%, * below 50%
