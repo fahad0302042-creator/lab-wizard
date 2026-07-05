@@ -52,8 +52,8 @@ create table if not exists public.consumption_logs (
 create index if not exists idx_chemicals_user on public.chemicals(user_id);
 create index if not exists idx_apparatus_user on public.apparatus(user_id);
 create index if not exists idx_logs_user on public.consumption_logs(user_id);
-create index if not exists idx_logs_user_month on public.consumption_logs(user_id, (logged_at::date));
 create index if not exists idx_logs_item on public.consumption_logs(item_id);
+create index if not exists idx_logs_logged_at on public.consumption_logs(logged_at);
 
 -- =============================================================================
 -- ROW LEVEL SECURITY
