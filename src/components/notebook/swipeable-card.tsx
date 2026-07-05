@@ -76,7 +76,7 @@ export function SwipeableCard({
 
   return (
     <div style={{ position: "relative", overflow: "hidden" }}>
-      {/* Action strip behind the card */}
+      {/* Action strip behind the card — springs in when revealed */}
       <div
         onClick={handleActionClick}
         style={{
@@ -95,6 +95,10 @@ export function SwipeableCard({
           fontWeight: 700,
           cursor: "pointer",
           borderRadius: "0 8px 8px 0",
+          transform: showAction ? "scaleX(1)" : "scaleX(0.8)",
+          opacity: showAction ? 1 : 0.5,
+          transition: "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease",
+          transformOrigin: "right center",
         }}
       >
         {actionLabel}

@@ -73,10 +73,13 @@ export const NotebookCard = forwardRef<HTMLDivElement, NotebookCardProps>(
     return (
       <div
         ref={ref}
-        className={clsx(variant === "a" ? "nb-card" : "nb-card-alt", "p-4", className)}
-        style={{
-          transform: `rotate(${tiltDeg}deg)`,
-        }}
+        className={clsx(variant === "a" ? "nb-card" : "nb-card-alt", "p-4", "nb-card-hover", className)}
+        style={
+          {
+            "--tilt": `${tiltDeg}deg`,
+            transform: `rotate(var(--tilt))`,
+          } as React.CSSProperties
+        }
         {...rest}
       >
         {tape !== "none" && (

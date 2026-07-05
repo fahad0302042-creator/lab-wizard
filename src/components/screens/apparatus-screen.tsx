@@ -19,6 +19,7 @@ import {
   Highlighter,
 } from "@/components/notebook/primitives";
 import { PlusIcon, SearchIcon } from "@/components/notebook/icons";
+import { PullToRefresh } from "@/components/notebook/pull-to-refresh";
 
 interface ApparatusProps {
   searchQuery: string;
@@ -57,6 +58,7 @@ export function ApparatusScreen({
   ]];
 
   return (
+    <PullToRefresh onRefresh={async () => { /* data is reactive via Supabase */ }}>
     <div className="pb-24">
       <div className="mb-4">
         <SectionTitle>apparatus shelf</SectionTitle>
@@ -154,6 +156,7 @@ export function ApparatusScreen({
         </button>
       </div>
     </div>
+    </PullToRefresh>
   );
 }
 

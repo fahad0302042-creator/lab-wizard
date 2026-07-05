@@ -21,6 +21,7 @@ import {
 } from "@/components/notebook/primitives";
 import { PlusIcon, SearchIcon, QrIcon } from "@/components/notebook/icons";
 import { SwipeableCard } from "@/components/notebook/swipeable-card";
+import { PullToRefresh } from "@/components/notebook/pull-to-refresh";
 
 type Filter = "all" | "low" | "critical";
 
@@ -63,6 +64,7 @@ export function ChemicalsScreen({
   }, [chemicals, filter, effectiveSearch]);
 
   return (
+    <PullToRefresh onRefresh={async () => { /* data is reactive via Supabase */ }}>
     <div className="pb-24">
       <div className="mb-4">
         <SectionTitle>chemicals shelf</SectionTitle>
@@ -180,6 +182,7 @@ export function ChemicalsScreen({
         </button>
       </div>
     </div>
+    </PullToRefresh>
   );
 }
 

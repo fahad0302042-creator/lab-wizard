@@ -59,7 +59,10 @@ export default function RootLayout({
               borderRadius: "2px 8px 3px 9px / 8px 3px 9px 2px",
               fontFamily: "var(--font-body), cursive",
               color: "var(--ink)",
+              transform: "rotate(-1deg)",
+              boxShadow: "2px 3px 8px rgba(0,0,0,0.15)",
             },
+            className: "nb-toast",
           }}
         />
       </body>

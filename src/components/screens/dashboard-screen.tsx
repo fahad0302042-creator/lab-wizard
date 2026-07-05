@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useLabStore } from "@/lib/store";
+import { CountUp } from "@/components/notebook/count-up";
 import {
   fullDateLine,
   greeting,
@@ -162,12 +163,11 @@ export function DashboardScreen({
           <div style={{ color: "var(--ink-muted)" }}>
             <FlaskIcon width="22" height="22" />
           </div>
-          <div
+          <CountUp
+            value={chemicals.length}
             className="font-body font-bold"
             style={{ fontSize: "32px", lineHeight: 1, color: "var(--ink)" }}
-          >
-            {chemicals.length}
-          </div>
+          />
           <div className="font-body text-sm" style={{ color: "var(--ink-muted)" }}>
             chemicals
           </div>
@@ -177,12 +177,11 @@ export function DashboardScreen({
           <div style={{ color: "var(--ink-muted)" }}>
             <BeakerIcon width="22" height="22" />
           </div>
-          <div
+          <CountUp
+            value={apparatus.length}
             className="font-body font-bold"
             style={{ fontSize: "32px", lineHeight: 1, color: "var(--ink)" }}
-          >
-            {apparatus.length}
-          </div>
+          />
           <div className="font-body text-sm" style={{ color: "var(--ink-muted)" }}>
             apparatus
           </div>
@@ -196,12 +195,11 @@ export function DashboardScreen({
           <div style={{ color: "var(--stock-low)" }}>
             <PlusIcon width="22" height="22" style={{ transform: "rotate(45deg)" }} />
           </div>
-          <div
+          <CountUp
+            value={lowStock.length}
             className="font-body font-bold"
             style={{ fontSize: "32px", lineHeight: 1, color: "var(--margin-red)" }}
-          >
-            {lowStock.length}
-          </div>
+          />
           <div className="font-body text-sm" style={{ color: "var(--ink-muted)" }}>
             low stock
           </div>
@@ -211,12 +209,11 @@ export function DashboardScreen({
           <div style={{ color: "var(--stock-healthy)" }}>
             <FlaskIcon width="22" height="22" />
           </div>
-          <div
+          <CountUp
+            value={consumedThisWeek}
             className="font-body font-bold"
             style={{ fontSize: "32px", lineHeight: 1, color: "var(--ink)" }}
-          >
-            {consumedThisWeek}
-          </div>
+          />
           <div className="font-body text-sm" style={{ color: "var(--ink-muted)" }}>
             used this week
           </div>

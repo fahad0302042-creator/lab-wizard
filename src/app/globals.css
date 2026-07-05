@@ -215,6 +215,7 @@
   border-radius: 2px 8px 3px 9px / 8px 3px 9px 2px;
   box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.12);
   position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .nb-card-alt {
   background-color: var(--card-fill);
@@ -222,6 +223,15 @@
   border-radius: 8px 3px 9px 2px / 2px 8px 3px 9px;
   box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.12);
   position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 3D tilt on hover (desktop only — feels like lifting a card off the page) */
+@media (hover: hover) and (pointer: fine) {
+  .nb-card-hover:hover {
+    transform: rotate(0deg) translateY(-3px) scale(1.01) !important;
+    box-shadow: 4px 8px 16px rgba(0, 0, 0, 0.18) !important;
+  }
 }
 
 /* Hatched fill for stock bars — thicker 4px stripes like the reference */
