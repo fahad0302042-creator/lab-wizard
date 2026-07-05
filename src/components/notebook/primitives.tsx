@@ -117,10 +117,12 @@ interface HandDrawnBarProps {
 
 export function HandDrawnBar({ status, percent, className }: HandDrawnBarProps) {
   const pct = Math.max(0, Math.min(100, percent));
+  const isCritical = status === "critical" || status === "empty";
   return (
     <div
       className={clsx(
         "relative w-full overflow-hidden",
+        isCritical && "animate-critical-pulse",
         className
       )}
       style={{

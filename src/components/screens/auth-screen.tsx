@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLabStore } from "@/lib/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { BigFlaskDoodle } from "@/components/notebook/icons";
 import { RuledInput, CircledButton } from "@/components/notebook/primitives";
 
 export function AuthScreen() {
@@ -65,9 +64,16 @@ export function AuthScreen() {
       >
 
         <div className="flex flex-col items-center text-center mb-5">
-          <div style={{ color: "var(--margin-red)" }}>
-            <BigFlaskDoodle />
-          </div>
+          <motion.img
+            src="/logo.png"
+            alt="Lab Wizard"
+            width={96}
+            height={96}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 12, delay: 0.1 }}
+            style={{ marginBottom: "8px" }}
+          />
           <h1
             className="font-display font-bold mt-2"
             style={{ fontSize: "40px", color: "var(--ink)" }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { clsx } from "clsx";
 import { CloseIcon } from "./icons";
 import { TornEdge } from "./primitives";
@@ -49,18 +50,21 @@ export function Modal({
       style={{ background: "rgba(43, 42, 40, 0.45)" }}
       onClick={onClose}
     >
-      <div
+      <motion.div
         onClick={(e) => e.stopPropagation()}
         className={clsx(
           "relative w-full overflow-hidden",
           maxW,
           variant === "notebook" ? "nb-card-alt" : "nb-card-alt"
         )}
+        initial={{ scale: 0.92, opacity: 0, y: 20, rotate: -1.5 }}
+        animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 10 }}
+        transition={{ type: "spring", stiffness: 300, damping: 24 }}
         style={{
           background: "var(--card-fill)",
           borderColor: "var(--border)",
           maxHeight: "92vh",
-          transform: "rotate(0deg)",
         }}
       >
         {variant === "notebook" && <TornEdge className="no-print" />}
@@ -102,7 +106,7 @@ export function Modal({
             {footer}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

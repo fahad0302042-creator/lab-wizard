@@ -27,7 +27,8 @@ export const metadata: Metadata = {
   description:
     "A handwritten lab notebook for tracking chemicals, apparatus, consumption and breakages with QR scanning.",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.png",
+    apple: "/logo.png",
   },
 };
 

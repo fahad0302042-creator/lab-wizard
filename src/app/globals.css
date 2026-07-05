@@ -446,3 +446,32 @@
 .animate-bar {
   animation: barFill 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+
+/* Pulse for critical/empty stock bars — draws attention without being annoying */
+@keyframes criticalPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+.animate-critical-pulse {
+  animation: criticalPulse 2s ease-in-out infinite;
+}
+
+/* Ink stamp effect for button press */
+@keyframes inkStamp {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.88) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-ink-stamp {
+  animation: inkStamp 0.2s ease-out;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLabStore } from "@/lib/store";
 import type { TabKey, Chemical, Apparatus } from "@/lib/types";
 import { AuthScreen } from "@/components/screens/auth-screen";
@@ -130,6 +131,14 @@ export default function Page() {
     <div id="app-root" className="min-h-screen flex flex-col items-center" style={{ background: "var(--desk)" }}>
       <div className="nb-page w-full max-w-[420px] flex-1 flex flex-col relative">
         <main className="flex-1 relative" style={{ paddingLeft: "50px", paddingRight: "18px", paddingTop: "20px" }}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
           {tab === "home" && (
             <DashboardScreen
               onNavigate={setTab}
@@ -168,6 +177,8 @@ export default function Page() {
             />
           )}
           {tab === "reports" && <ReportsScreen />}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
