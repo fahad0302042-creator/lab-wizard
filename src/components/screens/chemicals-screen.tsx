@@ -19,7 +19,8 @@ import {
   Highlighter,
   CircledButton,
 } from "@/components/notebook/primitives";
-import { PlusIcon, SearchIcon } from "@/components/notebook/icons";
+import { PlusIcon, SearchIcon, QrIcon } from "@/components/notebook/icons";
+import { SwipeableCard } from "@/components/notebook/swipeable-card";
 
 type Filter = "all" | "low" | "critical";
 
@@ -28,6 +29,8 @@ interface ChemicalsProps {
   onSearchChange: (q: string) => void;
   onAdd: () => void;
   onOpenDetail: (c: Chemical) => void;
+  onPrintQrLabels: () => void;
+  onQuickConsume: (c: Chemical) => void;
 }
 
 const TAPE_CYCLE = ["yellow", "blue", "green", "pink", "none", "none"] as const;
@@ -37,6 +40,8 @@ export function ChemicalsScreen({
   onSearchChange,
   onAdd,
   onOpenDetail,
+  onPrintQrLabels,
+  onQuickConsume,
 }: ChemicalsProps) {
   const chemicals = useLabStore((s) => s.chemicals);
   const [filter, setFilter] = useState<Filter>("all");
@@ -79,7 +84,7 @@ export function ChemicalsScreen({
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 mb-5">
+      <div className="flex items-center gap-4 mb-3 flex-wrap">
         <FilterPill active={filter === "all"} onClick={() => setFilter("all")}>
           all
         </FilterPill>
@@ -96,6 +101,19 @@ export function ChemicalsScreen({
           {filtered.length} of {chemicals.length}
         </span>
       </div>
+
+      {/* Print QR labels */}
+      {chemicals.length > 0 && (
+        <div className="mb-5">
+          <button
+            onClick={onPrintQrLabels}
+            className="font-body text-sm underline flex items-center gap-1"
+            style={{ color: "var(--ink-muted)", textUnderlineOffset: "3px" }}
+          >
+            <QrIcon width="16" height="16" /> print QR labels (40 per A4)
+          </button>
+        </div>
+      )}
 
       {/* List */}
       {filtered.length === 0 ? (
@@ -120,6 +138,7 @@ export function ChemicalsScreen({
               chemical={c}
               index={i}
               onOpen={() => onOpenDetail(c)}
+              onQuickConsume={() => onQuickConsume(c)}
             />
           ))}
         </div>
@@ -168,10 +187,12 @@ function ChemicalCard({
   chemical,
   index,
   onOpen,
+  onQuickConsume,
 }: {
   chemical: Chemical;
   index: number;
   onOpen: () => void;
+  onQuickConsume: () => void;
 }) {
   const status = stockStatus(chemical);
   const pct = percentRemaining(chemical);
@@ -179,6 +200,7 @@ function ChemicalCard({
   const tape = TAPE_CYCLE[index % TAPE_CYCLE.length];
   const isFlagged = status === "low" || status === "critical" || status === "empty";
   const tilt = index % 2 === 0 ? -0.8 : 0.9;
+  const canConsume = chemical.quantity > 0;
 
   return (
     <motion.div
@@ -199,64 +221,70 @@ function ChemicalCard({
           <MarginNote text={status === "empty" ? "empty!" : "order!"} />
         </div>
       )}
-      <NotebookCard
-        tape={tape}
-        paperclip={status === "critical" || status === "empty"}
-        tilt={tilt}
-        onClick={onOpen}
-        className="cursor-pointer hover:translate-y-[-2px] transition-transform"
+      <SwipeableCard
+        actionLabel={canConsume ? "use" : "—"}
+        actionColor={canConsume ? "var(--margin-red)" : "var(--ink-muted)"}
+        onAction={canConsume ? onQuickConsume : () => {}}
       >
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="min-w-0 flex-1">
-            <h3
-              className="font-accent font-bold leading-tight truncate"
-              style={{ fontSize: "22px", color: "var(--ink)" }}
-            >
-              {chemical.name}
-            </h3>
-            {chemical.formula && (
-              <p
-                className="font-body text-base"
+        <NotebookCard
+          tape={tape}
+          paperclip={status === "critical" || status === "empty"}
+          tilt={tilt}
+          onClick={onOpen}
+          className="cursor-pointer hover:translate-y-[-2px] transition-transform"
+        >
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="min-w-0 flex-1">
+              <h3
+                className="font-accent font-bold leading-tight truncate"
+                style={{ fontSize: "22px", color: "var(--ink)" }}
+              >
+                {chemical.name}
+              </h3>
+              {chemical.formula && (
+                <p
+                  className="font-body text-base"
+                  style={{ color: "var(--ink-muted)" }}
+                >
+                  {chemical.formula}
+                </p>
+              )}
+            </div>
+            <div className="text-right shrink-0">
+              <div
+                className="font-body font-bold"
+                style={{ fontSize: "20px", color: "var(--ink)" }}
+              >
+                {chemical.quantity}
+                <span style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
+                  {" "}{chemical.unit}
+                </span>
+              </div>
+              <div
+                className="font-body text-xs"
                 style={{ color: "var(--ink-muted)" }}
               >
-                {chemical.formula}
-              </p>
+                of {chemical.initial_quantity}
+              </div>
+            </div>
+          </div>
+
+          <HandDrawnBar status={status} percent={pct} className="mt-2" />
+
+          <p
+            className="font-display text-base font-semibold mt-1"
+            style={{ color: statusColor(status) }}
+          >
+            {status === "empty" ? (
+              <>
+                <Highlighter>0% — (empty!)</Highlighter>
+              </>
+            ) : (
+              caption
             )}
-          </div>
-          <div className="text-right shrink-0">
-            <div
-              className="font-body font-bold"
-              style={{ fontSize: "20px", color: "var(--ink)" }}
-            >
-              {chemical.quantity}
-              <span style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
-                {" "}{chemical.unit}
-              </span>
-            </div>
-            <div
-              className="font-body text-xs"
-              style={{ color: "var(--ink-muted)" }}
-            >
-              of {chemical.initial_quantity}
-            </div>
-          </div>
-        </div>
-
-        <HandDrawnBar status={status} percent={pct} className="mt-2" />
-
-        <p
-          className="font-display text-base font-semibold mt-1"
-          style={{ color: statusColor(status) }}
-        >
-          {status === "empty" ? (
-            <>
-              <Highlighter>0% — (empty!)</Highlighter>
-            </>
-          ) : (
-            caption
-          )}
-        </p>
-      </NotebookCard>
+          </p>
+        </NotebookCard>
+      </SwipeableCard>
     </motion.div>
   );
 }

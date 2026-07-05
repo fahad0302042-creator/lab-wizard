@@ -10,6 +10,7 @@ import { ApparatusScreen } from "@/components/screens/apparatus-screen";
 import { ScannerScreen } from "@/components/screens/scanner-screen";
 import { ReportsScreen } from "@/components/screens/reports-screen";
 import { SettingsScreen } from "@/components/screens/settings-screen";
+import { QrLabelsScreen } from "@/components/screens/qr-labels-screen";
 import { BottomNav } from "@/components/bottom-nav";
 import {
   AddChemicalModal,
@@ -69,6 +70,7 @@ export default function Page() {
   const [editAppOpen, setEditAppOpen] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [qrLabelsOpen, setQrLabelsOpen] = useState(false);
 
   const openChemDetail = (c: Chemical) => {
     setDetailChem(c);
@@ -142,6 +144,12 @@ export default function Page() {
               onSearchChange={setSearch}
               onAdd={() => setAddChemOpen(true)}
               onOpenDetail={openChemDetail}
+              onPrintQrLabels={() => setQrLabelsOpen(true)}
+              onQuickConsume={(c) => {
+                setLogChem(c);
+                setLogChemAction("consume");
+                setLogChemOpen(true);
+              }}
             />
           )}
           {tab === "apparatus" && (
@@ -162,6 +170,16 @@ export default function Page() {
           {tab === "reports" && <ReportsScreen />}
         </main>
       </div>
+
+      {/* QR Labels printing overlay */}
+      {qrLabelsOpen && (
+        <div
+          className="fixed inset-0 z-[100] overflow-y-auto"
+          style={{ background: "#f0f0f0", paddingTop: "60px" }}
+        >
+          <QrLabelsScreen onClose={() => setQrLabelsOpen(false)} />
+        </div>
+      )}
 
       {/* Settings as a full-screen overlay */}
       {settingsOpen && (

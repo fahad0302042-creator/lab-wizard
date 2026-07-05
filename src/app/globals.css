@@ -346,6 +346,81 @@
   .print-only {
     display: none !important;
   }
+  .qr-print-only {
+    display: none !important;
+  }
+}
+
+/* ============ QR Label Printing ============ */
+/* Clean/functional layout for reliable scanning — no hand-drawn flourishes */
+
+@media print {
+  /* When printing QR labels, hide everything except the label sheets */
+  body:has(.qr-print-only) #app-root,
+  body:has(.qr-print-only) .no-print {
+    display: none !important;
+  }
+
+  .qr-print-only {
+    display: block !important;
+  }
+
+  .qr-page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 10mm;
+    page-break-after: always;
+    background: white;
+  }
+  .qr-page:last-child {
+    page-break-after: auto;
+  }
+
+  .qr-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 4mm;
+    width: 100%;
+    height: 277mm;
+  }
+
+  .qr-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2mm;
+    border: 0.5px dashed #ccc;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .qr-code {
+    margin-bottom: 1mm;
+  }
+
+  .qr-name {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 7pt;
+    font-weight: 600;
+    color: #1a1a1a;
+    line-height: 1.1;
+    word-break: break-word;
+    max-width: 100%;
+  }
+
+  .qr-formula {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 6pt;
+    color: #666;
+    margin-top: 0.5mm;
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
 }
 
 /* Subtle entrance animation */

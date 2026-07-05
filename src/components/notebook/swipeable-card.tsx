@@ -1,0 +1,140 @@
+"use client";
+
+import { useRef, useState, type ReactNode } from "react";
+
+/**
+ * SwipeableCard — swipe left to reveal a "quick consume" action.
+ *
+ * On touch: drag the card left to reveal the action strip.
+ * On desktop: hover shows a hint, click the action strip to trigger.
+ *
+ * When the action strip is fully revealed (>80px), a tap triggers onAction.
+ */
+
+interface SwipeableCardProps {
+  children: ReactNode;
+  actionLabel: string;
+  actionColor: string;
+  onAction: () => void;
+}
+
+export function SwipeableCard({
+  children,
+  actionLabel,
+  actionColor,
+  onAction,
+}: SwipeableCardProps) {
+  const [offset, setOffset] = useState(0);
+  const [showAction, setShowAction] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const draggingRef = useRef(false);
+  const isHorizontal = useRef(false);
+
+  const ACTION_WIDTH = 90;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
+    draggingRef.current = true;
+    setDragging(true);
+    isHorizontal.current = false;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!draggingRef.current) return;
+    const dx = e.touches[0].clientX - startX.current;
+    const dy = e.touches[0].clientY - startY.current;
+    // Determine direction on first significant move
+    if (!isHorizontal.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      isHorizontal.current = Math.abs(dx) > Math.abs(dy);
+    }
+    if (isHorizontal.current) {
+      const clamped = Math.max(-ACTION_WIDTH, Math.min(0, dx));
+      setOffset(clamped);
+    }
+  };
+
+  const onTouchEnd = () => {
+    draggingRef.current = false;
+    setDragging(false);
+    if (offset < -ACTION_WIDTH / 2) {
+      setOffset(-ACTION_WIDTH);
+      setShowAction(true);
+    } else {
+      setOffset(0);
+      setShowAction(false);
+    }
+  };
+
+  const handleActionClick = () => {
+    onAction();
+    setOffset(0);
+    setShowAction(false);
+  };
+
+  return (
+    <div style={{ position: "relative", overflow: "hidden" }}>
+      {/* Action strip behind the card */}
+      <div
+        onClick={handleActionClick}
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: ACTION_WIDTH,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: actionColor,
+          color: "white",
+          fontFamily: "var(--font-display), cursive",
+          fontSize: "16px",
+          fontWeight: 700,
+          cursor: "pointer",
+          borderRadius: "0 8px 8px 0",
+        }}
+      >
+        {actionLabel}
+      </div>
+
+      {/* The card itself — slides left */}
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: dragging ? "none" : "transform 0.25s ease",
+          position: "relative",
+          zIndex: 1,
+          background: "var(--card-fill)",
+        }}
+      >
+        {children}
+      </div>
+
+      {/* Hint for desktop: swipe instruction */}
+      {!showAction && (
+        <div
+          className="no-print"
+          style={{
+            position: "absolute",
+            top: "50%",
+            right: 8,
+            transform: "translateY(-50%)",
+            fontSize: "10px",
+            color: "var(--ink-muted)",
+            opacity: 0.4,
+            pointerEvents: "none",
+            fontFamily: "var(--font-body), cursive",
+          }}
+        >
+          ← swipe
+        </div>
+      )}
+    </div>
+  );
+}
