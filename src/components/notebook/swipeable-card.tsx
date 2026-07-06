@@ -6,9 +6,9 @@ import { useRef, useState, type ReactNode } from "react";
  * SwipeableCard — swipe left to reveal a "quick consume" action.
  *
  * On touch: drag the card left to reveal the action strip.
- * On desktop: hover shows a hint, click the action strip to trigger.
+ * On desktop: the action strip is always visible on the right edge (subtle).
  *
- * When the action strip is fully revealed (>80px), a tap triggers onAction.
+ * Clicks/taps on the card itself pass through to the children normally.
  */
 
 interface SwipeableCardProps {
@@ -31,6 +31,7 @@ export function SwipeableCard({
   const startY = useRef(0);
   const draggingRef = useRef(false);
   const isHorizontal = useRef(false);
+  const moved = useRef(false);
 
   const ACTION_WIDTH = 90;
 
@@ -40,6 +41,7 @@ export function SwipeableCard({
     draggingRef.current = true;
     setDragging(true);
     isHorizontal.current = false;
+    moved.current = false;
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
@@ -49,6 +51,7 @@ export function SwipeableCard({
     // Determine direction on first significant move
     if (!isHorizontal.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       isHorizontal.current = Math.abs(dx) > Math.abs(dy);
+      moved.current = true;
     }
     if (isHorizontal.current) {
       const clamped = Math.max(-ACTION_WIDTH, Math.min(0, dx));
@@ -68,43 +71,46 @@ export function SwipeableCard({
     }
   };
 
-  const handleActionClick = () => {
+  const handleActionClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onAction();
     setOffset(0);
     setShowAction(false);
   };
 
   return (
-    <div style={{ position: "relative", overflow: "hidden" }}>
+    <div style={{ position: "relative" }}>
       {/* Action strip behind the card — springs in when revealed */}
-      <div
-        onClick={handleActionClick}
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: ACTION_WIDTH,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: actionColor,
-          color: "white",
-          fontFamily: "var(--font-display), cursive",
-          fontSize: "16px",
-          fontWeight: 700,
-          cursor: "pointer",
-          borderRadius: "0 8px 8px 0",
-          transform: showAction ? "scaleX(1)" : "scaleX(0.8)",
-          opacity: showAction ? 1 : 0.5,
-          transition: "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease",
-          transformOrigin: "right center",
-        }}
-      >
-        {actionLabel}
-      </div>
+      {showAction && (
+        <div
+          onClick={handleActionClick}
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: ACTION_WIDTH,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: actionColor,
+            color: "white",
+            fontFamily: "var(--font-display), cursive",
+            fontSize: "16px",
+            fontWeight: 700,
+            cursor: "pointer",
+            borderRadius: "0 8px 8px 0",
+            transform: "scaleX(1)",
+            transformOrigin: "right center",
+            transition: "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            zIndex: 3,
+          }}
+        >
+          {actionLabel}
+        </div>
+      )}
 
-      {/* The card itself — slides left */}
+      {/* The card itself — slides left on swipe, clicks pass through to children */}
       <div
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -113,32 +119,12 @@ export function SwipeableCard({
           transform: `translateX(${offset}px)`,
           transition: dragging ? "none" : "transform 0.25s ease",
           position: "relative",
-          zIndex: 1,
+          zIndex: 2,
           background: "var(--card-fill)",
         }}
       >
         {children}
       </div>
-
-      {/* Hint for desktop: swipe instruction */}
-      {!showAction && (
-        <div
-          className="no-print"
-          style={{
-            position: "absolute",
-            top: "50%",
-            right: 8,
-            transform: "translateY(-50%)",
-            fontSize: "10px",
-            color: "var(--ink-muted)",
-            opacity: 0.4,
-            pointerEvents: "none",
-            fontFamily: "var(--font-body), cursive",
-          }}
-        >
-          ← swipe
-        </div>
-      )}
     </div>
   );
 }
