@@ -21,7 +21,7 @@ import type {
   LogAction,
 } from "./types";
 import { uid, dateToNoonISO, todayLocalDate } from "./utils";
-import { getSupabase, isSupabaseConfigured } from "./supabase";
+import { getSupabase } from "./supabase";
 
 interface UndoRecord {
   logId: string;
@@ -467,21 +467,13 @@ export const useLabStore = create<LabState>()(
       },
     }),
     {
-      name: "lab-wizard-v2",
+      name: "lab-wizard-v3",
       storage: createJSONStorage(() => localStorage),
-      // Only persist user + recentScans in Supabase mode; persist everything in mock mode
-      partialize: (state) => {
-        if (isSupabaseConfigured()) {
-          return { user: state.user, recentScans: state.recentScans };
-        }
-        return {
-          user: state.user,
-          chemicals: state.chemicals,
-          apparatus: state.apparatus,
-          logs: state.logs,
-          recentScans: state.recentScans,
-        };
-      },
+      // Only persist user + recentScans — actual data comes from Supabase on load
+      partialize: (state) => ({
+        user: state.user,
+        recentScans: state.recentScans,
+      }),
     }
   )
 );

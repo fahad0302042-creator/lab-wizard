@@ -16,15 +16,20 @@ export function todayLocalDate(): string {
 
 /** Percentage remaining for a chemical or apparatus item. */
 export function percentRemaining(item: Chemical | Apparatus): number {
-  if (item.initial_quantity <= 0) return 0;
+  // If there's stock but no initial_quantity recorded (e.g. imported with 0),
+  // treat it as 100% — we have stock, just don't know the original amount.
+  if (item.initial_quantity <= 0) {
+    return item.quantity > 0 ? 100 : 0;
+  }
   const pct = (item.quantity / item.initial_quantity) * 100;
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
 /** Stock status thresholds: <20% critical, <50% low, otherwise healthy. Empty = 0. */
 export function stockStatus(item: Chemical | Apparatus): StockStatus {
+  // Empty only if there's actually 0 quantity on hand
+  if (item.quantity <= 0) return "empty";
   const pct = percentRemaining(item);
-  if (pct === 0) return "empty";
   if (pct < 20) return "critical";
   if (pct < 50) return "low";
   return "healthy";
