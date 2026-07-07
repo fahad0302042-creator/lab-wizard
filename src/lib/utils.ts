@@ -14,36 +14,23 @@ export function todayLocalDate(): string {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
 }
 
-/** Percentage remaining for a chemical or apparatus item. */
-export function percentRemaining(item: Chemical | Apparatus): number {
-  // If there's stock but no initial_quantity recorded (e.g. imported with 0),
-  // treat it as 100% — we have stock, just don't know the original amount.
-  if (item.initial_quantity <= 0) {
-    return item.quantity > 0 ? 100 : 0;
-  }
-  const pct = (item.quantity / item.initial_quantity) * 100;
-  return Math.max(0, Math.min(100, Math.round(pct)));
-}
-
-/** Stock status thresholds: <20% critical, <50% low, otherwise healthy. Empty = 0. */
+/** Stock status: based on absolute quantity + user-set low-stock threshold.
+ *  - empty: quantity is 0
+ *  - low: quantity > 0 but at or below the low-stock threshold
+ *  - healthy: quantity above the threshold (or no threshold set) */
 export function stockStatus(item: Chemical | Apparatus): StockStatus {
-  // Empty only if there's actually 0 quantity on hand
   if (item.quantity <= 0) return "empty";
-  const pct = percentRemaining(item);
-  if (pct < 20) return "critical";
-  if (pct < 50) return "low";
+  const threshold = ("low_stock_threshold" in item ? item.low_stock_threshold : 0) || 0;
+  if (threshold > 0 && item.quantity <= threshold) return "low";
   return "healthy";
 }
 
-/** Handwritten tone caption to go under the hand-drawn bar. */
-export function stockCaption(item: Chemical | Apparatus): string {
-  const pct = percentRemaining(item);
+/** Simple status label — no percentages, just plain words. */
+export function stockLabel(item: Chemical | Apparatus): string {
   const status = stockStatus(item);
-  if (status === "empty") return "0% — (empty!)";
-  if (status === "critical") return `${pct}% left — order more!`;
-  if (status === "low") return `${pct}% left — getting low`;
-  if (pct >= 85) return `${pct}% left — plenty ✓`;
-  return `${pct}% left`;
+  if (status === "empty") return "out of stock";
+  if (status === "low") return "low stock";
+  return "in stock";
 }
 
 /** Map a stock status to its tailwind color class. */
