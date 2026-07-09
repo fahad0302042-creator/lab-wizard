@@ -228,7 +228,9 @@ function ApparatusCard({
               className="font-body text-xs"
               style={{ color: "var(--ink-muted)" }}
             >
-              of {apparatus.initial_quantity}
+              {apparatus.low_stock_threshold > 0
+                ? `min ${apparatus.low_stock_threshold}`
+                : "pcs"}
             </div>
           </div>
         </div>

@@ -68,6 +68,7 @@ function AddApparatusForm({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<ApparatusCategory>("glassware");
   const [quantity, setQuantity] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("");
   const [notes, setNotes] = useState("");
 
   const submit = async () => {
@@ -80,8 +81,9 @@ function AddApparatusForm({ onClose }: { onClose: () => void }) {
       toast.error("quantity needs to be a number ≥ 0");
       return;
     }
+    const threshold = Number(lowStockThreshold) || 0;
     try {
-      await addApparatus({ name, category, quantity: qty, notes });
+      await addApparatus({ name, category, quantity: qty, low_stock_threshold: threshold, notes });
       toast.success(`added ${name}`);
       onClose();
     } catch (err) {
@@ -130,6 +132,14 @@ function AddApparatusForm({ onClose }: { onClose: () => void }) {
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
           placeholder="30"
+        />
+        <RuledInput
+          label="low stock level (optional)"
+          type="number"
+          inputMode="decimal"
+          value={lowStockThreshold}
+          onChange={(e) => setLowStockThreshold(e.target.value)}
+          placeholder="e.g. 5 — bar turns red at this level"
         />
         <RuledTextarea
           label="notes (optional)"
@@ -229,9 +239,11 @@ export function ApparatusDetailModal({
             style={{ fontSize: "22px", color: "var(--ink)" }}
           >
             {apparatus.quantity}
-            <span style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
-              {" "}/ {apparatus.initial_quantity}
-            </span>
+            {apparatus.low_stock_threshold > 0 && (
+              <span style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
+                {" "}/ min {apparatus.low_stock_threshold}
+              </span>
+            )}
           </span>
         </div>
 
@@ -422,6 +434,9 @@ function EditApparatusForm({
   const deleteApparatus = useLabStore((s) => s.deleteApparatus);
   const [name, setName] = useState(apparatus.name);
   const [category, setCategory] = useState<ApparatusCategory>(apparatus.category);
+  const [lowStockThreshold, setLowStockThreshold] = useState(
+    String(apparatus.low_stock_threshold || "")
+  );
   const [notes, setNotes] = useState(apparatus.notes);
 
   const submit = async () => {
@@ -433,6 +448,7 @@ function EditApparatusForm({
       await updateApparatus(apparatus.id, {
         name: name.trim(),
         category,
+        low_stock_threshold: Number(lowStockThreshold) || 0,
         notes: notes.trim(),
       });
       toast.success("updated");
@@ -480,6 +496,14 @@ function EditApparatusForm({
             ))}
           </div>
         </div>
+        <RuledInput
+          label="low stock level"
+          type="number"
+          inputMode="decimal"
+          value={lowStockThreshold}
+          onChange={(e) => setLowStockThreshold(e.target.value)}
+          placeholder="0 = not set"
+        />
         <RuledTextarea label="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
       <div

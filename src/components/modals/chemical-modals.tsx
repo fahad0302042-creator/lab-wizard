@@ -214,9 +214,11 @@ export function ChemicalDetailModal({
             style={{ fontSize: "22px", color: "var(--ink)" }}
           >
             {chemical.quantity} {chemical.unit}
-            <span style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
-              {" "}/ {chemical.initial_quantity} {chemical.unit}
-            </span>
+            {chemical.low_stock_threshold > 0 && (
+              <span style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
+                {" "}/ min {chemical.low_stock_threshold} {chemical.unit}
+              </span>
+            )}
           </span>
         </div>
 
@@ -398,6 +400,9 @@ function EditChemicalForm({
   const [name, setName] = useState(chemical.name);
   const [formula, setFormula] = useState(chemical.formula);
   const [unit, setUnit] = useState<ChemicalUnit>(chemical.unit);
+  const [lowStockThreshold, setLowStockThreshold] = useState(
+    String(chemical.low_stock_threshold || "")
+  );
   const [notes, setNotes] = useState(chemical.notes);
 
   const submit = async () => {
@@ -410,6 +415,7 @@ function EditChemicalForm({
         name: name.trim(),
         formula: formula.trim(),
         unit,
+        low_stock_threshold: Number(lowStockThreshold) || 0,
         notes: notes.trim(),
       });
       toast.success("updated");
@@ -458,9 +464,17 @@ function EditChemicalForm({
             ))}
           </div>
         </div>
+        <RuledInput
+          label="low stock level"
+          type="number"
+          inputMode="decimal"
+          value={lowStockThreshold}
+          onChange={(e) => setLowStockThreshold(e.target.value)}
+          placeholder="0 = not set"
+        />
         <RuledTextarea label="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
         <p className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>
-          quantity is changed via consume / restock, not here. edit initial_quantity by deleting & re-adding.
+          set the low-stock level — the bar turns amber when stock drops to this level.
         </p>
       </div>
       <div

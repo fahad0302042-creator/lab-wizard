@@ -267,7 +267,9 @@ function ChemicalCard({
                 className="font-body text-xs"
                 style={{ color: "var(--ink-muted)" }}
               >
-                of {chemical.initial_quantity}
+                {chemical.low_stock_threshold > 0
+                  ? `min ${chemical.low_stock_threshold} ${chemical.unit}`
+                  : chemical.unit}
               </div>
             </div>
           </div>
