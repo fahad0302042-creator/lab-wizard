@@ -11,6 +11,7 @@ export interface Chemical {
   unit: ChemicalUnit;
   quantity: number;
   initial_quantity: number;
+  low_stock_threshold: number; // user-set minimum level; 0 = not set
   notes: string;
   qr_code: string; // uuid string
   created_at: string; // ISO
@@ -29,6 +30,7 @@ export interface Apparatus {
   category: ApparatusCategory;
   quantity: number;
   initial_quantity: number;
+  low_stock_threshold: number; // user-set minimum level; 0 = not set
   notes: string;
   created_at: string;
 }

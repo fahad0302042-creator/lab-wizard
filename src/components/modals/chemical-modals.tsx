@@ -32,6 +32,7 @@ function AddChemicalForm({ onClose }: { onClose: () => void }) {
   const [formula, setFormula] = useState("");
   const [unit, setUnit] = useState<ChemicalUnit>("mL");
   const [quantity, setQuantity] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("");
   const [notes, setNotes] = useState("");
 
   const submit = async () => {
@@ -44,8 +45,9 @@ function AddChemicalForm({ onClose }: { onClose: () => void }) {
       toast.error("quantity needs to be a number ≥ 0");
       return;
     }
+    const threshold = Number(lowStockThreshold) || 0;
     try {
-      await addChemical({ name, formula, unit, quantity: qty, notes });
+      await addChemical({ name, formula, unit, quantity: qty, low_stock_threshold: threshold, notes });
       toast.success(`added ${name} to the shelf`);
       onClose();
     } catch (err) {
@@ -100,6 +102,14 @@ function AddChemicalForm({ onClose }: { onClose: () => void }) {
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
           placeholder="500"
+        />
+        <RuledInput
+          label="low stock level (optional)"
+          type="number"
+          inputMode="decimal"
+          value={lowStockThreshold}
+          onChange={(e) => setLowStockThreshold(e.target.value)}
+          placeholder="e.g. 100 — bar turns red at this level"
         />
         <RuledTextarea
           label="notes (optional)"

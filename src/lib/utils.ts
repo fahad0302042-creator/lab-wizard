@@ -14,10 +14,26 @@ export function todayLocalDate(): string {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
 }
 
-/** Stock status: based on absolute quantity + user-set low-stock threshold.
+/** Percentage remaining, based on the user-set low-stock threshold.
+ *  - No threshold (0): returns 100 if in stock, 0 if empty
+ *  - With threshold: (quantity / threshold) × 100, capped at 100
+ *    100% = at or above threshold (healthy)
+ *    <100% = below threshold (low)
+ */
+export function percentRemaining(item: Chemical | Apparatus): number {
+  if (item.quantity <= 0) return 0;
+  const threshold = ("low_stock_threshold" in item ? item.low_stock_threshold : 0) || 0;
+  if (threshold <= 0) return 100; // no threshold set, just "in stock"
+  const pct = (item.quantity / threshold) * 100;
+  return Math.max(0, Math.min(100, Math.round(pct)));
+}
+
+/** Stock status based on quantity vs user-set threshold.
  *  - empty: quantity is 0
- *  - low: quantity > 0 but at or below the low-stock threshold
- *  - healthy: quantity above the threshold (or no threshold set) */
+ *  - low: quantity > 0 but at or below the threshold
+ *  - healthy: quantity above the threshold (or no threshold set)
+ *  - critical: kept for compatibility, maps to empty
+ */
 export function stockStatus(item: Chemical | Apparatus): StockStatus {
   if (item.quantity <= 0) return "empty";
   const threshold = ("low_stock_threshold" in item ? item.low_stock_threshold : 0) || 0;
@@ -25,7 +41,19 @@ export function stockStatus(item: Chemical | Apparatus): StockStatus {
   return "healthy";
 }
 
-/** Simple status label — no percentages, just plain words. */
+/** Handwritten tone caption under the bar — plain words, no confusing percentages. */
+export function stockCaption(item: Chemical | Apparatus): string {
+  const status = stockStatus(item);
+  const threshold = ("low_stock_threshold" in item ? item.low_stock_threshold : 0) || 0;
+  if (status === "empty") return "out of stock!";
+  if (status === "low") {
+    if (threshold > 0 && item.quantity <= threshold * 0.5) return "critically low — order!";
+    return "low stock — order soon";
+  }
+  return "in stock ✓";
+}
+
+/** Simple status label for reports/detail views. */
 export function stockLabel(item: Chemical | Apparatus): string {
   const status = stockStatus(item);
   if (status === "empty") return "out of stock";

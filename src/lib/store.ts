@@ -54,6 +54,7 @@ interface LabState {
     formula: string;
     unit: ChemicalUnit;
     quantity: number;
+    low_stock_threshold?: number;
     notes?: string;
   }) => Promise<Chemical>;
   updateChemical: (id: string, patch: Partial<Chemical>) => Promise<void>;
@@ -65,6 +66,7 @@ interface LabState {
     name: string;
     category: ApparatusCategory;
     quantity: number;
+    low_stock_threshold?: number;
     notes?: string;
   }) => Promise<Apparatus>;
   updateApparatus: (id: string, patch: Partial<Apparatus>) => Promise<void>;
@@ -219,7 +221,7 @@ export const useLabStore = create<LabState>()(
 
       // ============ CHEMICALS ============
 
-      addChemical: async ({ name, formula, unit, quantity, notes }) => {
+      addChemical: async ({ name, formula, unit, quantity, notes, low_stock_threshold }) => {
         const supabase = getSupabase();
         const userId = get().user?.id;
         if (!userId) throw new Error("not signed in");
@@ -230,6 +232,7 @@ export const useLabStore = create<LabState>()(
           unit,
           quantity,
           initial_quantity: quantity,
+          low_stock_threshold: low_stock_threshold ?? 0,
           notes: notes?.trim() ?? "",
           qr_code: uid(),
         };
@@ -282,7 +285,7 @@ export const useLabStore = create<LabState>()(
 
       // ============ APPARATUS ============
 
-      addApparatus: async ({ name, category, quantity, notes }) => {
+      addApparatus: async ({ name, category, quantity, notes, low_stock_threshold }) => {
         const supabase = getSupabase();
         const userId = get().user?.id;
         if (!userId) throw new Error("not signed in");
@@ -292,6 +295,7 @@ export const useLabStore = create<LabState>()(
           category,
           quantity,
           initial_quantity: quantity,
+          low_stock_threshold: low_stock_threshold ?? 0,
           notes: notes?.trim() ?? "",
         };
 
