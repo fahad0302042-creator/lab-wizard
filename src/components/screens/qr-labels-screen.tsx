@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, createPortal } from "react";
+import { useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useLabStore } from "@/lib/store";
 
@@ -21,6 +21,75 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
       `${c.name} ${c.formula}`.toLowerCase().includes(q)
     );
   }, [chemicals, search]);
+
+  // Chunk into pages of 40
+  const pages: typeof chemicals[] = [];
+  for (let i = 0; i < filtered.length; i += 40) {
+    pages.push(filtered.slice(i, i + 40));
+  }
+  if (pages.length === 0) pages.push([]);
+
+  const handlePrint = () => {
+    // Open a new window with just the labels, trigger print
+    const html = document.querySelector("#qr-labels-content")?.innerHTML || "";
+    const win = window.open("", "_blank", "width=800,height=900");
+    if (!win) {
+      // Pop-up blocked — try direct print
+      window.print();
+      return;
+    }
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lab Wizard — QR Labels</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  html, body { margin: 0; padding: 0; background: white; font-family: 'Helvetica Neue', Arial, sans-serif; }
+  * { box-sizing: border-box; }
+  .qr-page {
+    width: 190mm;
+    page-break-after: always;
+  }
+  .qr-page:last-child { page-break-after: auto; }
+  .qr-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 3mm;
+  }
+  .qr-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1mm;
+    border: 0.5px dashed #ccc;
+    text-align: center;
+  }
+  .qr-name {
+    font-size: 7pt;
+    font-weight: 600;
+    color: #1a1a1a;
+    line-height: 1.1;
+    margin-top: 1mm;
+    word-break: break-word;
+  }
+  .qr-formula {
+    font-size: 6pt;
+    color: #666;
+    margin-top: 0.5mm;
+  }
+</style>
+</head>
+<body>${html}</body>
+</html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      try { win.print(); } catch {}
+    }, 500);
+  };
 
   return (
     <>
@@ -61,11 +130,10 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
           }}
         />
         <span style={{ fontSize: 12, opacity: 0.7 }}>
-          {filtered.length} labels · {Math.ceil(filtered.length / 40)} page
-          {Math.ceil(filtered.length / 40) > 1 ? "s" : ""}
+          {filtered.length} labels · {pages.length} page{pages.length > 1 ? "s" : ""}
         </span>
         <button
-          onClick={() => window.print()}
+          onClick={handlePrint}
           style={{
             background: "white",
             color: "#1a1a1a",
@@ -97,47 +165,63 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Print-only label sheets (portaled to body so print CSS can hide everything else) */}
-      <QrLabelPortal chemicals={filtered} />
-    </>
-  );
-}
-
-function QrLabelPortal({ chemicals }: { chemicals: ReturnType<typeof useLabStore.getState>["chemicals"] }) {
-  if (typeof document === "undefined") return null;
-
-  // Chunk into pages of 40
-  const pages: (typeof chemicals)[] = [];
-  for (let i = 0; i < chemicals.length; i += 40) {
-    pages.push(chemicals.slice(i, i + 40));
-  }
-  // Ensure at least one page even if empty
-  if (pages.length === 0) pages.push([]);
-
-  return createPortal(
-    <div className="qr-print-only">
-      {pages.map((page, pi) => (
-        <div key={pi} className="qr-page">
-          <div className="qr-grid">
-            {page.map((c) => (
-              <div key={c.id} className="qr-label">
-                <div className="qr-code">
+      {/* Label sheets — rendered off-screen, used for print */}
+      <div
+        id="qr-labels-content"
+        style={{ position: "absolute", left: "-9999px", top: 0 }}
+      >
+        {pages.map((page, pi) => (
+          <div key={pi} className="qr-page">
+            <div className="qr-grid">
+              {page.map((c) => (
+                <div key={c.id} className="qr-label">
                   <QRCodeSVG
                     value={`labwizard:chemical:${c.qr_code}`}
                     size={80}
                     level="M"
                   />
-                </div>
-                <div className="qr-text">
                   <div className="qr-name">{c.name}</div>
                   {c.formula && <div className="qr-formula">{c.formula}</div>}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+        ))}
+      </div>
+
+      {/* On-screen preview */}
+      <div style={{ padding: "70px 20px 20px", maxWidth: 800, margin: "0 auto" }}>
+        <p style={{ fontFamily: "var(--font-body), cursive", color: "#666", fontSize: 14, marginBottom: 16 }}>
+          {filtered.length} labels ready to print · {pages.length} page{pages.length > 1 ? "s" : ""} (40 per A4)
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+          {filtered.slice(0, 40).map((c) => (
+            <div key={c.id} style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              padding: 8,
+              border: "0.5px dashed #ccc",
+              textAlign: "center",
+            }}>
+              <QRCodeSVG
+                value={`labwizard:chemical:${c.qr_code}`}
+                size={70}
+                level="M"
+              />
+              <div style={{ fontSize: 8, fontWeight: 600, marginTop: 4, wordBreak: "break-word" }}>
+                {c.name}
+              </div>
+              {c.formula && <div style={{ fontSize: 7, color: "#666" }}>{c.formula}</div>}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>,
-    document.body
+        {filtered.length > 40 && (
+          <p style={{ fontFamily: "var(--font-body), cursive", color: "#666", fontSize: 12, marginTop: 12, textAlign: "center" }}>
+            + {filtered.length - 40} more on page 2… click "Print labels" to see all.
+          </p>
+        )}
+      </div>
+    </>
   );
 }
