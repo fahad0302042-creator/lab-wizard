@@ -29,16 +29,9 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
   }
   if (pages.length === 0) pages.push([]);
 
-  const handlePrint = () => {
-    // Open a new window with just the labels, trigger print
+  const buildLabelHTML = () => {
     const html = document.querySelector("#qr-labels-content")?.innerHTML || "";
-    const win = window.open("", "_blank", "width=800,height=900");
-    if (!win) {
-      // Pop-up blocked — try direct print
-      window.print();
-      return;
-    }
-    win.document.write(`<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -80,15 +73,45 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
     color: #666;
     margin-top: 0.5mm;
   }
+  .print-btn {
+    position: fixed; top: 12px; right: 16px; z-index: 999;
+    background: #1a1a1a; color: white; border: none; padding: 10px 24px;
+    font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer;
+  }
+  @media print { .print-btn { display: none; } }
 </style>
 </head>
-<body>${html}</body>
-</html>`);
+<body>
+<button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+${html}
+</body>
+</html>`;
+  };
+
+  const handlePrint = () => {
+    const fullHTML = buildLabelHTML();
+    const win = window.open("", "_blank", "width=800,height=900");
+    if (!win) {
+      // Pop-up blocked — download instead
+      handleDownload();
+      return;
+    }
+    win.document.write(fullHTML);
     win.document.close();
     win.focus();
-    setTimeout(() => {
-      try { win.print(); } catch {}
-    }, 500);
+  };
+
+  const handleDownload = () => {
+    const fullHTML = buildLabelHTML();
+    const blob = new Blob([fullHTML], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lab-wizard-qr-labels-${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -133,7 +156,7 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
           {filtered.length} labels · {pages.length} page{pages.length > 1 ? "s" : ""}
         </span>
         <button
-          onClick={handlePrint}
+          onClick={handleDownload}
           style={{
             background: "white",
             color: "#1a1a1a",
@@ -146,7 +169,22 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
             fontFamily: "inherit",
           }}
         >
-          🖨 Print labels
+          ⬇ Download labels
+        </button>
+        <button
+          onClick={handlePrint}
+          style={{
+            background: "transparent",
+            color: "white",
+            border: "1px solid white",
+            padding: "7px 16px",
+            fontSize: 13,
+            borderRadius: 4,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          🖨 Print
         </button>
         <button
           onClick={onClose}
@@ -192,7 +230,7 @@ export function QrLabelsScreen({ onClose }: { onClose: () => void }) {
       {/* On-screen preview */}
       <div style={{ padding: "70px 20px 20px", maxWidth: 800, margin: "0 auto" }}>
         <p style={{ fontFamily: "var(--font-body), cursive", color: "#666", fontSize: 14, marginBottom: 16 }}>
-          {filtered.length} labels ready to print · {pages.length} page{pages.length > 1 ? "s" : ""} (40 per A4)
+          {filtered.length} labels · {pages.length} page{pages.length > 1 ? "s" : ""} (40 per A4) · tap "⬇ Download labels" to save, then open the file and print to adhesive sheets.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
           {filtered.slice(0, 40).map((c) => (
