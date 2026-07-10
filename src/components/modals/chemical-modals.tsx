@@ -21,6 +21,7 @@ import {
   Highlighter,
 } from "@/components/notebook/primitives";
 import { QrIcon, PencilIcon, TrashIcon, PlusIcon, MinusIcon } from "@/components/notebook/icons";
+import { LogHistory } from "@/components/notebook/log-history";
 
 const UNITS: ChemicalUnit[] = ["mL", "g", "mg", "L", "kg", "drops", "pcs"];
 
@@ -254,6 +255,20 @@ export function ChemicalDetailModal({
         >
           <QrIcon width="16" height="16" /> view QR code
         </button>
+
+        {/* Activity history with edit/delete */}
+        <div
+          className="mt-3 pt-3"
+          style={{ borderTop: "1.5px dashed var(--ruled-line)" }}
+        >
+          <h4
+            className="font-display text-lg font-bold mb-2"
+            style={{ color: "var(--ink)" }}
+          >
+            activity log
+          </h4>
+          <LogHistory item={chemical} itemType="chemical" />
+        </div>
       </div>
     </Modal>
   );

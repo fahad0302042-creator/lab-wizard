@@ -20,6 +20,7 @@ import {
   Highlighter,
 } from "@/components/notebook/primitives";
 import { PencilIcon, TrashIcon, PlusIcon, MinusIcon } from "@/components/notebook/icons";
+import { LogHistory } from "@/components/notebook/log-history";
 
 const CATEGORIES: ApparatusCategory[] = [
   "glassware",
@@ -271,12 +272,24 @@ export function ApparatusDetailModal({
             </p>
           </div>
         )}
+
+        {/* Activity history with edit/delete */}
+        <div
+          className="mt-3 pt-3"
+          style={{ borderTop: "1.5px dashed var(--ruled-line)" }}
+        >
+          <h4
+            className="font-display text-lg font-bold mb-2"
+            style={{ color: "var(--ink)" }}
+          >
+            activity log
+          </h4>
+          <LogHistory item={apparatus} itemType="apparatus" />
+        </div>
       </div>
     </Modal>
   );
 }
-
-/* ============ Restock / Breakage shared form ============ */
 
 function ApparatusLogForm({
   apparatus,

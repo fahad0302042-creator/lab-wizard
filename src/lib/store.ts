@@ -85,6 +85,10 @@ interface LabState {
   // scanner
   pushRecentScan: (chemicalId: string) => void;
 
+  // log editing
+  updateLog: (logId: string, patch: { amount?: number; note?: string; logged_at?: string }) => Promise<void>;
+  deleteLog: (logId: string) => Promise<void>;
+
   // reports
   clearMonth: (monthKey: string) => Promise<void>;
 
@@ -447,6 +451,111 @@ export const useLabStore = create<LabState>()(
         }
         set((s) => ({
           logs: s.logs.filter((l) => l.logged_at.slice(0, 7) !== monthKey),
+        }));
+      },
+
+      // ============ LOG EDITING ============
+
+      updateLog: async (logId, patch) => {
+        const supabase = getSupabase();
+        const state = get();
+        const log = state.logs.find((l) => l.id === logId);
+        if (!log) return;
+
+        // Calculate quantity adjustment
+        const oldAmount = log.amount;
+        const newAmount = patch.amount ?? oldAmount;
+        const diff = newAmount - oldAmount;
+
+        // Apply the patch to the log
+        const updatedLog = {
+          ...log,
+          amount: newAmount,
+          note: patch.note ?? log.note,
+          logged_at: patch.logged_at ?? log.logged_at,
+        };
+
+        if (supabase) {
+          const { error } = await supabase
+            .from("consumption_logs")
+            .update({
+              amount: newAmount,
+              note: patch.note ?? log.note,
+              logged_at: patch.logged_at ?? log.logged_at,
+            })
+            .eq("id", logId);
+          if (error) throw error;
+        }
+
+        // Update the item quantity based on the diff
+        if (diff !== 0) {
+          if (log.item_type === "chemical") {
+            const item = state.chemicals.find((c) => c.id === log.item_id);
+            if (item) {
+              let newQty = item.quantity;
+              if (log.action === "consume" || log.action === "breakage") {
+                newQty = Math.max(0, newQty + diff); // reverse old, apply new
+              } else if (log.action === "restock") {
+                newQty = Math.max(0, newQty - diff);
+              }
+              await get().updateChemical(item.id, { quantity: newQty });
+            }
+          } else {
+            const item = state.apparatus.find((a) => a.id === log.item_id);
+            if (item) {
+              let newQty = item.quantity;
+              if (log.action === "breakage") {
+                newQty = Math.max(0, newQty + diff);
+              } else if (log.action === "restock") {
+                newQty = Math.max(0, newQty - diff);
+              }
+              await get().updateApparatus(item.id, { quantity: newQty });
+            }
+          }
+        }
+
+        set((s) => ({
+          logs: s.logs.map((l) => (l.id === logId ? updatedLog : l)),
+        }));
+      },
+
+      deleteLog: async (logId) => {
+        const supabase = getSupabase();
+        const state = get();
+        const log = state.logs.find((l) => l.id === logId);
+        if (!log) return;
+
+        // Reverse the quantity change
+        if (log.item_type === "chemical") {
+          const item = state.chemicals.find((c) => c.id === log.item_id);
+          if (item) {
+            let newQty = item.quantity;
+            if (log.action === "consume") {
+              newQty = newQty + log.amount; // give back the consumed amount
+            } else if (log.action === "restock") {
+              newQty = Math.max(0, newQty - log.amount); // take away the restocked amount
+            }
+            await get().updateChemical(item.id, { quantity: newQty });
+          }
+        } else {
+          const item = state.apparatus.find((a) => a.id === log.item_id);
+          if (item) {
+            let newQty = item.quantity;
+            if (log.action === "breakage") {
+              newQty = newQty + log.amount;
+            } else if (log.action === "restock") {
+              newQty = Math.max(0, newQty - log.amount);
+            }
+            await get().updateApparatus(item.id, { quantity: newQty });
+          }
+        }
+
+        if (supabase) {
+          await supabase.from("consumption_logs").delete().eq("id", logId);
+        }
+
+        set((s) => ({
+          logs: s.logs.filter((l) => l.id !== logId),
         }));
       },
 
