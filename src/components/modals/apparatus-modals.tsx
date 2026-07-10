@@ -437,6 +437,9 @@ function EditApparatusForm({
   const [lowStockThreshold, setLowStockThreshold] = useState(
     String(apparatus.low_stock_threshold || "")
   );
+  const [exactQuantity, setExactQuantity] = useState("");
+  const [correctionNote, setCorrectionNote] = useState("");
+  const [showCorrection, setShowCorrection] = useState(false);
   const [notes, setNotes] = useState(apparatus.notes);
 
   const submit = async () => {
@@ -455,6 +458,25 @@ function EditApparatusForm({
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "couldn't update");
+    }
+  };
+
+  const applyCorrection = async () => {
+    const newQty = Number(exactQuantity);
+    if (!Number.isFinite(newQty) || newQty < 0) {
+      toast.error("enter a valid quantity ≥ 0");
+      return;
+    }
+    if (newQty === apparatus.quantity) {
+      toast.error("new quantity is the same as current");
+      return;
+    }
+    try {
+      await updateApparatus(apparatus.id, { quantity: newQty });
+      toast.success(`quantity corrected: ${apparatus.quantity} → ${newQty}`);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "couldn't correct quantity");
     }
   };
 
@@ -505,6 +527,63 @@ function EditApparatusForm({
           placeholder="0 = not set"
         />
         <RuledTextarea label="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+
+        {/* Quantity correction — for fixing wrong entries */}
+        <div
+          style={{
+            marginTop: "8px",
+            padding: "12px",
+            border: "1.5px dashed var(--margin-red)",
+            borderRadius: "4px 8px 3px 9px / 8px 3px 9px 2px",
+            background: "color-mix(in srgb, var(--margin-red) 5%, var(--card-fill))",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowCorrection(!showCorrection)}
+            className="font-display text-lg font-bold w-full text-left"
+            style={{ color: "var(--margin-red)" }}
+          >
+            {showCorrection ? "▼" : "▶"} fix wrong quantity
+          </button>
+          {showCorrection && (
+            <div className="mt-3 flex flex-col gap-3">
+              <p className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>
+                current: <strong>{apparatus.quantity}</strong> — enter the correct amount if you made a data-entry error.
+              </p>
+              <RuledInput
+                label="correct quantity"
+                type="number"
+                inputMode="decimal"
+                value={exactQuantity}
+                onChange={(e) => setExactQuantity(e.target.value)}
+                placeholder={String(apparatus.quantity)}
+              />
+              <RuledTextarea
+                label="why are you correcting it? (optional)"
+                value={correctionNote}
+                onChange={(e) => setCorrectionNote(e.target.value)}
+                placeholder="e.g. miscounted during stocktake"
+              />
+              <button
+                type="button"
+                onClick={applyCorrection}
+                className="font-display text-base font-bold"
+                style={{
+                  color: "white",
+                  background: "var(--margin-red)",
+                  border: "none",
+                  padding: "8px 16px",
+                  borderRadius: "999px",
+                  cursor: "pointer",
+                  alignSelf: "flex-start",
+                }}
+              >
+                apply correction
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       <div
         className="px-5 py-3 flex items-center justify-end gap-2 flex-wrap sticky bottom-0"
