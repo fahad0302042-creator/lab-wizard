@@ -21,6 +21,7 @@ import {
 } from "@/components/notebook/primitives";
 import { PencilIcon, TrashIcon, PlusIcon, MinusIcon } from "@/components/notebook/icons";
 import { LogHistory } from "@/components/notebook/log-history";
+import { hapticSuccess } from "@/lib/haptics";
 
 const CATEGORIES: ApparatusCategory[] = [
   "glassware",
@@ -334,13 +335,14 @@ function ApparatusLogForm({
           duration: 5000,
           action: {
             label: "undo",
-            onClick: async () => {
-              await undo();
-              toast.info("undone");
+            onClick: () => {
+              undo().then(() => toast.info("undone"))
+                    .catch(() => toast.error("couldn't undo"));
             },
           },
         }
       );
+      hapticSuccess();
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "couldn't log action");

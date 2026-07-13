@@ -22,6 +22,7 @@ import {
 } from "@/components/notebook/primitives";
 import { QrIcon, PencilIcon, TrashIcon, PlusIcon, MinusIcon } from "@/components/notebook/icons";
 import { LogHistory } from "@/components/notebook/log-history";
+import { hapticSuccess } from "@/lib/haptics";
 
 const UNITS: ChemicalUnit[] = ["mL", "g", "mg", "L", "kg", "drops", "pcs"];
 
@@ -319,12 +320,13 @@ function ChemicalLogForm({
         duration: 5000,
         action: {
           label: "undo",
-          onClick: async () => {
-            await undo();
-            toast.info("undone — quantity restored");
+          onClick: () => {
+            undo().then(() => toast.info("undone — quantity restored"))
+                  .catch(() => toast.error("couldn't undo"));
           },
         },
       });
+      hapticSuccess();
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "couldn't log action");

@@ -295,6 +295,39 @@ export function DashboardScreen({
         </NotebookCard>
       </div>
 
+      {/* Low-stock list */}
+      {lowStock.length > 0 && (
+        <div className="mb-6">
+          <SectionTitle>needs restocking</SectionTitle>
+          <NotebookCard tilt={0} className="mt-3">
+            <div className="flex flex-col">
+              {lowStock.slice(0, 5).map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between py-1.5 border-b border-dashed last:border-0"
+                  style={{ borderColor: "var(--ruled-line)" }}
+                >
+                  <span className="font-body text-sm" style={{ color: "var(--ink)" }}>
+                    {item.name}
+                  </span>
+                  <span
+                    className="font-body text-sm font-bold"
+                    style={{ color: "var(--margin-red)" }}
+                  >
+                    {item.quantity} {item.unit ?? ""}
+                  </span>
+                </div>
+              ))}
+              {lowStock.length > 5 && (
+                <p className="font-body text-xs text-center mt-2" style={{ color: "var(--ink-muted)" }}>
+                  + {lowStock.length - 5} more — see chemicals tab
+                </p>
+              )}
+            </div>
+          </NotebookCard>
+        </div>
+      )}
+
       {/* Quick actions */}
       <div className="mb-6">
         <SectionTitle>quick actions</SectionTitle>

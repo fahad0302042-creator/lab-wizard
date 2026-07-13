@@ -32,6 +32,7 @@ interface ChemicalsProps {
   onOpenDetail: (c: Chemical) => void;
   onPrintQrLabels: () => void;
   onQuickConsume: (c: Chemical) => void;
+  onQuickRestock: (c: Chemical) => void;
 }
 
 const TAPE_CYCLE = ["yellow", "blue", "green", "pink", "none", "none"] as const;
@@ -43,15 +44,17 @@ export function ChemicalsScreen({
   onOpenDetail,
   onPrintQrLabels,
   onQuickConsume,
+  onQuickRestock,
 }: ChemicalsProps) {
   const chemicals = useLabStore((s) => s.chemicals);
   const [filter, setFilter] = useState<Filter>("all");
+  const [sortBy, setSortBy] = useState<"name" | "quantity" | "status">("name");
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   const effectiveSearch = (searchQuery || localSearch).toLowerCase().trim();
 
   const filtered = useMemo(() => {
-    return chemicals.filter((c) => {
+    const result = chemicals.filter((c) => {
       const status = stockStatus(c);
       if (filter === "low" && !(status === "low" || status === "critical")) return false;
       if (filter === "critical" && status !== "critical" && status !== "empty") return false;
@@ -61,7 +64,18 @@ export function ChemicalsScreen({
       }
       return true;
     });
-  }, [chemicals, filter, effectiveSearch]);
+    // Sort
+    result.sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "quantity") return b.quantity - a.quantity;
+      if (sortBy === "status") {
+        const order = { empty: 0, critical: 1, low: 2, healthy: 3 };
+        return (order[stockStatus(a)] ?? 4) - (order[stockStatus(b)] ?? 4);
+      }
+      return 0;
+    });
+    return result;
+  }, [chemicals, filter, effectiveSearch, sortBy]);
 
   return (
     <PullToRefresh onRefresh={async () => { /* data is reactive via Supabase */ }}>
@@ -104,6 +118,16 @@ export function ChemicalsScreen({
         </span>
       </div>
 
+      {/* Sort */}
+      <div className="flex items-center gap-3 mb-5">
+        <span className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>sort:</span>
+        {(["name", "quantity", "status"] as const).map((s) => (
+          <FilterPill key={s} active={sortBy === s} onClick={() => setSortBy(s)}>
+            {s}
+          </FilterPill>
+        ))}
+      </div>
+
       {/* Print QR labels */}
       {chemicals.length > 0 && (
         <div className="mb-5">
@@ -141,6 +165,7 @@ export function ChemicalsScreen({
               index={i}
               onOpen={() => onOpenDetail(c)}
               onQuickConsume={() => onQuickConsume(c)}
+              onQuickRestock={() => onQuickRestock(c)}
             />
           ))}
         </div>
@@ -191,11 +216,13 @@ function ChemicalCard({
   index,
   onOpen,
   onQuickConsume,
+  onQuickRestock,
 }: {
   chemical: Chemical;
   index: number;
   onOpen: () => void;
   onQuickConsume: () => void;
+  onQuickRestock: () => void;
 }) {
   const status = stockStatus(chemical);
   const pct = percentRemaining(chemical);
@@ -228,6 +255,9 @@ function ChemicalCard({
         actionLabel={canConsume ? "use" : "—"}
         actionColor={canConsume ? "var(--margin-red)" : "var(--ink-muted)"}
         onAction={canConsume ? onQuickConsume : () => {}}
+        rightActionLabel="restock"
+        rightActionColor="var(--stock-healthy)"
+        onRightAction={onQuickRestock}
       >
         <NotebookCard
           tape={tape}

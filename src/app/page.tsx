@@ -159,6 +159,11 @@ export default function Page() {
                 setLogChemAction("consume");
                 setLogChemOpen(true);
               }}
+              onQuickRestock={(c) => {
+                setLogChem(c);
+                setLogChemAction("restock");
+                setLogChemOpen(true);
+              }}
             />
           )}
           {tab === "apparatus" && (

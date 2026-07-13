@@ -16,6 +16,10 @@ interface SwipeableCardProps {
   actionLabel: string;
   actionColor: string;
   onAction: () => void;
+  /** Optional right-swipe action (swipe right to restock) */
+  rightActionLabel?: string;
+  rightActionColor?: string;
+  onRightAction?: () => void;
 }
 
 export function SwipeableCard({
@@ -23,9 +27,13 @@ export function SwipeableCard({
   actionLabel,
   actionColor,
   onAction,
+  rightActionLabel,
+  rightActionColor,
+  onRightAction,
 }: SwipeableCardProps) {
   const [offset, setOffset] = useState(0);
   const [showAction, setShowAction] = useState(false);
+  const [showRightAction, setShowRightAction] = useState(false);
   const [dragging, setDragging] = useState(false);
   const startX = useRef(0);
   const startY = useRef(0);
@@ -54,7 +62,7 @@ export function SwipeableCard({
       moved.current = true;
     }
     if (isHorizontal.current) {
-      const clamped = Math.max(-ACTION_WIDTH, Math.min(0, dx));
+      const clamped = Math.max(-ACTION_WIDTH, Math.min(onRightAction ? ACTION_WIDTH : 0, dx));
       setOffset(clamped);
     }
   };
@@ -65,9 +73,15 @@ export function SwipeableCard({
     if (offset < -ACTION_WIDTH / 2) {
       setOffset(-ACTION_WIDTH);
       setShowAction(true);
+      setShowRightAction(false);
+    } else if (offset > ACTION_WIDTH / 2 && onRightAction) {
+      setOffset(ACTION_WIDTH);
+      setShowRightAction(true);
+      setShowAction(false);
     } else {
       setOffset(0);
       setShowAction(false);
+      setShowRightAction(false);
     }
   };
 
@@ -78,9 +92,16 @@ export function SwipeableCard({
     setShowAction(false);
   };
 
+  const handleRightActionClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRightAction?.();
+    setOffset(0);
+    setShowRightAction(false);
+  };
+
   return (
     <div style={{ position: "relative" }}>
-      {/* Action strip behind the card — springs in when revealed */}
+      {/* Left action strip (swipe left = consume) */}
       {showAction && (
         <div
           onClick={handleActionClick}
@@ -100,9 +121,6 @@ export function SwipeableCard({
             fontWeight: 700,
             cursor: "pointer",
             borderRadius: "0 8px 8px 0",
-            transform: "scaleX(1)",
-            transformOrigin: "right center",
-            transition: "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
             zIndex: 3,
           }}
         >
@@ -110,7 +128,34 @@ export function SwipeableCard({
         </div>
       )}
 
-      {/* The card itself — slides left on swipe, clicks pass through to children */}
+      {/* Right action strip (swipe right = restock) */}
+      {showRightAction && onRightAction && (
+        <div
+          onClick={handleRightActionClick}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            width: ACTION_WIDTH,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: rightActionColor || "var(--stock-healthy)",
+            color: "white",
+            fontFamily: "var(--font-display), cursive",
+            fontSize: "16px",
+            fontWeight: 700,
+            cursor: "pointer",
+            borderRadius: "8px 0 0 8px",
+            zIndex: 3,
+          }}
+        >
+          {rightActionLabel || "restock"}
+        </div>
+      )}
+
+      {/* The card itself — slides on swipe, clicks pass through to children */}
       <div
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}

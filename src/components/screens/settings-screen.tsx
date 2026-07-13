@@ -22,6 +22,35 @@ export function SettingsScreen() {
 
   const isDark = theme === "dark";
 
+  const exportCSV = (type: "chemicals" | "apparatus") => {
+    const data = type === "chemicals" ? chemicals : apparatus;
+    if (data.length === 0) {
+      toast.error(`no ${type} to export`);
+      return;
+    }
+    const headers = type === "chemicals"
+      ? ["Name", "Formula", "Quantity", "Unit", "Low Stock Threshold", "Notes", "QR Code", "Created At"]
+      : ["Name", "Category", "Quantity", "Low Stock Threshold", "Notes", "Created At"];
+    const rows = data.map((item: Record<string, unknown>) =>
+      type === "chemicals"
+        ? [item.name, item.formula, item.quantity, item.unit, item.low_stock_threshold ?? 0, item.notes, item.qr_code, item.created_at]
+        : [item.name, item.category, item.quantity, item.low_stock_threshold ?? 0, item.notes, item.created_at]
+    );
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell: unknown) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lab-wizard-${type}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`exported ${data.length} ${type}`);
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -139,8 +168,29 @@ export function SettingsScreen() {
             <strong style={{ color: "var(--ink)" }}>{counts.logs}</strong> log entries.
           </p>
           <p className="pt-2">
-            data is stored locally in your browser. a Supabase backend can be wired in later — the data layer is isolated in <code style={{ color: "var(--ink)" }}>lib/store.ts</code>.
+            data is synced via Supabase — sign in on any device to see your inventory.
           </p>
+        </div>
+      </NotebookCard>
+
+      {/* Data export */}
+      <NotebookCard tilt={0} className="mb-4">
+        <h3
+          className="font-display text-2xl font-bold mb-2"
+          style={{ color: "var(--ink)" }}
+        >
+          export data
+        </h3>
+        <p className="font-body text-sm mb-3" style={{ color: "var(--ink-muted)" }}>
+          download your inventory as CSV for backup or spreadsheet use.
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <CircledButton onClick={() => exportCSV("chemicals")}>
+            chemicals CSV
+          </CircledButton>
+          <CircledButton onClick={() => exportCSV("apparatus")}>
+            apparatus CSV
+          </CircledButton>
         </div>
       </NotebookCard>
 
