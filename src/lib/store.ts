@@ -85,6 +85,9 @@ interface LabState {
   // scanner
   pushRecentScan: (chemicalId: string) => void;
 
+  // batch consume — multiple items at once
+  batchConsume: (entries: { itemId: string; itemType: ItemType; amount: number; note?: string }[]) => Promise<void>;
+
   // log editing
   updateLog: (logId: string, patch: { amount?: number; note?: string; logged_at?: string }) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
@@ -212,13 +215,22 @@ export const useLabStore = create<LabState>()(
             supabase.from("consumption_logs").select("*").order("logged_at", { ascending: false }),
           ]);
 
-          set({
-            chemicals: (chemRes.data || []) as Chemical[],
-            apparatus: (appRes.data || []) as Apparatus[],
-            logs: (logRes.data || []) as ConsumptionLog[],
-            loading: false,
-          });
+          // Only update if we got data — if offline, keep cached data
+          const chemData = chemRes.data;
+          const appData = appRes.data;
+          const logData = logRes.data;
+          if (chemData || appData || logData) {
+            set({
+              chemicals: (chemData || get().chemicals) as Chemical[],
+              apparatus: (appData || get().apparatus) as Apparatus[],
+              logs: (logData || get().logs) as ConsumptionLog[],
+              loading: false,
+            });
+          } else {
+            set({ loading: false });
+          }
         } catch {
+          // Offline or error — keep cached data from localStorage
           set({ loading: false });
         }
       },
@@ -266,7 +278,8 @@ export const useLabStore = create<LabState>()(
         const supabase = getSupabase();
         if (supabase) {
           const { error } = await supabase.from("chemicals").update(patch).eq("id", id);
-          if (error) throw error;
+          // If offline/error, still update local state (will sync next time)
+          if (error && !/network|fetch/i.test(error.message)) throw error;
         }
         set((s) => ({
           chemicals: s.chemicals.map((c) => (c.id === id ? { ...c, ...patch } : c)),
@@ -328,7 +341,7 @@ export const useLabStore = create<LabState>()(
         const supabase = getSupabase();
         if (supabase) {
           const { error } = await supabase.from("apparatus").update(patch).eq("id", id);
-          if (error) throw error;
+          if (error && !/network|fetch/i.test(error.message)) throw error;
         }
         set((s) => ({
           apparatus: s.apparatus.map((a) => (a.id === id ? { ...a, ...patch } : a)),
@@ -419,7 +432,8 @@ export const useLabStore = create<LabState>()(
             await cur.updateApparatus(record.itemId, { quantity: record.prevQuantity });
           }
           if (supabase) {
-            await supabase.from("consumption_logs").delete().eq("id", logId);
+            await supabase.from("consumption_logs").delete().eq("id", logId).then(() => {})
+              .catch(() => {/* offline — local state already updated */});
           }
           set((s) => ({
             logs: s.logs.filter((l) => l.id !== logId),
@@ -434,6 +448,63 @@ export const useLabStore = create<LabState>()(
         set((s) => ({
           recentScans: [chemicalId, ...s.recentScans.filter((id) => id !== chemicalId)].slice(0, 8),
         })),
+
+      // ============ BATCH CONSUME ============
+
+      batchConsume: async (entries) => {
+        const supabase = getSupabase();
+        const userId = get().user?.id;
+        if (!userId) throw new Error("not signed in");
+        const isoDate = dateToNoonISO(todayLocalDate());
+
+        for (const entry of entries) {
+          if (entry.amount <= 0) continue;
+          // Update quantity
+          if (entry.itemType === "chemical") {
+            const item = get().chemicals.find((c) => c.id === entry.itemId);
+            if (item) {
+              const newQty = Math.max(0, item.quantity - entry.amount);
+              await get().updateChemical(item.id, { quantity: newQty });
+            }
+          } else {
+            const item = get().apparatus.find((a) => a.id === entry.itemId);
+            if (item) {
+              const newQty = Math.max(0, item.quantity - entry.amount);
+              await get().updateApparatus(item.id, { quantity: newQty });
+            }
+          }
+
+          // Create log entry
+          const logBase = {
+            item_id: entry.itemId,
+            item_type: entry.itemType,
+            action: "consume" as LogAction,
+            amount: entry.amount,
+            note: entry.note?.trim() ?? "",
+            logged_at: isoDate,
+          };
+
+          let logId: string;
+          if (supabase && userId) {
+            const { data, error } = await supabase
+              .from("consumption_logs")
+              .insert({ ...logBase, user_id: userId })
+              .select()
+              .single();
+            if (error) throw error;
+            logId = (data as ConsumptionLog).id;
+          } else {
+            logId = uid();
+          }
+
+          const log: ConsumptionLog = {
+            id: logId,
+            ...logBase,
+            created_at: new Date().toISOString(),
+          };
+          set((s) => ({ logs: [log, ...s.logs] }));
+        }
+      },
 
       // ============ REPORTS ============
 
@@ -582,9 +653,13 @@ export const useLabStore = create<LabState>()(
     {
       name: "lab-wizard-v3",
       storage: createJSONStorage(() => localStorage),
-      // Only persist user + recentScans — actual data comes from Supabase on load
+      // Persist everything — serves as offline cache.
+      // On reconnect, loadAll() refreshes from Supabase.
       partialize: (state) => ({
         user: state.user,
+        chemicals: state.chemicals,
+        apparatus: state.apparatus,
+        logs: state.logs,
         recentScans: state.recentScans,
       }),
     }

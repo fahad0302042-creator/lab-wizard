@@ -26,9 +26,15 @@ export const metadata: Metadata = {
   title: "Lab Wizard — chemistry lab inventory",
   description:
     "A handwritten lab notebook for tracking chemicals, apparatus, consumption and breakages with QR scanning.",
+  manifest: "/manifest.json",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Lab Wizard",
   },
 };
 

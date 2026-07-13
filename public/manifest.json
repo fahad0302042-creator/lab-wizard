@@ -1,0 +1,24 @@
+{
+  "name": "Lab Wizard — chemistry lab inventory",
+  "short_name": "Lab Wizard",
+  "description": "A handwritten lab notebook for tracking chemicals, apparatus, consumption and breakages with QR scanning.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF7EC",
+  "theme_color": "#FBF7EC",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

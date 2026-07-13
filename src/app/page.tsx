@@ -26,6 +26,7 @@ import {
   ApparatusLogModal,
   EditApparatusModal,
 } from "@/components/modals/apparatus-modals";
+import { BatchConsumeModal } from "@/components/modals/batch-consume-modal";
 
 export default function Page() {
   const user = useLabStore((s) => s.user);
@@ -72,6 +73,7 @@ export default function Page() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [qrLabelsOpen, setQrLabelsOpen] = useState(false);
+  const [batchConsumeOpen, setBatchConsumeOpen] = useState(false);
 
   const openChemDetail = (c: Chemical) => {
     setDetailChem(c);
@@ -164,6 +166,7 @@ export default function Page() {
                 setLogChemAction("restock");
                 setLogChemOpen(true);
               }}
+              onBatchConsume={() => setBatchConsumeOpen(true)}
             />
           )}
           {tab === "apparatus" && (
@@ -345,6 +348,12 @@ export default function Page() {
         apparatus={editApp}
         open={editAppOpen}
         onClose={() => setEditAppOpen(false)}
+      />
+
+      {/* Batch consume */}
+      <BatchConsumeModal
+        open={batchConsumeOpen}
+        onClose={() => setBatchConsumeOpen(false)}
       />
     </div>
   );

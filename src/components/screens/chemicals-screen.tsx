@@ -33,6 +33,7 @@ interface ChemicalsProps {
   onPrintQrLabels: () => void;
   onQuickConsume: (c: Chemical) => void;
   onQuickRestock: (c: Chemical) => void;
+  onBatchConsume: () => void;
 }
 
 const TAPE_CYCLE = ["yellow", "blue", "green", "pink", "none", "none"] as const;
@@ -45,6 +46,7 @@ export function ChemicalsScreen({
   onPrintQrLabels,
   onQuickConsume,
   onQuickRestock,
+  onBatchConsume,
 }: ChemicalsProps) {
   const chemicals = useLabStore((s) => s.chemicals);
   const [filter, setFilter] = useState<Filter>("all");
@@ -128,9 +130,16 @@ export function ChemicalsScreen({
         ))}
       </div>
 
-      {/* Print QR labels */}
+      {/* Quick actions: batch consume + QR labels */}
       {chemicals.length > 0 && (
-        <div className="mb-5">
+        <div className="mb-5 flex gap-4 flex-wrap">
+          <button
+            onClick={onBatchConsume}
+            className="font-body text-sm underline flex items-center gap-1"
+            style={{ color: "var(--margin-red)", textUnderlineOffset: "3px" }}
+          >
+            batch consume (multiple)
+          </button>
           <button
             onClick={onPrintQrLabels}
             className="font-body text-sm underline flex items-center gap-1"
