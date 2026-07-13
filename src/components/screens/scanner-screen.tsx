@@ -89,7 +89,9 @@ export function ScannerScreen({ onScanned }: ScannerProps) {
           // Expected format: labwizard:chemical:<uuid>
           const match = decodedText.match(/^labwizard:chemical:(.+)$/);
           const qr = match ? match[1] : decodedText;
-          const chem = chemicals.find((c) => c.qr_code === qr);
+          // Always get fresh chemicals from the store (avoids stale closure)
+          const freshChemicals = useLabStore.getState().chemicals;
+          const chem = freshChemicals.find((c) => c.qr_code === qr);
           if (chem) {
             pushRecentScan(chem.id);
             stopScanning();
