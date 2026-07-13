@@ -242,7 +242,7 @@ function ApparatusCard({
           style={{ color: statusColor(status) }}
         >
           {status === "empty" ? (
-            <Highlighter>0% — (out!)</Highlighter>
+            <Highlighter>out of stock!</Highlighter>
           ) : (
             caption
           )}

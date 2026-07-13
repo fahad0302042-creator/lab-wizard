@@ -282,7 +282,7 @@ function ChemicalCard({
           >
             {status === "empty" ? (
               <>
-                <Highlighter>0% — (empty!)</Highlighter>
+                <Highlighter>out of stock!</Highlighter>
               </>
             ) : (
               caption
