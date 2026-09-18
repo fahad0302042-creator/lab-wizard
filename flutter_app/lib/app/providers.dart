@@ -365,6 +365,35 @@ class InventoryController extends Notifier<InventoryState> {
     );
   }
 
+  Future<void> updateItem({
+    required ItemKind type,
+    required String id,
+    required Map<String, dynamic> changes,
+  }) async {
+    final userId = _requireUser();
+    final saved = await _repository.updateItem(
+      userId: userId,
+      type: type,
+      id: id,
+      changes: changes,
+    );
+    final cached = await _repository.loadCached(userId);
+    state = state.copyWith(
+      chemicals: type == ItemKind.chemical
+          ? state.chemicals
+                .map((item) => item.id == id ? Chemical.fromMap(saved) : item)
+                .toList()
+          : state.chemicals,
+      apparatus: type == ItemKind.apparatus
+          ? state.apparatus
+                .map((item) => item.id == id ? Apparatus.fromMap(saved) : item)
+                .toList()
+          : state.apparatus,
+      pendingCount: cached.pendingCount,
+      fromCache: cached.pendingCount > 0,
+    );
+  }
+
   Future<void> applyAction({
     required String itemId,
     required ItemKind itemType,

@@ -25,6 +25,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   ItemKind _kind = ItemKind.chemical;
   bool _exporting = false;
 
+  bool get _isCurrentMonth {
+    final now = DateTime.now();
+    return _month.year == now.year && _month.month == now.month;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inventoryProvider);
@@ -47,55 +52,73 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         .length;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(42, 18, 18, 32),
+      padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
       children: [
         const PageHeading('monthly report'),
-        const SizedBox(height: 6),
-        SizedBox(
-          height: 42,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: 12,
-            separatorBuilder: (_, _) => const SizedBox(width: 7),
-            itemBuilder: (_, index) {
-              final date = DateTime(
-                DateTime.now().year,
-                DateTime.now().month - index,
-              );
-              final selected =
-                  date.year == _month.year && date.month == _month.month;
-              return ChoiceChip(
-                label: Text(DateFormat('MMM yyyy').format(date)),
-                selected: selected,
-                onSelected: (_) => setState(() => _month = date),
-              );
-            },
+        const SizedBox(height: 2),
+        NotebookCard(
+          tape: NotebookTape.yellow,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Previous month',
+                onPressed: () => setState(
+                  () => _month = DateTime(_month.year, _month.month - 1),
+                ),
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Expanded(
+                child: Text(
+                  DateFormat('MMMM yyyy').format(_month),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Caveat',
+                    fontSize: 23,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Next month',
+                onPressed: _isCurrentMonth
+                    ? null
+                    : () => setState(
+                        () => _month = DateTime(_month.year, _month.month + 1),
+                      ),
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 14),
-        SegmentedButton<ItemKind>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(
-              value: ItemKind.chemical,
-              label: Text('Chemicals'),
-              icon: Icon(Icons.science_outlined),
+        Row(
+          children: [
+            const Icon(Icons.science_outlined, size: 19),
+            const SizedBox(width: 4),
+            NotebookFilterWord(
+              label: 'chemicals',
+              selected: _kind == ItemKind.chemical,
+              onTap: () => setState(() => _kind = ItemKind.chemical),
+              fontSize: 21,
             ),
-            ButtonSegment(
-              value: ItemKind.apparatus,
-              label: Text('Apparatus'),
-              icon: Icon(Icons.precision_manufacturing_outlined),
+            const SizedBox(width: 20),
+            const Icon(Icons.precision_manufacturing_outlined, size: 19),
+            const SizedBox(width: 4),
+            NotebookFilterWord(
+              label: 'apparatus',
+              selected: _kind == ItemKind.apparatus,
+              onTap: () => setState(() => _kind = ItemKind.apparatus),
+              fontSize: 21,
             ),
           ],
-          selected: {_kind},
-          onSelectionChanged: (value) => setState(() => _kind = value.first),
         ),
         const SizedBox(height: 18),
         Row(
           children: [
             Expanded(
               child: _ReportMetric(
-                label: 'used',
+                label: 'usage actions',
                 value: consumed,
                 color: LabColors.amber,
               ),
@@ -103,7 +126,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             const SizedBox(width: 9),
             Expanded(
               child: _ReportMetric(
-                label: 'added',
+                label: 'restocks',
                 value: restocked,
                 color: LabColors.green,
               ),
@@ -111,7 +134,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             const SizedBox(width: 9),
             Expanded(
               child: _ReportMetric(
-                label: 'broken',
+                label: 'damage',
                 value: broken,
                 color: LabColors.marginRed,
               ),

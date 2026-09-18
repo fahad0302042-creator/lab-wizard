@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../features/inventory/domain/models.dart';
 import '../theme/app_theme.dart';
 
+enum NotebookTape { none, yellow, blue, green, pink }
+
 class NotebookPage extends StatelessWidget {
   const NotebookPage({
     required this.child,
@@ -18,11 +20,21 @@ class NotebookPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = DecoratedBox(
-      decoration: BoxDecoration(color: context.paperColor),
+      decoration: BoxDecoration(
+        color: context.paperColor,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x35000000),
+            blurRadius: 22,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
       child: CustomPaint(
         painter: _PaperPainter(
           ruled: context.ruledColor,
-          margin: LabColors.marginRed.withValues(alpha: .28),
+          margin: context.marginLineColor,
+          desk: Theme.of(context).scaffoldBackgroundColor,
         ),
         child: child,
       ),
@@ -32,46 +44,69 @@ class NotebookPage extends StatelessWidget {
 }
 
 class _PaperPainter extends CustomPainter {
-  const _PaperPainter({required this.ruled, required this.margin});
+  const _PaperPainter({
+    required this.ruled,
+    required this.margin,
+    required this.desk,
+  });
 
   final Color ruled;
   final Color margin;
+  final Color desk;
 
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
       ..color = ruled
       ..strokeWidth = 1;
-    for (double y = 94; y < size.height; y += 34) {
-      canvas.drawLine(
-        Offset.zero.translate(0, y),
-        Offset(size.width, y),
-        linePaint,
-      );
+    for (double y = 70; y < size.height; y += 27) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
     }
-    final marginPaint = Paint()
-      ..color = margin
-      ..strokeWidth = 1.2;
-    canvas.drawLine(const Offset(28, 0), Offset(28, size.height), marginPaint);
+    canvas.drawLine(
+      const Offset(38.5, 0),
+      Offset(38.5, size.height),
+      Paint()
+        ..color = margin
+        ..strokeWidth = 1.4,
+    );
+
+    // A restrained torn-paper edge, matching the web page without making the
+    // Android status area noisy.
+    final tear = Path()..moveTo(0, 1);
+    for (double x = 0; x <= size.width + 12; x += 12) {
+      tear
+        ..lineTo(x + 6, 4)
+        ..lineTo(x + 12, 1);
+    }
+    canvas.drawPath(
+      tear,
+      Paint()
+        ..color = desk.withValues(alpha: .45)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _PaperPainter oldDelegate) =>
-      oldDelegate.ruled != ruled || oldDelegate.margin != margin;
+      oldDelegate.ruled != ruled ||
+      oldDelegate.margin != margin ||
+      oldDelegate.desk != desk;
 }
 
 class PageHeading extends StatelessWidget {
-  const PageHeading(this.text, {this.trailing, super.key});
+  const PageHeading(this.text, {this.trailing, this.fontSize, super.key});
 
   final String text;
   final Widget? trailing;
+  final double? fontSize;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: SketchTitle(text)),
+        Expanded(child: SketchTitle(text, fontSize: fontSize ?? 35)),
         ?trailing,
       ],
     );
@@ -79,7 +114,7 @@ class PageHeading extends StatelessWidget {
 }
 
 class SketchTitle extends StatefulWidget {
-  const SketchTitle(this.text, {this.fontSize = 34, super.key});
+  const SketchTitle(this.text, {this.fontSize = 35, super.key});
 
   final String text;
   final double fontSize;
@@ -97,7 +132,7 @@ class _SketchTitleState extends State<SketchTitle>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 540),
+      duration: const Duration(milliseconds: 480),
     )..forward();
   }
 
@@ -111,23 +146,29 @@ class _SketchTitleState extends State<SketchTitle>
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return RepaintBoundary(
-      child: CustomPaint(
-        painter: _UnderlinePainter(
-          progress: reduceMotion
-              ? const AlwaysStoppedAnimation(1)
-              : _controller,
-          color: context.inkColor,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 9),
-          child: Text(
-            widget.text,
-            style: TextStyle(
-              fontFamily: 'Kalam',
-              fontSize: widget.fontSize,
-              height: 1.05,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -.5,
+      child: Transform.rotate(
+        angle: -.012,
+        alignment: Alignment.centerLeft,
+        child: CustomPaint(
+          painter: _UnderlinePainter(
+            progress: reduceMotion
+                ? const AlwaysStoppedAnimation(1)
+                : _controller,
+            color: context.marginRedColor,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              widget.text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Caveat',
+                fontSize: widget.fontSize,
+                height: .98,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.4,
+              ),
             ),
           ),
         ),
@@ -145,32 +186,19 @@ class _UnderlinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final width = math.min(size.width * .62, 180.0) * progress.value;
+    final width = math.min(size.width * .68, 150.0) * progress.value;
     if (width <= 0) return;
+    final y = size.height - 3;
     final path = Path()
-      ..moveTo(1, size.height - 3)
-      ..cubicTo(
-        width * .2,
-        size.height - 9,
-        width * .36,
-        size.height + 1,
-        width * .55,
-        size.height - 4,
-      )
-      ..cubicTo(
-        width * .73,
-        size.height - 8,
-        width * .83,
-        size.height + 1,
-        width,
-        size.height - 5,
-      );
+      ..moveTo(1, y)
+      ..cubicTo(width * .18, y - 5, width * .34, y + 3, width * .51, y)
+      ..cubicTo(width * .68, y - 4, width * .82, y + 3, width, y - 1);
     canvas.drawPath(
       path,
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
+        ..strokeWidth = 2.4
         ..strokeCap = StrokeCap.round,
     );
   }
@@ -187,6 +215,9 @@ class NotebookCard extends StatelessWidget {
     this.onTap,
     this.accent,
     this.rotation = 0,
+    this.tape = NotebookTape.none,
+    this.paperclip = false,
+    this.alternate = false,
     super.key,
   });
 
@@ -195,32 +226,140 @@ class NotebookCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? accent;
   final double rotation;
+  final NotebookTape tape;
+  final bool paperclip;
+  final bool alternate;
 
   @override
   Widget build(BuildContext context) {
-    final card = Material(
-      color: context.isDark ? const Color(0xFF24221E) : const Color(0xFFFFFEFA),
-      shape: RoundedRectangleBorder(
-        side: BorderSide(
-          color: (accent ?? context.inkColor).withValues(alpha: .18),
-          width: 1.2,
+    final ink = context.inkColor;
+    final borderColor = accent == null
+        ? ink.withValues(alpha: .88)
+        : Color.lerp(ink, accent, .34)!;
+    final radius = alternate
+        ? const BorderRadius.only(
+            topLeft: Radius.elliptical(9, 3),
+            topRight: Radius.elliptical(3, 9),
+            bottomLeft: Radius.elliptical(3, 9),
+            bottomRight: Radius.elliptical(9, 3),
+          )
+        : const BorderRadius.only(
+            topLeft: Radius.elliptical(3, 9),
+            topRight: Radius.elliptical(9, 3),
+            bottomLeft: Radius.elliptical(8, 3),
+            bottomRight: Radius.elliptical(3, 9),
+          );
+
+    final card = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x24000000),
+                blurRadius: 6,
+                offset: Offset(2, 3),
+              ),
+            ],
+          ),
+          child: Material(
+            color: context.cardColor,
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: borderColor, width: 1.45),
+              borderRadius: radius,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Padding(padding: padding, child: child),
+            ),
+          ),
         ),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(15),
-          topRight: Radius.circular(20),
-          bottomLeft: Radius.circular(19),
-          bottomRight: Radius.circular(13),
+        if (tape != NotebookTape.none)
+          Positioned(
+            top: -10,
+            left: alternate ? null : 28,
+            right: alternate ? 32 : null,
+            child: _WashiTape(color: _tapeColor(tape)),
+          ),
+        if (paperclip)
+          const Positioned(
+            top: -15,
+            right: 22,
+            child: SizedBox(
+              width: 28,
+              height: 46,
+              child: CustomPaint(painter: _PaperclipPainter()),
+            ),
+          ),
+      ],
+    );
+    return rotation == 0
+        ? card
+        : Transform.rotate(angle: rotation, child: card);
+  }
+
+  static Color _tapeColor(NotebookTape tape) => switch (tape) {
+    NotebookTape.yellow => LabColors.tapeYellow,
+    NotebookTape.blue => LabColors.tapeBlue,
+    NotebookTape.green => LabColors.tapeGreen,
+    NotebookTape.pink => LabColors.tapePink,
+    NotebookTape.none => Colors.transparent,
+  };
+}
+
+class _WashiTape extends StatelessWidget {
+  const _WashiTape({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: .065,
+      child: Container(
+        width: 60,
+        height: 22,
+        decoration: BoxDecoration(
+          color: color,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 2,
+              offset: Offset(0, 1),
+            ),
+          ],
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
       ),
     );
-    if (rotation == 0) return card;
-    return Transform.rotate(angle: rotation, child: card);
   }
+}
+
+class _PaperclipPainter extends CustomPainter {
+  const _PaperclipPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(8, 8)
+      ..cubicTo(8, 3, 20, 3, 20, 10)
+      ..lineTo(20, 32)
+      ..cubicTo(20, 38, 12, 38, 12, 32)
+      ..lineTo(12, 14);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFF8A8578)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class StaggerIn extends StatelessWidget {
@@ -233,13 +372,13 @@ class StaggerIn extends StatelessWidget {
   Widget build(BuildContext context) {
     if (MediaQuery.disableAnimationsOf(context)) return child;
     return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 260 + math.min(index, 8) * 42),
+      duration: Duration(milliseconds: 240 + math.min(index, 7) * 38),
       curve: Curves.easeOutCubic,
       tween: Tween(begin: 0, end: 1),
       builder: (context, value, child) => Opacity(
         opacity: value,
         child: Transform.translate(
-          offset: Offset(0, 12 * (1 - value)),
+          offset: Offset(0, 10 * (1 - value)),
           child: child,
         ),
       ),
@@ -260,7 +399,7 @@ class AnimatedQuantity extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
-          : const Duration(milliseconds: 520),
+          : const Duration(milliseconds: 480),
       curve: Curves.easeOutCubic,
       tween: Tween(end: value),
       builder: (_, animated, _) =>
@@ -277,24 +416,86 @@ class StockBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = statusColor(status);
-    return TweenAnimationBuilder<double>(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 650),
-      curve: Curves.easeOutBack,
-      tween: Tween(end: progress),
-      builder: (_, value, _) => ClipRRect(
-        borderRadius: BorderRadius.circular(99),
-        child: LinearProgressIndicator(
-          minHeight: 8,
-          value: value,
-          backgroundColor: color.withValues(alpha: .12),
-          valueColor: AlwaysStoppedAnimation(color),
+    final color = switch (status) {
+      StockState.healthy => context.healthyColor,
+      StockState.low => context.lowColor,
+      StockState.empty => context.marginRedColor,
+    };
+    return Semantics(
+      label: '${(progress * 100).round()} percent full',
+      value: '${(progress * 100).round()}%',
+      child: TweenAnimationBuilder<double>(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 650),
+        curve: Curves.easeOutCubic,
+        tween: Tween(end: progress.clamp(0, 1)),
+        builder: (_, value, _) => SizedBox(
+          height: 17,
+          width: double.infinity,
+          child: CustomPaint(
+            painter: _HatchedBarPainter(
+              progress: value,
+              color: color,
+              ink: context.inkColor,
+            ),
+          ),
         ),
       ),
     );
   }
+}
+
+class _HatchedBarPainter extends CustomPainter {
+  const _HatchedBarPainter({
+    required this.progress,
+    required this.color,
+    required this.ink,
+  });
+
+  final double progress;
+  final Color color;
+  final Color ink;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final shape = RRect.fromRectAndCorners(
+      rect.deflate(1),
+      topLeft: const Radius.elliptical(10, 4),
+      topRight: const Radius.elliptical(4, 10),
+      bottomLeft: const Radius.elliptical(4, 10),
+      bottomRight: const Radius.elliptical(10, 4),
+    );
+    canvas.save();
+    canvas.clipRRect(shape);
+    final fillWidth = math.max(0.0, (size.width - 2) * progress);
+    final fill = Rect.fromLTWH(1, 1, fillWidth, size.height - 2);
+    canvas.drawRect(fill, Paint()..color = color);
+    canvas.save();
+    canvas.clipRect(fill);
+    final stripe = Paint()
+      ..color = Color.lerp(color, Colors.black, .18)!
+      ..strokeWidth = 3.2;
+    for (double x = -size.height; x < fillWidth + size.height; x += 8) {
+      canvas.drawLine(Offset(x, size.height), Offset(x + 9, 0), stripe);
+    }
+    canvas.restore();
+    canvas.restore();
+    canvas.drawRRect(
+      shape,
+      Paint()
+        ..color = ink
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HatchedBarPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.ink != ink;
 }
 
 Color statusColor(StockState status) => switch (status) {
@@ -305,8 +506,14 @@ Color statusColor(StockState status) => switch (status) {
 
 String statusLabel(StockState status) => switch (status) {
   StockState.healthy => 'in stock',
-  StockState.low => 'low stock',
+  StockState.low => 'getting low',
   StockState.empty => 'out of stock',
+};
+
+String stockCaption(StockState status) => switch (status) {
+  StockState.healthy => 'in stock ✓',
+  StockState.low => 'getting low!',
+  StockState.empty => 'out of stock!',
 };
 
 class StatusBadge extends StatelessWidget {
@@ -316,32 +523,132 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = statusColor(status);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 240),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    final color = switch (status) {
+      StockState.healthy => context.healthyColor,
+      StockState.low => context.lowColor,
+      StockState.empty => context.marginRedColor,
+    };
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(99),
+        color: status == StockState.empty
+            ? LabColors.highlighter.withValues(alpha: .75)
+            : color.withValues(alpha: .12),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(2),
+          topRight: Radius.circular(9),
+          bottomLeft: Radius.circular(8),
+          bottomRight: Radius.circular(3),
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            status == StockState.empty ? Icons.error_outline : Icons.circle,
-            size: 11,
-            color: color,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        child: Text(
+          stockCaption(status),
+          style: TextStyle(
+            color: status == StockState.empty ? context.inkColor : color,
+            fontFamily: 'Caveat',
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(width: 5),
-          Text(
-            statusLabel(status),
+        ),
+      ),
+    );
+  }
+}
+
+class NotebookFilterWord extends StatelessWidget {
+  const NotebookFilterWord({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.fontSize = 22,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          child: Text(
+            label,
             style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+              color: selected ? context.marginRedColor : context.mutedInkColor,
+              fontFamily: 'Caveat',
+              fontSize: fontSize,
+              height: 1,
+              fontWeight: FontWeight.w700,
+              decoration: selected ? TextDecoration.underline : null,
+              decorationColor: context.marginRedColor,
+              decorationThickness: 2,
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class CircledNotebookButton extends StatelessWidget {
+  const CircledNotebookButton({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.color,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = color ?? context.inkColor;
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: foreground,
+        side: BorderSide(color: foreground, width: 1.8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      icon: icon == null ? const SizedBox.shrink() : Icon(icon, size: 18),
+      label: Text(label),
+    );
+  }
+}
+
+class MarginNote extends StatelessWidget {
+  const MarginNote(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: -.12,
+      child: Text(
+        text,
+        maxLines: 2,
+        style: TextStyle(
+          color: context.marginRedColor,
+          fontFamily: 'Caveat',
+          fontSize: 16,
+          height: .9,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -364,27 +671,29 @@ class EmptyNotebookState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 22),
+      padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 22),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           TweenAnimationBuilder<double>(
-            tween: Tween(begin: .75, end: 1),
+            tween: Tween(begin: .8, end: 1),
             curve: Curves.elasticOut,
-            duration: const Duration(milliseconds: 800),
+            duration: const Duration(milliseconds: 700),
             builder: (_, value, child) =>
                 Transform.scale(scale: value, child: child),
-            child: Icon(icon, size: 54, color: context.mutedInkColor),
+            child: Icon(icon, size: 48, color: context.mutedInkColor),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
             title,
+            textAlign: TextAlign.center,
             style: const TextStyle(
-              fontFamily: 'Kalam',
-              fontSize: 25,
-              fontWeight: FontWeight.bold,
+              fontFamily: 'Caveat',
+              fontSize: 27,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             message,
             textAlign: TextAlign.center,

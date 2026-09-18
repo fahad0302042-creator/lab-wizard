@@ -39,7 +39,7 @@ class DashboardScreen extends ConsumerWidget {
       onRefresh: ref.read(inventoryProvider.notifier).refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(42, 18, 18, 32),
+        padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
         children: [
           StaggerIn(
             index: 0,
@@ -59,7 +59,7 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                IconButton.filledTonal(
+                IconButton(
                   tooltip: 'Settings',
                   onPressed: onSettings,
                   icon: const Icon(Icons.settings_outlined),
@@ -74,9 +74,9 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(height: 14),
           TextField(
             readOnly: true,
-            onTap: () => onNavigate(1),
+            onTap: () => _showGlobalSearch(context, ref),
             decoration: const InputDecoration(
-              hintText: 'Search chemicals or apparatus…',
+              hintText: 'search chemicals, apparatus…',
               prefixIcon: Icon(Icons.search),
               suffixIcon: Icon(Icons.arrow_forward),
             ),
@@ -87,7 +87,7 @@ class DashboardScreen extends ConsumerWidget {
               index: 1,
               child: NotebookCard(
                 accent: LabColors.marginRed,
-                onTap: () => onNavigate(1),
+                onTap: () => _showAttentionSheet(context, ref),
                 child: Row(
                   children: [
                     const Icon(
@@ -132,6 +132,7 @@ class DashboardScreen extends ConsumerWidget {
                 value: inventory.chemicals.length.toDouble(),
                 label: 'chemicals',
                 color: LabColors.blue,
+                onTap: () => onNavigate(1),
               ),
               _MetricCard(
                 index: 3,
@@ -139,6 +140,7 @@ class DashboardScreen extends ConsumerWidget {
                 value: inventory.apparatus.length.toDouble(),
                 label: 'apparatus',
                 color: LabColors.green,
+                onTap: () => onNavigate(3),
               ),
               _MetricCard(
                 index: 4,
@@ -146,6 +148,7 @@ class DashboardScreen extends ConsumerWidget {
                 value: inventory.attentionCount.toDouble(),
                 label: 'need attention',
                 color: LabColors.marginRed,
+                onTap: () => _showAttentionSheet(context, ref),
               ),
               _MetricCard(
                 index: 5,
@@ -153,6 +156,7 @@ class DashboardScreen extends ConsumerWidget {
                 value: weeklyLogs.length.toDouble(),
                 label: 'actions this week',
                 color: LabColors.amber,
+                onTap: () => onNavigate(4),
               ),
             ],
           ),
@@ -208,6 +212,101 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  void _showGlobalSearch(BuildContext context, WidgetRef ref) {
+    final inventory = ref.read(inventoryProvider);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .86,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: sheetContext.paperColor,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+            ),
+            child: _GlobalSearchSheet(
+              inventory: inventory,
+              onOpen: (kind, id) {
+                Navigator.pop(sheetContext);
+                Future<void>.delayed(const Duration(milliseconds: 120), () {
+                  if (context.mounted) {
+                    showItemDetailSheet(context, ref, kind, id);
+                  }
+                });
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAttentionSheet(BuildContext context, WidgetRef ref) {
+    final inventory = ref.read(inventoryProvider);
+    final results = [
+      ...inventory.chemicals
+          .where((item) => item.stockState != StockState.healthy)
+          .map(
+            (item) => _GlobalResult(
+              kind: ItemKind.chemical,
+              id: item.id,
+              name: item.name,
+              subtitle: item.formula,
+              quantity: item.quantity,
+              unit: item.unit,
+              status: item.stockState,
+            ),
+          ),
+      ...inventory.apparatus
+          .where((item) => item.stockState != StockState.healthy)
+          .map(
+            (item) => _GlobalResult(
+              kind: ItemKind.apparatus,
+              id: item.id,
+              name: item.name,
+              subtitle: item.category,
+              quantity: item.quantity,
+              unit: 'pcs',
+              status: item.stockState,
+            ),
+          ),
+    ]..sort((a, b) => a.quantity.compareTo(b.quantity));
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * .78,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: sheetContext.paperColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+          ),
+          child: _ResultList(
+            title: 'needs attention',
+            results: results,
+            emptyMessage: 'Everything is currently above its low-stock level.',
+            onOpen: (kind, id) {
+              Navigator.pop(sheetContext);
+              Future<void>.delayed(const Duration(milliseconds: 120), () {
+                if (context.mounted) {
+                  showItemDetailSheet(context, ref, kind, id);
+                }
+              });
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   static String _firstName(User user) {
     final metadataName = user.userMetadata?['name']?.toString().trim();
     final fallback = user.email?.split('@').first ?? 'friend';
@@ -226,6 +325,220 @@ class DashboardScreen extends ConsumerWidget {
   };
 }
 
+class _GlobalSearchSheet extends StatefulWidget {
+  const _GlobalSearchSheet({required this.inventory, required this.onOpen});
+
+  final InventoryState inventory;
+  final void Function(ItemKind kind, String id) onOpen;
+
+  @override
+  State<_GlobalSearchSheet> createState() => _GlobalSearchSheetState();
+}
+
+class _GlobalSearchSheetState extends State<_GlobalSearchSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _controller.text.trim().toLowerCase();
+    final results = query.isEmpty
+        ? const <_GlobalResult>[]
+        : [
+                ...widget.inventory.chemicals.map(
+                  (item) => _GlobalResult(
+                    kind: ItemKind.chemical,
+                    id: item.id,
+                    name: item.name,
+                    subtitle: item.formula,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    status: item.stockState,
+                    searchText: item.notes,
+                  ),
+                ),
+                ...widget.inventory.apparatus.map(
+                  (item) => _GlobalResult(
+                    kind: ItemKind.apparatus,
+                    id: item.id,
+                    name: item.name,
+                    subtitle: item.category,
+                    quantity: item.quantity,
+                    unit: 'pcs',
+                    status: item.stockState,
+                    searchText: item.notes,
+                  ),
+                ),
+              ]
+              .where(
+                (item) => '${item.name} ${item.subtitle} ${item.searchText}'
+                    .toLowerCase()
+                    .contains(query),
+              )
+              .take(40)
+              .toList();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 6, 24, 8),
+          child: Column(
+            children: [
+              const PageHeading('search the notebook'),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'name, formula, or category…',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: query.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _controller.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: query.isEmpty
+              ? const EmptyNotebookState(
+                  icon: Icons.manage_search,
+                  title: 'find anything quickly',
+                  message: 'Search chemicals and apparatus together.',
+                )
+              : _ResultList(
+                  results: results,
+                  emptyMessage: 'No chemical or apparatus matches that search.',
+                  onOpen: widget.onOpen,
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GlobalResult {
+  const _GlobalResult({
+    required this.kind,
+    required this.id,
+    required this.name,
+    required this.subtitle,
+    required this.quantity,
+    required this.unit,
+    required this.status,
+    this.searchText = '',
+  });
+
+  final ItemKind kind;
+  final String id;
+  final String name;
+  final String subtitle;
+  final double quantity;
+  final String unit;
+  final StockState status;
+  final String searchText;
+}
+
+class _ResultList extends StatelessWidget {
+  const _ResultList({
+    required this.results,
+    required this.emptyMessage,
+    required this.onOpen,
+    this.title,
+  });
+
+  final String? title;
+  final List<_GlobalResult> results;
+  final String emptyMessage;
+  final void Function(ItemKind kind, String id) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    if (results.isEmpty) {
+      return EmptyNotebookState(
+        icon: Icons.search_off,
+        title: 'nothing here',
+        message: emptyMessage,
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+      itemCount: results.length + (title == null ? 0 : 1),
+      separatorBuilder: (_, _) => const SizedBox(height: 11),
+      itemBuilder: (context, index) {
+        if (title != null && index == 0) {
+          return PageHeading(title!, fontSize: 31);
+        }
+        final itemIndex = index - (title == null ? 0 : 1);
+        final item = results[itemIndex];
+        return NotebookCard(
+          onTap: () => onOpen(item.kind, item.id),
+          tape: itemIndex % 4 == 0 ? NotebookTape.yellow : NotebookTape.none,
+          alternate: itemIndex.isOdd,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            children: [
+              Icon(
+                item.kind == ItemKind.chemical
+                    ? Icons.science_outlined
+                    : Icons.precision_manufacturing_outlined,
+                color: item.status == StockState.empty
+                    ? context.marginRedColor
+                    : context.mutedInkColor,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'ArchitectsDaughter',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (item.subtitle.isNotEmpty)
+                      Text(
+                        item.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.mutedInkColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Text(
+                '${formatQuantity(item.quantity)} ${item.unit}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _MetricCard extends StatelessWidget {
   const _MetricCard({
     required this.index,
@@ -233,6 +546,7 @@ class _MetricCard extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
+    required this.onTap,
   });
 
   final int index;
@@ -240,14 +554,22 @@ class _MetricCard extends StatelessWidget {
   final double value;
   final String label;
   final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return StaggerIn(
       index: index,
       child: NotebookCard(
+        onTap: onTap,
+        tape: switch (index % 4) {
+          0 => NotebookTape.yellow,
+          1 => NotebookTape.blue,
+          2 => NotebookTape.pink,
+          _ => NotebookTape.green,
+        },
         accent: color,
-        rotation: index.isEven ? -.006 : .006,
+        rotation: index.isEven ? -.008 : .008,
         padding: const EdgeInsets.all(13),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

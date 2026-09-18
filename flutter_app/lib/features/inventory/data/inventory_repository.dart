@@ -179,6 +179,45 @@ class InventoryRepository {
     }
   }
 
+  Future<Map<String, dynamic>> updateItem({
+    required String userId,
+    required ItemKind type,
+    required String id,
+    required Map<String, dynamic> changes,
+  }) async {
+    final table = type == ItemKind.chemical ? 'chemicals' : 'apparatus';
+    try {
+      final data = await remote!
+          .from(table)
+          .update(changes)
+          .eq('id', id)
+          .select()
+          .single();
+      final saved = Map<String, dynamic>.from(data);
+      await local.upsertRecord(userId, type.name, saved);
+      return saved;
+    } catch (error) {
+      if (remote != null && !_isConnectivityError(error)) rethrow;
+      final records = await local.loadRecords(userId, type.name);
+      final current = records.where((row) => row['id'] == id).firstOrNull;
+      if (current == null) {
+        throw StateError('The item is not available offline.');
+      }
+      final saved = <String, dynamic>{...current, ...changes, 'id': id};
+      await local.upsertRecord(userId, type.name, saved);
+      await local.enqueue(
+        PendingOperation(
+          id: _uuid.v4(),
+          userId: userId,
+          type: 'update_item',
+          payload: {'id': id, 'item_type': type.name, 'changes': changes},
+          createdAt: DateTime.now(),
+        ),
+      );
+      return saved;
+    }
+  }
+
   Future<ConsumptionLog> applyAction({
     required String userId,
     required String itemId,
@@ -367,6 +406,16 @@ class InventoryRepository {
           await remote!.from('apparatus').upsert(operation.payload);
         } else if (operation.type == 'inventory_action') {
           await _applyRemoteAction(userId, operation.payload);
+        } else if (operation.type == 'update_item') {
+          final table = operation.payload['item_type'] == 'chemical'
+              ? 'chemicals'
+              : 'apparatus';
+          await remote!
+              .from(table)
+              .update(
+                Map<String, dynamic>.from(operation.payload['changes'] as Map),
+              )
+              .eq('id', operation.payload['id']);
         } else {
           throw StateError('Unknown operation ${operation.type}');
         }

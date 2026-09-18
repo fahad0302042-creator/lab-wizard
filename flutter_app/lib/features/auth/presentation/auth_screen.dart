@@ -46,6 +46,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: StaggerIn(
                 index: 0,
                 child: NotebookCard(
+                  tape: NotebookTape.yellow,
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                   child: Form(
                     key: _formKey,

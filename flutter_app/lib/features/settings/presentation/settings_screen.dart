@@ -21,7 +21,7 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       body: NotebookPage(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(42, 12, 18, 32),
+          padding: const EdgeInsets.fromLTRB(54, 12, 20, 32),
           children: [
             Row(
               children: [
