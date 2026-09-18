@@ -47,6 +47,9 @@ local-*
 dev.log
 dev.out.log
 test
+# The root web project ignores scratch `test`, but Flutter tests are required in CI.
+!flutter_app/test/
+!flutter_app/test/**
 prompt
 
 server.log
