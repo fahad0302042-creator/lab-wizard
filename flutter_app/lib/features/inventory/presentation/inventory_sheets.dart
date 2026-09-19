@@ -129,6 +129,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   String _unit = 'mL';
   String _category = 'glassware';
   bool _saving = false;
+  bool _dirty = false;
 
   static const _units = ['mL', 'g', 'mg', 'L', 'kg', 'drops', 'pcs'];
   static const _categories = [
@@ -138,6 +139,24 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     'measurement',
     'other',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    for (final controller in [
+      _name,
+      _subtitle,
+      _quantity,
+      _threshold,
+      _notes,
+    ]) {
+      controller.addListener(_markDirty);
+    }
+  }
+
+  void _markDirty() {
+    if (!_dirty && mounted) setState(() => _dirty = true);
+  }
 
   @override
   void dispose() {
@@ -152,116 +171,129 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   @override
   Widget build(BuildContext context) {
     final chemical = widget.kind == ItemKind.chemical;
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PageHeading(chemical ? 'add chemical' : 'add apparatus'),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _name,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: chemical ? 'Chemical name' : 'Apparatus name',
-            ),
-            validator: _required,
-          ),
-          const SizedBox(height: 12),
-          if (chemical)
+    return _UnsavedChangesGuard(
+      dirty: _dirty,
+      busy: _saving,
+      onDiscard: () => _dirty = false,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PageHeading(chemical ? 'add chemical' : 'add apparatus'),
+            const SizedBox(height: 12),
             TextFormField(
-              controller: _subtitle,
-              decoration: const InputDecoration(
-                labelText: 'Formula',
-                hintText: 'e.g. HCl',
+              controller: _name,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: chemical ? 'Chemical name' : 'Apparatus name',
               ),
-            )
-          else
-            DropdownButtonFormField<String>(
-              initialValue: _category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: _categories
-                  .map(
-                    (value) =>
-                        DropdownMenuItem(value: value, child: Text(value)),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _category = value!),
+              validator: _required,
             ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _quantity,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Starting quantity',
-                  ),
-                  validator: _nonNegativeNumber,
+            const SizedBox(height: 12),
+            if (chemical)
+              TextFormField(
+                controller: _subtitle,
+                decoration: const InputDecoration(
+                  labelText: 'Formula',
+                  hintText: 'e.g. HCl',
                 ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                initialValue: _category,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: _categories
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: Text(value)),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() {
+                  _category = value!;
+                  _dirty = true;
+                }),
               ),
-              if (chemical) ...[
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 105,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _unit,
-                    decoration: const InputDecoration(labelText: 'Unit'),
-                    items: _units
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => _unit = value!),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _quantity,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Starting quantity',
+                    ),
+                    validator: _nonNegativeNumber,
                   ),
                 ),
+                if (chemical) ...[
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 105,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _unit,
+                      decoration: const InputDecoration(labelText: 'Unit'),
+                      items: _units
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() {
+                        _unit = value!;
+                        _dirty = true;
+                      }),
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _threshold,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Low-stock level',
-              helperText: 'The item is flagged at or below this amount.',
             ),
-            validator: _optionalNonNegativeNumber,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _notes,
-            minLines: 2,
-            maxLines: 4,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Notes',
-              hintText: 'Cabinet, supplier, safety note…',
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _threshold,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Low-stock level',
+                helperText: 'The item is flagged at or below this amount.',
+              ),
+              validator: _optionalNonNegativeNumber,
             ),
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: _saving ? null : _save,
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.add),
-            label: Text(_saving ? 'Saving…' : 'Add to shelf'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _notes,
+              minLines: 2,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Notes',
+                hintText: 'Cabinet, supplier, safety note…',
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
+              label: Text(_saving ? 'Saving…' : 'Add to shelf'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -309,6 +341,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
       }
       HapticFeedback.mediumImpact();
       if (!mounted) return;
+      _dirty = false;
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       messenger.showSnackBar(
@@ -342,6 +375,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   late String _unit;
   late String _category;
   bool _saving = false;
+  bool _dirty = false;
 
   static const _units = ['mL', 'g', 'mg', 'L', 'kg', 'drops', 'pcs'];
   static const _categories = [
@@ -378,6 +412,13 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     _category = apparatus?.category ?? 'other';
     if (!_units.contains(_unit)) _unit = 'pcs';
     if (!_categories.contains(_category)) _category = 'other';
+    for (final controller in [_name, _subtitle, _threshold, _notes]) {
+      controller.addListener(_markDirty);
+    }
+  }
+
+  void _markDirty() {
+    if (!_dirty && mounted) setState(() => _dirty = true);
   }
 
   @override
@@ -392,103 +433,116 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   @override
   Widget build(BuildContext context) {
     final chemical = widget.kind == ItemKind.chemical;
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PageHeading(chemical ? 'edit chemical' : 'edit apparatus'),
-          TextFormField(
-            controller: _name,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: chemical ? 'Chemical name' : 'Apparatus name',
+    return _UnsavedChangesGuard(
+      dirty: _dirty,
+      busy: _saving,
+      onDiscard: () => _dirty = false,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PageHeading(chemical ? 'edit chemical' : 'edit apparatus'),
+            TextFormField(
+              controller: _name,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: chemical ? 'Chemical name' : 'Apparatus name',
+              ),
+              validator: (value) =>
+                  (value ?? '').trim().isEmpty ? 'Required' : null,
             ),
-            validator: (value) =>
-                (value ?? '').trim().isEmpty ? 'Required' : null,
-          ),
-          const SizedBox(height: 12),
-          if (chemical)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _subtitle,
-                    decoration: const InputDecoration(labelText: 'Formula'),
+            const SizedBox(height: 12),
+            if (chemical)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _subtitle,
+                      decoration: const InputDecoration(labelText: 'Formula'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 100,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _unit,
-                    decoration: const InputDecoration(labelText: 'Unit'),
-                    items: _units
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => _unit = value!),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 100,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _unit,
+                      decoration: const InputDecoration(labelText: 'Unit'),
+                      items: _units
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() {
+                        _unit = value!;
+                        _dirty = true;
+                      }),
+                    ),
                   ),
-                ),
-              ],
-            )
-          else
-            DropdownButtonFormField<String>(
-              initialValue: _category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: _categories
-                  .map(
-                    (value) =>
-                        DropdownMenuItem(value: value, child: Text(value)),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _category = value!),
+                ],
+              )
+            else
+              DropdownButtonFormField<String>(
+                initialValue: _category,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: _categories
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: Text(value)),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() {
+                  _category = value!;
+                  _dirty = true;
+                }),
+              ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _threshold,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Low-stock level',
+                helperText: 'The shelf flags the item at or below this amount.',
+              ),
+              validator: (value) {
+                final number = double.tryParse((value ?? '').trim());
+                return number == null || number < 0 ? 'Enter 0 or more' : null;
+              },
             ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _threshold,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Low-stock level',
-              helperText: 'The shelf flags the item at or below this amount.',
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _notes,
+              minLines: 2,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Notes',
+                hintText: 'Cabinet, supplier, safety note…',
+              ),
             ),
-            validator: (value) {
-              final number = double.tryParse((value ?? '').trim());
-              return number == null || number < 0 ? 'Enter 0 or more' : null;
-            },
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _notes,
-            minLines: 2,
-            maxLines: 4,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Notes',
-              hintText: 'Cabinet, supplier, safety note…',
+            const SizedBox(height: 22),
+            FilledButton.icon(
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.edit_outlined),
+              label: Text(_saving ? 'Saving…' : 'Save changes'),
             ),
-          ),
-          const SizedBox(height: 22),
-          FilledButton.icon(
-            onPressed: _saving ? null : _save,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-            ),
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.edit_outlined),
-            label: Text(_saving ? 'Saving…' : 'Save changes'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -519,6 +573,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
           );
       HapticFeedback.mediumImpact();
       if (!mounted) return;
+      _dirty = false;
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       messenger.showSnackBar(const SnackBar(content: Text('Item updated')));
@@ -1193,6 +1248,54 @@ class _ItemDetail extends ConsumerWidget {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
     }
+  }
+}
+
+class _UnsavedChangesGuard extends StatelessWidget {
+  const _UnsavedChangesGuard({
+    required this.dirty,
+    required this.busy,
+    required this.onDiscard,
+    required this.child,
+  });
+
+  final bool dirty;
+  final bool busy;
+  final VoidCallback onDiscard;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !dirty && !busy,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || busy) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Discard unsaved changes?'),
+            content: const Text(
+              'Your edits have not been saved to the notebook yet.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Keep editing'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Discard'),
+              ),
+            ],
+          ),
+        );
+        if (discard == true && context.mounted) {
+          onDiscard();
+          Navigator.pop(context);
+        }
+      },
+      child: child,
+    );
   }
 }
 

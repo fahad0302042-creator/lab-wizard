@@ -59,6 +59,10 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                _HeaderSyncButton(
+                  state: inventory,
+                  onPressed: ref.read(inventoryProvider.notifier).refresh,
+                ),
                 IconButton(
                   tooltip: 'Settings',
                   onPressed: onSettings,
@@ -82,6 +86,63 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
+          if (!inventory.loading &&
+              inventory.chemicals.isEmpty &&
+              inventory.apparatus.isEmpty) ...[
+            NotebookCard(
+              tape: NotebookTape.yellow,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'your lab notebook is ready',
+                    style: TextStyle(
+                      fontFamily: 'Caveat',
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const _GettingStartedStep(
+                    done: true,
+                    text: 'Sign in to your existing account',
+                  ),
+                  const _GettingStartedStep(
+                    done: false,
+                    text: 'Add your first chemical or apparatus',
+                  ),
+                  const _GettingStartedStep(
+                    done: false,
+                    text: 'Choose a low-stock warning level',
+                  ),
+                  const _GettingStartedStep(
+                    done: false,
+                    text: 'Print or scan your first QR label',
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 9,
+                    runSpacing: 8,
+                    children: [
+                      CircledNotebookButton(
+                        label: 'add chemical',
+                        icon: Icons.add,
+                        onPressed: () =>
+                            showAddItemSheet(context, ref, ItemKind.chemical),
+                      ),
+                      CircledNotebookButton(
+                        label: 'add apparatus',
+                        icon: Icons.add,
+                        onPressed: () =>
+                            showAddItemSheet(context, ref, ItemKind.apparatus),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
           if (inventory.attentionCount > 0) ...[
             StaggerIn(
               index: 1,
@@ -592,6 +653,71 @@ class _MetricCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HeaderSyncButton extends StatelessWidget {
+  const _HeaderSyncButton({required this.state, required this.onPressed});
+
+  final InventoryState state;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final offline = state.error != null || state.fromCache;
+    final color = state.pendingCount > 0
+        ? context.lowColor
+        : offline
+        ? context.marginRedColor
+        : context.healthyColor;
+    final icon = state.pendingCount > 0
+        ? Icons.cloud_upload_outlined
+        : offline
+        ? Icons.cloud_off_outlined
+        : Icons.cloud_done_outlined;
+    final label = state.refreshing
+        ? 'Syncing inventory'
+        : state.pendingCount > 0
+        ? '${state.pendingCount} changes waiting to sync'
+        : offline
+        ? 'Offline copy shown'
+        : 'Inventory synced';
+    return IconButton(
+      tooltip: '$label — tap to refresh',
+      onPressed: state.refreshing ? null : onPressed,
+      icon: state.refreshing
+          ? SizedBox.square(
+              dimension: 19,
+              child: CircularProgressIndicator(strokeWidth: 2, color: color),
+            )
+          : Icon(icon, color: color),
+    );
+  }
+}
+
+class _GettingStartedStep extends StatelessWidget {
+  const _GettingStartedStep({required this.done, required this.text});
+
+  final bool done;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            done ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+            size: 18,
+            color: done ? context.healthyColor : context.mutedInkColor,
+          ),
+          const SizedBox(width: 7),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }

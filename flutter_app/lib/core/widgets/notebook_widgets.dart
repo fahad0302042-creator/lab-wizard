@@ -251,6 +251,7 @@ class NotebookCard extends StatelessWidget {
           );
 
     final card = Stack(
+      fit: StackFit.passthrough,
       clipBehavior: Clip.none,
       children: [
         DecoratedBox(

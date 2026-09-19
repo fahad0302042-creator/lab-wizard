@@ -46,35 +46,20 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       const InventoryScreen(kind: ItemKind.apparatus),
       const ReportsScreen(),
     ];
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-
     return Scaffold(
       body: NotebookPage(
         includeSafeArea: false,
         child: SafeArea(
           bottom: false,
-          child: Stack(
-            fit: StackFit.expand,
+          child: IndexedStack(
+            index: _index,
+            sizing: StackFit.expand,
             children: List.generate(pages.length, (pageIndex) {
-              final active = pageIndex == _index;
               return TickerMode(
-                enabled: active,
-                child: ExcludeSemantics(
-                  excluding: !active,
-                  child: IgnorePointer(
-                    ignoring: !active,
-                    child: AnimatedOpacity(
-                      opacity: active ? 1 : 0,
-                      duration: reduceMotion
-                          ? Duration.zero
-                          : const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      child: KeyedSubtree(
-                        key: ValueKey('main-page-$pageIndex'),
-                        child: pages[pageIndex],
-                      ),
-                    ),
-                  ),
+                enabled: pageIndex == _index,
+                child: KeyedSubtree(
+                  key: ValueKey('main-page-$pageIndex'),
+                  child: pages[pageIndex],
                 ),
               );
             }),

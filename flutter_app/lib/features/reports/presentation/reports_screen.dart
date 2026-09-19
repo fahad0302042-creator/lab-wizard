@@ -50,6 +50,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final broken = logs
         .where((log) => log.action == InventoryAction.breakage)
         .length;
+    final itemStates = _kind == ItemKind.chemical
+        ? state.chemicals.map((item) => item.stockState).toList()
+        : state.apparatus.map((item) => item.stockState).toList();
+    final healthyItems = itemStates
+        .where((status) => status == StockState.healthy)
+        .length;
+    final healthRatio = itemStates.isEmpty
+        ? 0.0
+        : healthyItems / itemStates.length;
+    final topUsage = _topUsage(state, logs, _kind);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
@@ -142,10 +152,75 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ],
         ),
         const SizedBox(height: 24),
+        const PageHeading('stock health'),
+        NotebookCard(
+          tape: NotebookTape.blue,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    itemStates.isEmpty
+                        ? '—'
+                        : '${(healthRatio * 100).round()}%',
+                    style: const TextStyle(
+                      fontFamily: 'Caveat',
+                      fontSize: 31,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      itemStates.isEmpty
+                          ? 'No items on this shelf yet.'
+                          : '$healthyItems of ${itemStates.length} items are comfortably stocked.',
+                      style: TextStyle(color: context.mutedInkColor),
+                    ),
+                  ),
+                ],
+              ),
+              if (itemStates.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                StockBar(
+                  progress: healthRatio,
+                  status: healthRatio >= .8
+                      ? StockState.healthy
+                      : healthRatio > 0
+                      ? StockState.low
+                      : StockState.empty,
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
         const PageHeading('activity by day'),
         NotebookCard(
           child: _MonthChart(month: _month, logs: logs),
         ),
+        if (topUsage.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          PageHeading(
+            _kind == ItemKind.chemical ? 'top used' : 'most reported',
+          ),
+          NotebookCard(
+            tape: NotebookTape.green,
+            child: Column(
+              children: topUsage
+                  .take(5)
+                  .toList()
+                  .asMap()
+                  .entries
+                  .map(
+                    (entry) =>
+                        _TopUsageRow(rank: entry.key + 1, summary: entry.value),
+                  )
+                  .toList(),
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         OutlinedButton.icon(
           onPressed: logs.isEmpty || _exporting
@@ -236,6 +311,100 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ),
     );
     return document.save();
+  }
+}
+
+List<_UsageSummary> _topUsage(
+  InventoryState state,
+  List<ConsumptionLog> logs,
+  ItemKind kind,
+) {
+  final totals = <String, double>{};
+  final relevantAction = kind == ItemKind.chemical
+      ? InventoryAction.consume
+      : InventoryAction.breakage;
+  for (final log in logs.where((value) => value.action == relevantAction)) {
+    totals.update(
+      log.itemId,
+      (value) => value + log.amount,
+      ifAbsent: () => log.amount,
+    );
+  }
+  final summaries = totals.entries.map((entry) {
+    if (kind == ItemKind.chemical) {
+      final item = state.chemicals
+          .where((value) => value.id == entry.key)
+          .firstOrNull;
+      return _UsageSummary(
+        name: item?.name ?? 'Removed chemical',
+        amount: entry.value,
+        unit: item?.unit ?? '',
+      );
+    }
+    final item = state.apparatus
+        .where((value) => value.id == entry.key)
+        .firstOrNull;
+    return _UsageSummary(
+      name: item?.name ?? 'Removed apparatus',
+      amount: entry.value,
+      unit: 'pcs',
+    );
+  }).toList()..sort((a, b) => b.amount.compareTo(a.amount));
+  return summaries;
+}
+
+class _UsageSummary {
+  const _UsageSummary({
+    required this.name,
+    required this.amount,
+    required this.unit,
+  });
+
+  final String name;
+  final double amount;
+  final String unit;
+}
+
+class _TopUsageRow extends StatelessWidget {
+  const _TopUsageRow({required this.rank, required this.summary});
+
+  final int rank;
+  final _UsageSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 26,
+            child: Text(
+              '$rank.',
+              style: TextStyle(
+                color: context.marginRedColor,
+                fontFamily: 'Caveat',
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              summary.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${formatQuantity(summary.amount)} ${summary.unit}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
   }
 }
 
