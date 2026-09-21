@@ -18,11 +18,11 @@ Ground rules for every item:
 | UX-02 | VALIDATING | Alphabetical quick navigation | A–Z control jumps to the first matching item; unavailable letters are visibly disabled; works after sorting/searching. | UX-01 |
 | UX-03 | VALIDATING | Sticky search and filters | Collapsing shelf heading; search/filter/sort controls remain reachable while scrolling without hiding most of the list. | UX-01, UX-02 |
 | UX-04 | VALIDATING | Undo inventory actions | Recent consume/restock/damage can be reversed safely; reversal is represented in the audit trail and works with offline outbox retries. | SYNC-01 |
-| BATCH-01 | TODO | Batch restock | Multi-select chemicals/apparatus, validate amounts, show progress and record separate audit entries. | None |
-| BATCH-02 | TODO | Batch threshold update | Multi-select items and set low-stock values with preview and validation. | None |
+| BATCH-01 | VALIDATING | Batch restock | Multi-select chemicals/apparatus, validate amounts, show progress and record separate audit entries. | None |
+| BATCH-02 | VALIDATING | Batch threshold update | Multi-select items and set low-stock values with preview and validation. | None |
 | BATCH-03 | TODO | Batch category/location assignment | Apply supported shared fields to selected items; incompatible fields are not silently changed. | DATA-01 |
-| BATCH-04 | TODO | Safe multi-delete | Selection summary, typed confirmation for large deletions, online requirement and clear audit/export warning. | None |
-| QR-01 | TODO | Selected-item QR printing | Select specific chemicals/apparatus and print only those labels; retain 40-per-A4 option. | None |
+| BATCH-04 | VALIDATING | Safe multi-delete | Selection summary, typed confirmation for large deletions, online requirement and clear audit/export warning. | None |
+| QR-01 | VALIDATING | Selected-item QR printing | Select specific chemicals/apparatus and print only those labels; retain 40-per-A4 option. | None |
 
 ## Milestone B — Import and higher-quality data entry
 
@@ -130,3 +130,4 @@ This remains intentionally after the current single-lab quality program: organiz
 | 2026-09-21 | UX-01, UX-02, UX-03 | `IN PROGRESS` → `VALIDATING` | Compact/detailed shelf mode, A–Z quick navigation and collapsing heading with sticky controls implemented with widget tests; awaiting green branch CI + phone check of the branch APK. |
 | 2026-09-21 | SYNC-01 | `TODO` → `VALIDATING` | Local DB v2 (outbox status/label/last attempt + `sync_meta`), per-change failure handling (connectivity keeps `pending`; other errors mark `failed` and do not block other items), sync center screen with retry one/all + safe discard, last-successful-sync shown in Settings/Dashboard. SQLite-backed tests run on CI. Pulled ahead of UX-04 because UX-04 depends on it. |
 | 2026-09-21 | UX-04 | `TODO` → `VALIDATING` | Undo from the post-action snackbar and from item history (entries ≤ 7 days). Mirrors the web app's undo (restore quantity, delete entry) plus an additive `inventory_reversals` table + idempotent `undo_inventory_action` RPC (`flutter_app/supabase/002_undo_inventory_action.sql`) so the history shows "undone" entries; web-parity fallback when the migration is absent. Queued-but-unsynced actions are cancelled; offline undos are queued as `undo_action` and can be discarded from the sync center with a full local rollback. |
+| 2026-09-21 | BATCH-01, BATCH-02, BATCH-04, QR-01 | `TODO` → `VALIDATING` | Shared multi-select mode on both shelves (long-press or overflow "select items…", select/clear shown, back leaves selection). Bottom bar: batch restock (per-item amounts, same-amount fill, validation, progress, one audit entry per item, retry failed rows), batch threshold (old → new preview, unchanged items skipped), QR labels for the selected chemicals (same 40-per-A4 sheet), safe delete (summary with history counts, export warning, unsynced items blocked, offline blocked, typed `DELETE` for 5+ items, per-item failure report). BATCH-03 stays TODO until DATA-01. |

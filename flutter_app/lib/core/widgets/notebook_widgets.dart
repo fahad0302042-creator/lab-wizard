@@ -213,6 +213,7 @@ class NotebookCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
+    this.onLongPress,
     this.accent,
     this.rotation = 0,
     this.tape = NotebookTape.none,
@@ -224,6 +225,7 @@ class NotebookCard extends StatelessWidget {
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final Color? accent;
   final double rotation;
   final NotebookTape tape;
@@ -274,6 +276,7 @@ class NotebookCard extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
+              onLongPress: onLongPress,
               child: Padding(padding: padding, child: child),
             ),
           ),

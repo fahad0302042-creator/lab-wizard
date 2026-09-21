@@ -68,6 +68,10 @@ Without this migration, the mobile app automatically falls back to the existing 
 
 Run `supabase/002_undo_inventory_action.sql` to add the `inventory_reversals` table and the idempotent `undo_inventory_action` RPC. Undoing a consume/restock/damage restores the quantity and deletes the log entry (the same thing the web app's undo does) and stores a reversal record that the item history shows as an "undone" entry. Changes that are still queued on the device are simply cancelled. Only entries recorded in the last 7 days can be undone, and a restock cannot be undone once that stock has been used. Without the migration the app performs the web-parity undo and keeps the reversal note locally.
 
+## Selecting several items (BATCH-01/02/04, QR-01)
+
+Long-press any card or row (or use the shelf menu → *select items…*) to enter selection mode. The bar at the bottom offers a batch restock with a separate amount and history entry per item, a batch low-stock threshold with an old → new preview, QR labels for just the selected chemicals, and a guarded delete: unsynced items and offline devices are blocked, deleting five or more items requires typing `DELETE`, and every batch reports the rows that failed so they can be retried on their own.
+
 ## Sync center (SYNC-01)
 
 Settings → *Sync center* (also reachable from the dashboard sync banner) lists every change waiting on the device with its attempts, last error and status. Connection problems keep a change `pending` and retry automatically; any other server error marks only that change as `failed` so other items keep syncing. Failed changes can be retried individually, all at once, or discarded — discarding rolls the offline copy back to what it was before the change.

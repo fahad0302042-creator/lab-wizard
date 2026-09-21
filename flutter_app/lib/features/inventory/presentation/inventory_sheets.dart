@@ -20,7 +20,7 @@ Future<void> showAddItemSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(child: _AddItemForm(kind: kind)),
+    builder: (_) => NotebookSheetFrame(child: _AddItemForm(kind: kind)),
   );
 }
 
@@ -34,7 +34,7 @@ Future<void> showEditItemSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(
+    builder: (_) => NotebookSheetFrame(
       child: _EditItemForm(kind: kind, itemId: itemId),
     ),
   );
@@ -51,7 +51,7 @@ Future<void> showInventoryActionSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(
+    builder: (_) => NotebookSheetFrame(
       child: _ActionForm(kind: kind, itemId: itemId, action: action),
     ),
   );
@@ -67,7 +67,7 @@ Future<void> showItemDetailSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(
+    builder: (_) => NotebookSheetFrame(
       maxHeightFactor: .9,
       child: _ItemDetail(kind: kind, itemId: itemId),
     ),
@@ -80,12 +80,18 @@ Future<void> showBatchConsumeSheet(BuildContext context, WidgetRef _) {
     isScrollControlled: true,
     useSafeArea: true,
     builder: (_) =>
-        const _SheetFrame(maxHeightFactor: .92, child: _BatchConsumeForm()),
+        const NotebookSheetFrame(maxHeightFactor: .92, child: _BatchConsumeForm()),
   );
 }
 
-class _SheetFrame extends StatelessWidget {
-  const _SheetFrame({required this.child, this.maxHeightFactor = .94});
+/// Paper-coloured bottom-sheet body that scrolls and keeps clear of the
+/// keyboard. Shared by every form sheet in the app.
+class NotebookSheetFrame extends StatelessWidget {
+  const NotebookSheetFrame({
+    required this.child,
+    this.maxHeightFactor = .94,
+    super.key,
+  });
 
   final Widget child;
   final double maxHeightFactor;

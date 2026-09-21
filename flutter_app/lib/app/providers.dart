@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -289,6 +290,20 @@ class InventoryState {
     lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
   );
 }
+
+/// Reports whether the device has any network at all. Used before actions
+/// that must not be queued, such as deleting items. Unknown counts as online
+/// so the server can give the final answer.
+final isOnlineProvider = Provider<Future<bool> Function()>(
+  (ref) => () async {
+    try {
+      final results = await Connectivity().checkConnectivity();
+      return results.any((result) => result != ConnectivityResult.none);
+    } catch (_) {
+      return true;
+    }
+  },
+);
 
 final inventoryProvider = NotifierProvider<InventoryController, InventoryState>(
   InventoryController.new,

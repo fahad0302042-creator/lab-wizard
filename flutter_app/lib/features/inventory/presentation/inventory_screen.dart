@@ -13,13 +13,17 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../domain/models.dart';
+import 'batch_sheets.dart';
 import 'inventory_sheets.dart';
 
 enum _StockFilter { all, low, critical }
 
 enum _InventorySort { name, quantity, status }
 
-enum _ShelfMenu { batchConsume, printLabels, settings }
+enum _ShelfMenu { select, batchConsume, printLabels, settings }
+
+/// Actions offered for a multi-selection (BATCH-01/02/04, QR-01).
+enum SelectionAction { restock, threshold, labels, delete }
 
 /// Letters offered by the quick navigation strip. Names that do not start
 /// with a Latin letter are grouped under `#`.
@@ -78,6 +82,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   _InventorySort _sort = _InventorySort.name;
   bool _printingLabels = false;
   bool _headingCollapsed = false;
+  bool _selectionMode = false;
+  final _selected = <String>{};
   List<_InventoryView> _visibleItems = const [];
 
   static const _detailedGap = 18.0;
@@ -126,15 +132,30 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         },
       );
     _visibleItems = items;
+    if (_selected.isNotEmpty) {
+      final existing = {for (final item in allItems) item.id};
+      _selected.retainWhere(existing.contains);
+    }
+    final visibleIds = {for (final item in items) item.id};
+    final allVisibleSelected =
+        items.isNotEmpty && visibleIds.every(_selected.contains);
     final showIndex = allItems.length >= _minimumItemsForIndex;
     final availableLetters = {for (final item in items) item.letter};
     final motion = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
 
-    return Scaffold(
+    return PopScope(
+      // Back leaves selection mode before it leaves the shelf.
+      canPop: !_selectionMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _exitSelection();
+      },
+      child: Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.small(
+      floatingActionButton: _selectionMode
+          ? null
+          : FloatingActionButton.small(
         heroTag: 'add-${widget.kind.name}',
         tooltip: _isChemical ? 'Add chemical' : 'Add apparatus',
         onPressed: () => showAddItemSheet(context, ref, widget.kind),
@@ -177,6 +198,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               shown: items.length,
               total: allItems.length,
               printingLabels: _printingLabels,
+              selectionMode: _selectionMode,
+              selectedCount: _selected.length,
+              allVisibleSelected: allVisibleSelected,
+              onExitSelection: _exitSelection,
+              onSelectAllVisible: () => setState(() {
+                if (allVisibleSelected) {
+                  _selected.removeAll(visibleIds);
+                } else {
+                  _selected.addAll(visibleIds);
+                }
+              }),
               onSearchChanged: () => setState(() {}),
               onClearSearch: () {
                 _searchController.clear();
@@ -297,9 +329,74 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               ],
             ),
           ),
+          AnimatedSize(
+            duration: motion,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.bottomCenter,
+            child: _selectionMode
+                ? _SelectionActionBar(
+                    kind: widget.kind,
+                    count: _selected.length,
+                    busy: _printingLabels,
+                    onAction: _handleSelectionAction,
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
         ],
       ),
+      ),
     );
+  }
+
+  void _enterSelection([String? id]) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectionMode = true;
+      if (id != null) _selected.add(id);
+    });
+  }
+
+  void _exitSelection() {
+    if (!_selectionMode && _selected.isEmpty) return;
+    setState(() {
+      _selectionMode = false;
+      _selected.clear();
+    });
+  }
+
+  void _toggleSelected(String id) {
+    setState(() {
+      if (!_selected.add(id)) _selected.remove(id);
+    });
+  }
+
+  Future<void> _handleSelectionAction(SelectionAction action) async {
+    final ids = Set<String>.of(_selected);
+    if (ids.isEmpty) return;
+    switch (action) {
+      case SelectionAction.restock:
+        await showBatchRestockSheet(context, kind: widget.kind, itemIds: ids);
+      case SelectionAction.threshold:
+        await showBatchThresholdSheet(
+          context,
+          kind: widget.kind,
+          itemIds: ids,
+        );
+      case SelectionAction.labels:
+        final chemicals = ref
+            .read(inventoryProvider)
+            .chemicals
+            .where((item) => ids.contains(item.id))
+            .toList();
+        await _printQrLabels(chemicals);
+        return;
+      case SelectionAction.delete:
+        await showBatchDeleteSheet(context, kind: widget.kind, itemIds: ids);
+    }
+    if (!mounted) return;
+    // Items that were deleted disappear from the selection on rebuild; keep
+    // the rest selected so a second action can follow.
+    setState(() {});
   }
 
   Widget _buildDetailedCard(List<_InventoryView> items, int index) {
@@ -313,7 +410,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           index: index,
           tape: _tapes[index % _tapes.length],
           kind: widget.kind,
-          onTap: () => _openDetail(item.id),
+          selecting: _selectionMode,
+          selected: _selected.contains(item.id),
+          onTap: () => _selectionMode
+              ? _toggleSelected(item.id)
+              : _openDetail(item.id),
+          onLongPress: () => _selectionMode
+              ? _toggleSelected(item.id)
+              : _enterSelection(item.id),
           onConsume: () => _openAction(item.id, _primaryAction),
           onRestock: () => _openAction(item.id, InventoryAction.restock),
         ),
@@ -328,7 +432,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       child: _CompactRow(
         item: item,
         kind: widget.kind,
-        onTap: () => _openDetail(item.id),
+        selecting: _selectionMode,
+        selected: _selected.contains(item.id),
+        onTap: () =>
+            _selectionMode ? _toggleSelected(item.id) : _openDetail(item.id),
+        onLongPress: () => _selectionMode
+            ? _toggleSelected(item.id)
+            : _enterSelection(item.id),
         onConsume: () => _openAction(item.id, _primaryAction),
         onRestock: () => _openAction(item.id, InventoryAction.restock),
       ),
@@ -354,6 +464,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   void _handleMenu(_ShelfMenu value, InventoryState state) {
     switch (value) {
+      case _ShelfMenu.select:
+        _enterSelection();
       case _ShelfMenu.batchConsume:
         showBatchConsumeSheet(context, ref);
       case _ShelfMenu.printLabels:
@@ -552,6 +664,11 @@ class _ShelfControls extends StatelessWidget {
     required this.shown,
     required this.total,
     required this.printingLabels,
+    required this.selectionMode,
+    required this.selectedCount,
+    required this.allVisibleSelected,
+    required this.onExitSelection,
+    required this.onSelectAllVisible,
     required this.onSearchChanged,
     required this.onClearSearch,
     required this.onFilter,
@@ -569,6 +686,11 @@ class _ShelfControls extends StatelessWidget {
   final int shown;
   final int total;
   final bool printingLabels;
+  final bool selectionMode;
+  final int selectedCount;
+  final bool allVisibleSelected;
+  final VoidCallback onExitSelection;
+  final VoidCallback onSelectAllVisible;
   final VoidCallback onSearchChanged;
   final VoidCallback onClearSearch;
   final ValueChanged<_StockFilter> onFilter;
@@ -582,6 +704,42 @@ class _ShelfControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (selectionMode)
+          Row(
+            key: const Key('selection-bar'),
+            children: [
+              IconButton(
+                key: const Key('selection-close'),
+                tooltip: 'Leave selection',
+                onPressed: onExitSelection,
+                icon: const Icon(Icons.close),
+              ),
+              Expanded(
+                child: Text(
+                  '$selectedCount selected',
+                  style: const TextStyle(
+                    fontFamily: 'ArchitectsDaughter',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                key: const Key('selection-select-all'),
+                onPressed: onSelectAllVisible,
+                icon: Icon(
+                  allVisibleSelected
+                      ? Icons.remove_done
+                      : Icons.done_all,
+                  size: 18,
+                ),
+                label: Text(
+                  allVisibleSelected ? 'clear shown' : 'select shown',
+                ),
+              ),
+            ],
+          )
+        else
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -619,6 +777,15 @@ class _ShelfControls extends StatelessWidget {
               onSelected: onMenu,
               icon: const Icon(Icons.more_vert),
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: _ShelfMenu.select,
+                  enabled: total > 0,
+                  child: const ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.checklist),
+                    title: Text('select items…'),
+                  ),
+                ),
                 if (chemical) ...[
                   const PopupMenuItem(
                     value: _ShelfMenu.batchConsume,
@@ -943,6 +1110,9 @@ class _InventoryCard extends StatelessWidget {
     required this.onTap,
     required this.onConsume,
     required this.onRestock,
+    this.selecting = false,
+    this.selected = false,
+    this.onLongPress,
   });
 
   final _InventoryView item;
@@ -952,6 +1122,9 @@ class _InventoryCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onConsume;
   final VoidCallback onRestock;
+  final bool selecting;
+  final bool selected;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -970,7 +1143,9 @@ class _InventoryCard extends StatelessWidget {
           ),
         Dismissible(
           key: ValueKey('${kind.name}-${item.id}'),
-          direction: DismissDirection.horizontal,
+          direction: selecting
+              ? DismissDirection.none
+              : DismissDirection.horizontal,
           confirmDismiss: (direction) async {
             HapticFeedback.mediumImpact();
             if (direction == DismissDirection.startToEnd) {
@@ -1000,7 +1175,9 @@ class _InventoryCard extends StatelessWidget {
             tag: '${kind.name}-${item.id}',
             child: NotebookCard(
               onTap: onTap,
+              onLongPress: onLongPress,
               tape: tape,
+              accent: selected ? context.inkColor : null,
               paperclip: item.status == StockState.empty,
               alternate: index.isOdd,
               rotation: index.isEven ? -.008 : .009,
@@ -1010,6 +1187,14 @@ class _InventoryCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (selecting)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 10, top: 2),
+                          child: _SelectionMark(
+                            selected: selected,
+                            key: Key('select-mark-${item.id}'),
+                          ),
+                        ),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1093,13 +1278,13 @@ class _InventoryCard extends StatelessWidget {
                       _CardAction(
                         label: kind == ItemKind.chemical ? 'use' : 'damage',
                         color: context.marginRedColor,
-                        onTap: onConsume,
+                        onTap: selecting ? onTap : onConsume,
                       ),
                       const SizedBox(width: 10),
                       _CardAction(
                         label: '+ stock',
                         color: context.healthyColor,
-                        onTap: onRestock,
+                        onTap: selecting ? onTap : onRestock,
                       ),
                     ],
                   ),
@@ -1123,6 +1308,9 @@ class _CompactRow extends StatelessWidget {
     required this.onTap,
     required this.onConsume,
     required this.onRestock,
+    this.selecting = false,
+    this.selected = false,
+    this.onLongPress,
   });
 
   final _InventoryView item;
@@ -1130,6 +1318,9 @@ class _CompactRow extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onConsume;
   final VoidCallback onRestock;
+  final bool selecting;
+  final bool selected;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -1146,7 +1337,9 @@ class _CompactRow extends StatelessWidget {
     };
     return Dismissible(
       key: ValueKey('${kind.name}-${item.id}'),
-      direction: DismissDirection.horizontal,
+      direction: selecting
+          ? DismissDirection.none
+          : DismissDirection.horizontal,
       confirmDismiss: (direction) async {
         HapticFeedback.mediumImpact();
         if (direction == DismissDirection.startToEnd) {
@@ -1169,13 +1362,25 @@ class _CompactRow extends StatelessWidget {
         text: chemical ? 'use' : 'damage',
       ),
       child: Material(
-        color: Colors.transparent,
+        color: selected
+            ? context.inkColor.withValues(alpha: .06)
+            : Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(2, 6, 0, 6),
             child: Row(
               children: [
+                if (selecting)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: _SelectionMark(
+                      selected: selected,
+                      key: Key('select-mark-${item.id}'),
+                    ),
+                  )
+                else
                 Semantics(
                   label: statusText,
                   child: Container(
@@ -1247,30 +1452,179 @@ class _CompactRow extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 2),
-                IconButton(
-                  tooltip: chemical ? 'Use' : 'Report damage',
-                  onPressed: onConsume,
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 21,
-                  color: context.marginRedColor,
-                  icon: Icon(
-                    chemical
-                        ? Icons.remove_circle_outline
-                        : Icons.report_problem_outlined,
+                if (!selecting) ...[
+                  IconButton(
+                    tooltip: chemical ? 'Use' : 'Report damage',
+                    onPressed: onConsume,
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 21,
+                    color: context.marginRedColor,
+                    icon: Icon(
+                      chemical
+                          ? Icons.remove_circle_outline
+                          : Icons.report_problem_outlined,
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Restock',
-                  onPressed: onRestock,
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 21,
-                  color: context.healthyColor,
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
+                  IconButton(
+                    tooltip: 'Restock',
+                    onPressed: onRestock,
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 21,
+                    color: context.healthyColor,
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ] else
+                  const SizedBox(width: 8),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Hand-drawn style check circle used while selecting items.
+class _SelectionMark extends StatelessWidget {
+  const _SelectionMark({required this.selected, super.key});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: selected ? 'selected' : 'not selected',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: selected ? context.inkColor : Colors.transparent,
+          shape: BoxShape.circle,
+          border: Border.all(color: context.inkColor, width: 1.8),
+        ),
+        child: selected
+            ? Icon(Icons.check, size: 16, color: context.paperColor)
+            : null,
+      ),
+    );
+  }
+}
+
+/// Bottom bar with the batch actions for the current selection.
+class _SelectionActionBar extends StatelessWidget {
+  const _SelectionActionBar({
+    required this.kind,
+    required this.count,
+    required this.busy,
+    required this.onAction,
+  });
+
+  final ItemKind kind;
+  final int count;
+  final bool busy;
+  final ValueChanged<SelectionAction> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = count > 0 && !busy;
+    return Material(
+      key: const Key('selection-actions'),
+      color: context.cardColor,
+      elevation: 6,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: _SelectionButton(
+                  key: const Key('selection-restock'),
+                  icon: Icons.add_circle_outline,
+                  label: 'restock',
+                  onPressed: enabled
+                      ? () => onAction(SelectionAction.restock)
+                      : null,
+                ),
+              ),
+              Expanded(
+                child: _SelectionButton(
+                  key: const Key('selection-threshold'),
+                  icon: Icons.tune,
+                  label: 'threshold',
+                  onPressed: enabled
+                      ? () => onAction(SelectionAction.threshold)
+                      : null,
+                ),
+              ),
+              if (kind == ItemKind.chemical)
+                Expanded(
+                  child: _SelectionButton(
+                    key: const Key('selection-labels'),
+                    icon: Icons.qr_code_2,
+                    label: busy ? 'preparing…' : 'labels',
+                    onPressed: enabled
+                        ? () => onAction(SelectionAction.labels)
+                        : null,
+                  ),
+                ),
+              Expanded(
+                child: _SelectionButton(
+                  key: const Key('selection-delete'),
+                  icon: Icons.delete_outline,
+                  label: 'delete',
+                  color: context.marginRedColor,
+                  onPressed: enabled
+                      ? () => onAction(SelectionAction.delete)
+                      : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionButton extends StatelessWidget {
+  const _SelectionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.color,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: color ?? context.inkColor,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 22),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Caveat',
+              fontSize: 16,
+              height: 1,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
