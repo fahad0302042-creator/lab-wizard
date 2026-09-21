@@ -221,6 +221,14 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('trend-note')), findsOneWidget);
+      // REPORT-03: four uses over 46 days of history give an estimate with
+      // its reasoning; the range above does not change it.
+      expect(find.byKey(const Key('runout-c1')), findsOneWidget);
+      expect(
+        find.textContaining('4 uses totalling 20 mL over the last 46 days'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('runout-gaps')), findsNothing);
 
       await tester.tap(find.byKey(const Key('report-range-last30')));
       await tester.pumpAndSettle();

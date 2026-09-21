@@ -14,6 +14,7 @@ import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../domain/report_range.dart';
 import '../domain/report_stats.dart';
+import '../domain/runout.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -90,6 +91,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ? 0.0
         : healthyItems / itemStates.length;
     final topUsage = _topUsage(state, logs, _kind);
+    // REPORT-03: always judged on the last 90 days ending today, independent
+    // of the range above, so a report about May does not "predict" the past.
+    final runOut = _kind == ItemKind.chemical
+        ? runOutReportForChemicals(state.chemicals, state.logs)
+        : runOutReportForApparatus(state.apparatus, state.logs);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
@@ -281,6 +287,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 24),
+        const PageHeading('run-out estimates'),
+        _RunOutSection(report: runOut),
         const SizedBox(height: 24),
         PageHeading(
           _range.dayCount > 62 ? 'activity by week' : 'activity by day',
@@ -588,6 +597,117 @@ class _ReportMetric extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RunOutSection extends StatefulWidget {
+  const _RunOutSection({required this.report});
+
+  final RunOutReport report;
+
+  @override
+  State<_RunOutSection> createState() => _RunOutSectionState();
+}
+
+class _RunOutSectionState extends State<_RunOutSection> {
+  static const _collapsedCount = 5;
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final report = widget.report;
+    final muted = context.mutedInkColor;
+    final shown = _expanded
+        ? report.estimates
+        : report.estimates.take(_collapsedCount).toList();
+    return NotebookCard(
+      tape: NotebookTape.pink,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (report.estimates.isEmpty)
+            Text(
+              'No estimates yet. Each one needs $runOutMinEntries+ uses '
+              'spread over $runOutMinSpanDays+ days within the last '
+              '$runOutLookbackDays days; keep logging and they appear here.',
+              key: const Key('runout-empty'),
+              style: TextStyle(color: muted),
+            ),
+          for (final estimate in shown)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Semantics(
+                label:
+                    '${estimate.name} runs out in ${estimate.headline}. '
+                    '${estimate.explanation}',
+                child: Column(
+                  key: Key('runout-${estimate.itemId}'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            estimate.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          estimate.headline,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: estimate.urgent
+                                ? context.marginRedColor
+                                : estimate.soon
+                                ? context.lowColor
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      estimate.explanation,
+                      style: TextStyle(color: muted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (report.estimates.length > _collapsedCount)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('runout-toggle'),
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(
+                  _expanded
+                      ? 'show fewer'
+                      : 'show all ${report.estimates.length}',
+                ),
+              ),
+            ),
+          if (report.withoutEstimate > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              report.gapSummary,
+              key: const Key('runout-gaps'),
+              style: TextStyle(color: muted, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            'Assumes the pace of the last $runOutLookbackDays days continues; '
+            'restocks raise the stock and move the date out.',
+            style: TextStyle(color: muted, fontSize: 11),
+          ),
+        ],
       ),
     );
   }
