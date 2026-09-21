@@ -381,7 +381,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     AssetReports assets,
   ) async {
     final day = DateFormat('d MMM yyyy');
-    pw.Widget table(String title, List<String> headers, List<List<String>> rows) {
+    pw.Widget table(
+      String title,
+      List<String> headers,
+      List<List<String>> rows,
+    ) {
       if (rows.isEmpty) return pw.SizedBox();
       return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,

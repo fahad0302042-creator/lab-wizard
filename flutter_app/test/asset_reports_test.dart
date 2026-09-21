@@ -74,7 +74,10 @@ void main() {
     expect(report.later, 1);
     expect(report.undated, 1);
     expect(report.isEmpty, isFalse);
-    expect(expiryReport([_chemical('f', 'Formalin')], now: _today).isEmpty, isTrue);
+    expect(
+      expiryReport([_chemical('f', 'Formalin')], now: _today).isEmpty,
+      isTrue,
+    );
   });
 
   test('damage view groups incidents per item inside the range', () {

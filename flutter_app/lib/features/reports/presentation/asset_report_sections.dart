@@ -311,10 +311,7 @@ class _ReportLine extends StatelessWidget {
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    color: context.mutedInkColor,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: context.mutedInkColor, fontSize: 12),
                 ),
               ],
             ),

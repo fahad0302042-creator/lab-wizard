@@ -4,10 +4,11 @@ import '../../inventory/domain/models.dart';
 import 'report_range.dart';
 
 /// Signed whole days from [today] to [day] on the local calendar.
-int daysFromToday(DateTime day, {required DateTime today}) =>
-    DateTime.utc(day.year, day.month, day.day)
-        .difference(DateTime.utc(today.year, today.month, today.day))
-        .inDays;
+int daysFromToday(DateTime day, {required DateTime today}) => DateTime.utc(
+  day.year,
+  day.month,
+  day.day,
+).difference(DateTime.utc(today.year, today.month, today.day)).inDays;
 
 /// "in 3 days", "today", "2 days ago".
 String relativeDays(int days) {
