@@ -10,6 +10,7 @@ import 'package:lab_wizard/core/database/local_database.dart';
 import 'package:lab_wizard/core/theme/app_theme.dart';
 import 'package:lab_wizard/features/auth/presentation/delete_account_sheet.dart';
 import 'package:lab_wizard/features/inventory/domain/models.dart';
+import 'package:lab_wizard/features/security/app_lock_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
@@ -117,7 +118,8 @@ class _FakeAuth extends AuthController {
   final passwords = <String>[];
 
   @override
-  AuthState build() => const AuthState(phase: AuthPhase.signedIn);
+  AuthState build() =>
+      AuthState(phase: AuthPhase.signedIn, user: User.fromJson(_userJson));
 
   @override
   Future<String?> deleteAccount({required String password}) async {
@@ -248,6 +250,7 @@ void main() {
   });
 
   group('DeleteAccountForm', () {
+    late MemorySecureStore secure;
     Future<(_FakeAuth, List<bool?>, List<int>)> pump(
       WidgetTester tester, {
       String? error,
@@ -259,9 +262,13 @@ void main() {
       final auth = _FakeAuth(error: error);
       final results = <bool?>[];
       final exports = <int>[];
+      // An app-lock PIN of this account must not outlive it (SECURITY-01).
+      secure = MemorySecureStore()
+        ..values[AppLockController.pinKey('u1')] = '{"stale":true}';
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            secureStoreProvider.overrideWithValue(secure),
             authProvider.overrideWith(() => auth),
             inventoryProvider.overrideWith(
               () => _FakeInventory(
@@ -336,6 +343,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(auth.passwords, ['pw']);
       expect(results, [true]);
+      expect(secure.values, isEmpty, reason: 'PIN forgotten');
     });
 
     testWidgets('errors keep the sheet open and cancel keeps the account', (

@@ -11,7 +11,6 @@ import '../core/database/local_database.dart';
 import '../core/utils/errors.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/models.dart';
-import '../features/security/app_lock_providers.dart';
 import '../features/sync/data/incremental_sync.dart';
 import '../features/sync/domain/sync_conflict.dart';
 
@@ -318,7 +317,6 @@ class AuthController extends Notifier<AuthState> {
       // A cache that cannot be cleared is harmless: it is unreadable without
       // the account and overwritten on the next sign-in.
     }
-    await ref.read(appLockProvider.notifier).forget(user.id);
     ref.read(inventoryProvider.notifier).clearMemory();
     try {
       await client.auth.signOut();

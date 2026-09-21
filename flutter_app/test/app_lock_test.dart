@@ -8,13 +8,13 @@ import 'package:lab_wizard/features/security/app_lock_providers.dart';
 import 'package:lab_wizard/features/security/domain/app_lock.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
-final _userJson = {
+final _userJson = <String, dynamic>{
   'id': 'u1',
   'aud': 'authenticated',
   'role': 'authenticated',
   'email': 'ali@example.org',
-  'app_metadata': {'provider': 'email'},
-  'user_metadata': {},
+  'app_metadata': <String, dynamic>{'provider': 'email'},
+  'user_metadata': <String, dynamic>{},
   'created_at': '2026-01-01T00:00:00Z',
   'updated_at': '2026-01-01T00:00:00Z',
 };

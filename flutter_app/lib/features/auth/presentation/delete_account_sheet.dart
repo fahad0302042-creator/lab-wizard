@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
+import '../../security/app_lock_providers.dart';
 import '../../settings/presentation/data_export.dart';
 
 /// The word that must be typed before the account can be deleted.
@@ -81,11 +82,19 @@ class _DeleteAccountFormState extends ConsumerState<DeleteAccountForm> {
       _deleting = true;
       _error = null;
     });
+    final userId = ref.read(authProvider).user?.id;
     final error = await ref
         .read(authProvider.notifier)
         .deleteAccount(password: _password.text);
     if (!mounted) return;
     if (error == null) {
+      if (userId != null) {
+        // The account is gone, so its app-lock PIN has no owner any more
+        // (SECURITY-01). Done here rather than in AuthController because the
+        // lock already depends on the auth state.
+        await ref.read(appLockProvider.notifier).forget(userId);
+        if (!mounted) return;
+      }
       Navigator.of(context).pop(true);
       return;
     }
