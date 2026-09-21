@@ -9,6 +9,7 @@ import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../import/presentation/import_screen.dart';
 import '../../inventory/domain/models.dart';
 import '../../sync/presentation/sync_center_screen.dart';
 
@@ -247,17 +248,33 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   const _CardTitle(
                     icon: Icons.download_outlined,
-                    title: 'export a backup',
+                    title: 'backup & import',
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '${inventory.chemicals.length} chemicals · ${inventory.apparatus.length} apparatus · ${inventory.logs.length} log entries',
                   ),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () => _exportCsv(context, inventory),
-                    icon: const Icon(Icons.share_outlined),
-                    label: const Text('Share inventory CSV'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _exportCsv(context, inventory),
+                        icon: const Icon(Icons.share_outlined),
+                        label: const Text('Share inventory CSV'),
+                      ),
+                      OutlinedButton.icon(
+                        key: const Key('open-import'),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const ImportScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('Import CSV'),
+                      ),
+                    ],
                   ),
                 ],
               ),

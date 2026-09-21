@@ -15,6 +15,7 @@ class _FakeInventory extends InventoryController {
   final Set<String> failFor;
   final restocks = <(String, double, String)>[];
   final thresholds = <(String, double)>[];
+  final fields = <(String, String, String)>[];
   final deletions = <String>[];
 
   @override
@@ -58,7 +59,21 @@ class _FakeInventory extends InventoryController {
     required String id,
     required Map<String, dynamic> changes,
   }) async {
-    thresholds.add((id, (changes['low_stock_threshold'] as num).toDouble()));
+    if (changes.containsKey('low_stock_threshold')) {
+      thresholds.add((id, (changes['low_stock_threshold'] as num).toDouble()));
+      return;
+    }
+    final entry = changes.entries.single;
+    fields.add((id, entry.key, entry.value as String));
+    state = state.copyWith(
+      chemicals: state.chemicals
+          .map(
+            (item) => item.id == id && entry.key == 'location'
+                ? item.copyWith(location: entry.value as String)
+                : item,
+          )
+          .toList(),
+    );
   }
 
   @override
@@ -84,6 +99,7 @@ List<Chemical> _chemicals(int count) => [
       notes: '',
       qrCode: 'qr-$index',
       createdAt: DateTime(2026, 1, 1 + index),
+      location: index == 1 ? 'Cabinet B' : null,
     ),
 ];
 
@@ -298,6 +314,38 @@ void main() {
       await tester.pumpAndSettle();
       expect(fake.thresholds, [('chem-0', 4.0), ('chem-2', 4.0)]);
       expect(find.text('Threshold updated for 2 items'), findsOneWidget);
+    });
+  });
+
+  group('BATCH-03 location / category', () {
+    testWidgets('moves selected chemicals to one location with a preview', (
+      tester,
+    ) async {
+      final fake = await _pump(
+        tester,
+        InventoryState(chemicals: _chemicals(3)),
+      );
+      await _selectFirst(tester, 3);
+      await tester.tap(find.byKey(const Key('selection-field')));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a location'), findsOneWidget);
+      expect(find.text('no location yet'), findsNWidgets(2));
+
+      // Existing locations are offered as one-tap suggestions.
+      await tester.tap(find.byKey(const Key('location-suggestion-Cabinet B')));
+      await tester.pumpAndSettle();
+      expect(find.text('none → Cabinet B'), findsNWidgets(2));
+      expect(find.text('already Cabinet B — unchanged'), findsOneWidget);
+      expect(find.text('Update 2 items'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('batch-field-submit')));
+      await tester.pumpAndSettle();
+      expect(fake.fields, [
+        ('chem-0', 'location', 'Cabinet B'),
+        ('chem-2', 'location', 'Cabinet B'),
+      ]);
+      expect(fake.thresholds, isEmpty);
+      expect(find.text('Location updated for 2 items'), findsOneWidget);
     });
   });
 

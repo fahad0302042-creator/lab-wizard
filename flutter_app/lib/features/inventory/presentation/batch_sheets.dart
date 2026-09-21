@@ -38,6 +38,22 @@ Future<void> showBatchThresholdSheet(
   ),
 );
 
+/// Batch storage location (chemicals) or category (apparatus) with an
+/// old → new preview (BATCH-03). The field is chosen by the shelf, so a
+/// value can never be written to an item type that does not have it.
+Future<void> showBatchFieldSheet(
+  BuildContext context, {
+  required ItemKind kind,
+  required Set<String> itemIds,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  builder: (_) => NotebookSheetFrame(
+    child: _BatchFieldForm(kind: kind, itemIds: itemIds),
+  ),
+);
+
 /// Guarded multi-delete (BATCH-04): summary, unsynced/offline checks, typed
 /// confirmation for large deletions and a per-item result report.
 Future<void> showBatchDeleteSheet(
@@ -138,6 +154,7 @@ class _BatchItem {
     required this.quantity,
     required this.threshold,
     required this.unit,
+    this.field = '',
   });
 
   final String id;
@@ -145,6 +162,10 @@ class _BatchItem {
   final double quantity;
   final double threshold;
   final String unit;
+
+  /// Current value of the BATCH-03 field: location for chemicals, category
+  /// for apparatus.
+  final String field;
 }
 
 List<_BatchItem> _itemsFor(
@@ -162,6 +183,7 @@ List<_BatchItem> _itemsFor(
                 quantity: item.quantity,
                 threshold: item.lowStockThreshold,
                 unit: item.unit,
+                field: item.location ?? '',
               ),
         ]
       : [
@@ -173,6 +195,7 @@ List<_BatchItem> _itemsFor(
                 quantity: item.quantity,
                 threshold: item.lowStockThreshold,
                 unit: 'pcs',
+                field: item.category,
               ),
         ];
   items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
@@ -655,6 +678,253 @@ class _BatchThresholdFormState extends ConsumerState<_BatchThresholdForm> {
       SnackBar(
         content: Text(
           'Threshold updated for $updated item${updated == 1 ? '' : 's'}',
+        ),
+      ),
+    );
+  }
+}
+
+/// Known apparatus categories, matching the add/edit sheets.
+const apparatusCategories = [
+  'glassware',
+  'balances',
+  'heating',
+  'measurement',
+  'other',
+];
+
+class _BatchFieldForm extends ConsumerStatefulWidget {
+  const _BatchFieldForm({required this.kind, required this.itemIds});
+
+  final ItemKind kind;
+  final Set<String> itemIds;
+
+  @override
+  ConsumerState<_BatchFieldForm> createState() => _BatchFieldFormState();
+}
+
+class _BatchFieldFormState extends ConsumerState<_BatchFieldForm> {
+  final _value = TextEditingController();
+  String? _category;
+  bool _running = false;
+  int _done = 0;
+  int _total = 0;
+  BatchOutcome? _outcome;
+
+  bool get _chemical => widget.kind == ItemKind.chemical;
+  String get _fieldLabel => _chemical ? 'location' : 'category';
+  String get _column => _chemical ? 'location' : 'category';
+
+  /// The new value, or null while nothing valid has been entered.
+  String? get _target {
+    if (_chemical) {
+      final text = _value.text.trim();
+      return text.isEmpty ? null : text;
+    }
+    return _category;
+  }
+
+  @override
+  void dispose() {
+    _value.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(inventoryProvider);
+    final items = _itemsFor(state, widget.kind, widget.itemIds);
+    final target = _target;
+    final changed = target == null
+        ? const <_BatchItem>[]
+        : items.where((item) => item.field != target).toList();
+    final outcome = _outcome;
+    final suggestions = _chemical
+        ? ({
+            for (final item in state.chemicals)
+              if ((item.location ?? '').trim().isNotEmpty)
+                item.location!.trim(),
+          }.toList()..sort())
+        : const <String>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PageHeading('batch $_fieldLabel'),
+        Text(
+          _chemical
+              ? 'Move ${items.length} selected reagents to one storage '
+                    'location. Items already there are left untouched.'
+              : 'Put ${items.length} selected items in one category. Items '
+                    'already in it are left untouched.',
+          style: TextStyle(color: context.mutedInkColor),
+        ),
+        const SizedBox(height: 12),
+        if (items.isEmpty)
+          const EmptyNotebookState(
+            icon: Icons.checklist,
+            title: 'nothing selected',
+            message: 'Pick items on the shelf first.',
+          )
+        else if (outcome != null && outcome.hasFailures)
+          _BatchReport(
+            outcome: outcome,
+            verb: 'updated',
+            onRetry: _running ? null : () => _run(changed, onlyFailed: true),
+            onClose: () => Navigator.pop(context),
+          )
+        else ...[
+          if (_chemical) ...[
+            TextField(
+              key: const Key('batch-field-value'),
+              controller: _value,
+              enabled: !_running,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                labelText: 'new storage location',
+                hintText: 'Cabinet B, shelf 2',
+                helperText: 'Needs the 003 chemical metadata database script.',
+              ),
+            ),
+            if (suggestions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final suggestion in suggestions.take(8))
+                    ActionChip(
+                      key: Key('location-suggestion-$suggestion'),
+                      label: Text(suggestion),
+                      onPressed: _running
+                          ? null
+                          : () => setState(() => _value.text = suggestion),
+                    ),
+                ],
+              ),
+            ],
+          ] else
+            DropdownButtonFormField<String>(
+              key: const Key('batch-field-category'),
+              initialValue: _category,
+              decoration: const InputDecoration(labelText: 'new category'),
+              items: [
+                for (final category in apparatusCategories)
+                  DropdownMenuItem(value: category, child: Text(category)),
+              ],
+              onChanged: _running
+                  ? null
+                  : (value) => setState(() => _category = value),
+            ),
+          const SizedBox(height: 12),
+          const PageHeading('preview', fontSize: 27),
+          for (final item in items)
+            ListTile(
+              key: Key('field-preview-${item.id}'),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: Icon(
+                target == null
+                    ? Icons.horizontal_rule
+                    : item.field == target
+                    ? Icons.check
+                    : Icons.arrow_forward,
+                size: 18,
+                color: context.mutedInkColor,
+              ),
+              title: Text(
+                item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                target == null
+                    ? (item.field.isEmpty ? 'no $_fieldLabel yet' : item.field)
+                    : item.field == target
+                    ? 'already $target — unchanged'
+                    : '${item.field.isEmpty ? 'none' : item.field} → $target',
+              ),
+            ),
+          const SizedBox(height: 14),
+          if (_running) _BatchProgress(done: _done, total: _total),
+          FilledButton.icon(
+            key: const Key('batch-field-submit'),
+            onPressed: _running || target == null || changed.isEmpty
+                ? null
+                : () => _run(changed),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+            icon: _running
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(_chemical ? Icons.place_outlined : Icons.category_outlined),
+            label: Text(
+              _running
+                  ? 'Updating $_done of $_total…'
+                  : target == null
+                  ? 'Enter a $_fieldLabel'
+                  : changed.isEmpty
+                  ? 'Nothing to change'
+                  : 'Update ${changed.length} item${changed.length == 1 ? '' : 's'}',
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _run(List<_BatchItem> items, {bool onlyFailed = false}) async {
+    final previous = _outcome;
+    final targets = onlyFailed && previous != null
+        ? items
+              .where(
+                (item) => previous.failures.any(
+                  (failure) => failure.itemId == item.id,
+                ),
+              )
+              .toList()
+        : items;
+    final value = _target;
+    if (value == null) return;
+    setState(() {
+      _running = true;
+      _done = 0;
+      _total = targets.length;
+      _outcome = null;
+    });
+    final controller = ref.read(inventoryProvider.notifier);
+    final outcome = await runBatch<_BatchItem>(
+      items: targets,
+      idOf: (item) => item.id,
+      nameOf: (item) => item.name,
+      step: (item) => controller.updateItem(
+        type: widget.kind,
+        id: item.id,
+        changes: {_column: value},
+      ),
+      onProgress: (done) {
+        if (mounted) setState(() => _done = done);
+      },
+    );
+    if (!mounted) return;
+    final updated = (previous?.succeeded ?? 0) + outcome.succeeded;
+    setState(() {
+      _running = false;
+      _outcome = BatchOutcome(succeeded: updated, failures: outcome.failures);
+    });
+    if (outcome.hasFailures) return;
+    HapticFeedback.mediumImpact();
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.pop(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          '${_chemical ? 'Location' : 'Category'} updated for $updated '
+          'item${updated == 1 ? '' : 's'}',
         ),
       ),
     );

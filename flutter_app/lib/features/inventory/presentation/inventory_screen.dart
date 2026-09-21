@@ -24,7 +24,7 @@ enum _InventorySort { name, quantity, status }
 enum _ShelfMenu { select, batchConsume, printLabels, settings }
 
 /// Actions offered for a multi-selection (BATCH-01/02/04, QR-01).
-enum SelectionAction { restock, threshold, labels, delete }
+enum SelectionAction { restock, threshold, field, labels, delete }
 
 /// Letters offered by the quick navigation strip. Names that do not start
 /// with a Latin letter are grouped under `#`.
@@ -393,6 +393,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         await showBatchRestockSheet(context, kind: widget.kind, itemIds: ids);
       case SelectionAction.threshold:
         await showBatchThresholdSheet(context, kind: widget.kind, itemIds: ids);
+      case SelectionAction.field:
+        await showBatchFieldSheet(context, kind: widget.kind, itemIds: ids);
       case SelectionAction.labels:
         final chemicals = ref
             .read(inventoryProvider)
@@ -1620,6 +1622,18 @@ class _SelectionActionBar extends StatelessWidget {
                       : null,
                 ),
               ),
+              Expanded(
+                child: _SelectionButton(
+                  key: const Key('selection-field'),
+                  icon: kind == ItemKind.chemical
+                      ? Icons.place_outlined
+                      : Icons.category_outlined,
+                  label: kind == ItemKind.chemical ? 'location' : 'category',
+                  onPressed: enabled
+                      ? () => onAction(SelectionAction.field)
+                      : null,
+                ),
+              ),
               if (kind == ItemKind.chemical)
                 Expanded(
                   child: _SelectionButton(
@@ -1670,20 +1684,25 @@ class _SelectionButton extends StatelessWidget {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: color ?? context.inkColor,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        minimumSize: const Size(48, 48),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 22),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'Caveat',
-              fontSize: 16,
-              height: 1,
-              fontWeight: FontWeight.w700,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(
+                fontFamily: 'Caveat',
+                fontSize: 16,
+                height: 1,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

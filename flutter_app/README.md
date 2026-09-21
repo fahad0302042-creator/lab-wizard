@@ -76,9 +76,13 @@ While you type a new item, the add sheet compares the normalized name (case, spa
 
 Run `supabase/003_chemical_metadata.sql` to add optional `supplier`, `cas_number`, `concentration`, `location`, `expiry_date` and `hazard_classes` columns to `chemicals`. All columns are nullable, so rows created by the web app or before the migration stay valid and the web app is unaffected. The add/edit sheets gain a collapsible *more details* section (CAS numbers are check-digit validated, hazards are GHS01–GHS09 chips, expiry is a calendar date). Chemicals that are expired or expire within 30 days get a badge on the shelf and an *expiring* filter; the item sheet shows the metadata, a plain-language expiry line and hazard chips. The CSV export includes the new columns. Metadata columns are only sent to the server when they are filled in or changed, and the app explains that the database needs the script if it is missing.
 
-## Selecting several items (BATCH-01/02/04, QR-01)
+## Selecting several items (BATCH-01/02/03/04, QR-01)
 
-Long-press any card or row (or use the shelf menu → *select items…*) to enter selection mode. The bar at the bottom offers a batch restock with a separate amount and history entry per item, a batch low-stock threshold with an old → new preview, QR labels for just the selected chemicals, and a guarded delete: unsynced items and offline devices are blocked, deleting five or more items requires typing `DELETE`, and every batch reports the rows that failed so they can be retried on their own.
+Long-press any card or row (or use the shelf menu → *select items…*) to enter selection mode. The bar at the bottom offers a batch restock with a separate amount and history entry per item, a batch low-stock threshold with an old → new preview, a batch storage location (chemicals) or category (apparatus) with the same preview — the field is decided by the shelf, so nothing is ever written to an item type that lacks it — QR labels for just the selected chemicals, and a guarded delete: unsynced items and offline devices are blocked, deleting five or more items requires typing `DELETE`, and every batch reports the rows that failed so they can be retried on their own.
+
+## CSV import (IMPORT-01)
+
+Settings → *backup & import* → **Import CSV** opens the system file picker (no storage permission needed). The app's own export imports as-is; other files are mapped column by column with automatic header guesses, a *first row is a header* switch and a shelf selector (chemicals, apparatus, or a `type` column). Every row is validated before anything is written — missing names, non-numeric or negative amounts, fractional apparatus counts, bad CAS numbers and unreadable dates are errors; unknown units/categories and missing units fall back with a warning — and rows matching an existing item are flagged as duplicates and skipped unless *import duplicates too* is on. The import runs row by row (offline rows go through the outbox like any other add), and the finished screen lists every skipped or failed line with its reason and can share the report as a text file.
 
 ## Sync center (SYNC-01)
 
