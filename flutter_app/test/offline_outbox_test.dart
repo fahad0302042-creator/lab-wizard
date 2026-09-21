@@ -230,6 +230,149 @@ void main() {
     });
   });
 
+  group('undo (UX-04)', () {
+    test('a queued action is cancelled instead of reversed', () async {
+      final local = openLocal('undo-queued.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+      final chemical = await repository.addChemical(
+        userId: 'u1',
+        name: 'Ethanol',
+        formula: 'C2H6O',
+        unit: 'mL',
+        quantity: 100,
+        threshold: 10,
+        notes: '',
+      );
+      final log = await repository.applyAction(
+        userId: 'u1',
+        itemId: chemical.id,
+        itemType: ItemKind.chemical,
+        action: InventoryAction.consume,
+        amount: 25,
+        previousQuantity: 100,
+        note: '',
+        loggedAt: DateTime(2026, 9, 21),
+      );
+      expect(log.operationId, isNotNull);
+
+      final result = await repository.undoAction(
+        userId: 'u1',
+        log: log,
+        currentQuantity: 75,
+      );
+      expect(result.cancelled, isTrue);
+      expect(result.reversal, isNull);
+
+      final snapshot = await repository.loadCached('u1');
+      expect(snapshot.chemicals.single.quantity, 100);
+      expect(snapshot.logs, isEmpty);
+      expect(snapshot.reversals, isEmpty);
+      expect(snapshot.outbox.single.type, 'add_chemical');
+    });
+
+    test('a synced action is undone offline and can be discarded', () async {
+      final local = openLocal('undo-offline.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+      final chemical = Chemical(
+        id: 'chem-1',
+        name: 'Acetone',
+        formula: 'C3H6O',
+        unit: 'mL',
+        quantity: 60,
+        initialQuantity: 100,
+        lowStockThreshold: 10,
+        notes: '',
+        qrCode: 'qr-1',
+        createdAt: DateTime(2026, 1, 1),
+      );
+      final log = ConsumptionLog(
+        id: 'log-1',
+        itemId: chemical.id,
+        itemType: ItemKind.chemical,
+        action: InventoryAction.consume,
+        amount: 40,
+        note: 'spill',
+        loggedAt: DateTime(2026, 9, 20, 12),
+        createdAt: DateTime(2026, 9, 20, 12),
+      );
+      await local.upsertRecord('u1', 'chemical', chemical.toMap());
+      await local.upsertRecord('u1', 'log', log.toMap());
+
+      final result = await repository.undoAction(
+        userId: 'u1',
+        log: log,
+        currentQuantity: 60,
+        itemName: 'Acetone',
+        unit: 'mL',
+      );
+      expect(result.cancelled, isFalse);
+      expect(result.reversal, isNotNull);
+      expect(result.reversal!.originalLogId, 'log-1');
+      expect(result.reversal!.originalNote, 'spill');
+
+      var snapshot = await repository.loadCached('u1');
+      expect(snapshot.chemicals.single.quantity, 100);
+      expect(snapshot.logs, isEmpty);
+      expect(snapshot.reversals.single.action, InventoryAction.consume);
+      expect(snapshot.reversals.single.amount, 40);
+      expect(snapshot.outbox.single.type, 'undo_action');
+      expect(snapshot.outbox.single.description, 'Undo: Consume 40 mL of Acetone');
+      expect(snapshot.outbox.single.itemId, chemical.id);
+
+      // Discarding the queued undo brings the entry and the quantity back.
+      await repository.discardOperation('u1', snapshot.outbox.single);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.chemicals.single.quantity, 60);
+      expect(snapshot.logs.single.id, 'log-1');
+      expect(snapshot.reversals, isEmpty);
+      expect(snapshot.outbox, isEmpty);
+    });
+
+    test('a restock cannot be undone when the stock is already used', () async {
+      final local = openLocal('undo-guard.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+      final log = ConsumptionLog(
+        id: 'log-2',
+        itemId: 'app-1',
+        itemType: ItemKind.apparatus,
+        action: InventoryAction.restock,
+        amount: 10,
+        note: '',
+        loggedAt: DateTime(2026, 9, 20),
+        createdAt: DateTime(2026, 9, 20),
+      );
+      await expectLater(
+        repository.undoAction(userId: 'u1', log: log, currentQuantity: 4),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('only 4 left of the 10'),
+          ),
+        ),
+      );
+    });
+
+    test('undo window is seven days', () {
+      final now = DateTime(2026, 9, 21, 12);
+      ConsumptionLog logAt(DateTime createdAt) => ConsumptionLog(
+        id: 'x',
+        itemId: 'i',
+        itemType: ItemKind.chemical,
+        action: InventoryAction.consume,
+        amount: 1,
+        note: '',
+        loggedAt: createdAt,
+        createdAt: createdAt,
+      );
+      expect(isUndoable(logAt(now.subtract(const Duration(days: 6))), now: now), isTrue);
+      expect(isUndoable(logAt(now.subtract(const Duration(days: 8))), now: now), isFalse);
+    });
+  });
+
   group('sync center copy', () {
     test('relative times read like a notebook note', () {
       final now = DateTime(2026, 9, 21, 12);

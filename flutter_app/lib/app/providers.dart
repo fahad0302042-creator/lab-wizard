@@ -226,6 +226,7 @@ class InventoryState {
     this.apparatus = const [],
     this.logs = const [],
     this.outbox = const [],
+    this.reversals = const [],
     this.loading = false,
     this.refreshing = false,
     this.fromCache = false,
@@ -240,6 +241,9 @@ class InventoryState {
 
   /// Changes queued on this device, oldest first (SYNC-01).
   final List<PendingOperation> outbox;
+
+  /// Undone actions, newest first (UX-04).
+  final List<InventoryReversal> reversals;
   final bool loading;
   final bool refreshing;
   final bool fromCache;
@@ -264,6 +268,7 @@ class InventoryState {
     List<Apparatus>? apparatus,
     List<ConsumptionLog>? logs,
     List<PendingOperation>? outbox,
+    List<InventoryReversal>? reversals,
     bool? loading,
     bool? refreshing,
     bool? fromCache,
@@ -275,6 +280,7 @@ class InventoryState {
     apparatus: apparatus ?? this.apparatus,
     logs: logs ?? this.logs,
     outbox: outbox ?? this.outbox,
+    reversals: reversals ?? this.reversals,
     loading: loading ?? this.loading,
     refreshing: refreshing ?? this.refreshing,
     fromCache: fromCache ?? this.fromCache,
@@ -404,6 +410,7 @@ class InventoryController extends Notifier<InventoryState> {
       apparatus: snapshot.apparatus,
       logs: snapshot.logs,
       outbox: snapshot.outbox,
+      reversals: snapshot.reversals,
       loading: loading,
       fromCache: snapshot.fromCache,
       lastUpdated: DateTime.now(),
@@ -495,7 +502,7 @@ class InventoryController extends Notifier<InventoryState> {
     );
   }
 
-  Future<void> applyAction({
+  Future<ConsumptionLog> applyAction({
     required String itemId,
     required ItemKind itemType,
     required InventoryAction action,
@@ -551,6 +558,72 @@ class InventoryController extends Notifier<InventoryState> {
       outbox: cached.outbox,
       fromCache: cached.pendingCount > 0,
     );
+    return log;
+  }
+
+  /// Reverses a recorded action from the last [undoWindow] (UX-04).
+  Future<UndoResult> undoAction(String logId, {String reason = ''}) async {
+    final userId = _requireUser();
+    final log = state.logs.where((entry) => entry.id == logId).firstOrNull;
+    if (log == null) {
+      throw StateError('This entry is no longer in the history.');
+    }
+    if (!isUndoable(log)) {
+      throw StateError(
+        'Only changes from the last ${undoWindow.inDays} days can be undone.',
+      );
+    }
+    final current = log.itemType == ItemKind.chemical
+        ? state.chemicals
+              .where((item) => item.id == log.itemId)
+              .firstOrNull
+              ?.quantity
+        : state.apparatus
+              .where((item) => item.id == log.itemId)
+              .firstOrNull
+              ?.quantity;
+    if (current == null) throw StateError('The item no longer exists.');
+    final result = await _repository.undoAction(
+      userId: userId,
+      log: log,
+      currentQuantity: current,
+      reason: reason,
+      itemName: _nameOf(log.itemType, log.itemId),
+      unit: _unitOf(log.itemType, log.itemId),
+    );
+    final serverQuantity = result.item?['quantity'];
+    final nextQuantity = serverQuantity is num
+        ? serverQuantity.toDouble()
+        : log.action == InventoryAction.restock
+        ? (current - log.amount).clamp(0, double.infinity).toDouble()
+        : current + log.amount;
+    final cached = await _repository.loadCached(userId);
+    state = state.copyWith(
+      chemicals: log.itemType == ItemKind.chemical
+          ? state.chemicals
+                .map(
+                  (item) => item.id == log.itemId
+                      ? item.copyWith(quantity: nextQuantity)
+                      : item,
+                )
+                .toList()
+          : state.chemicals,
+      apparatus: log.itemType == ItemKind.apparatus
+          ? state.apparatus
+                .map(
+                  (item) => item.id == log.itemId
+                      ? item.copyWith(quantity: nextQuantity)
+                      : item,
+                )
+                .toList()
+          : state.apparatus,
+      logs: state.logs.where((entry) => entry.id != logId).toList(),
+      reversals: cached.reversals,
+      outbox: cached.outbox,
+      fromCache: cached.pendingCount > 0,
+    );
+    if (result.alreadyUndone) unawaited(refresh());
+    return result;
   }
 
   Future<void> deleteItem(ItemKind type, String id) async {
@@ -564,6 +637,9 @@ class InventoryController extends Notifier<InventoryState> {
           ? state.apparatus.where((item) => item.id != id).toList()
           : state.apparatus,
       logs: state.logs.where((log) => log.itemId != id).toList(),
+      reversals: state.reversals
+          .where((reversal) => reversal.itemId != id)
+          .toList(),
     );
   }
 

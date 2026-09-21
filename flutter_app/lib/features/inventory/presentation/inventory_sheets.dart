@@ -6,7 +6,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
+import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../data/inventory_repository.dart';
 import '../domain/models.dart';
 
 Future<void> showAddItemSheet(
@@ -997,7 +999,7 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await ref
+      final log = await ref
           .read(inventoryProvider.notifier)
           .applyAction(
             itemId: widget.itemId,
@@ -1010,9 +1012,17 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
       HapticFeedback.mediumImpact();
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
+      final container = ProviderScope.containerOf(context, listen: false);
       Navigator.pop(context);
       messenger.showSnackBar(
-        SnackBar(content: Text('${widget.action.name} recorded')),
+        SnackBar(
+          content: Text('${widget.action.name} recorded'),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => undoRecordedAction(container, messenger, log.id),
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -1054,10 +1064,7 @@ class _ItemDetail extends ConsumerWidget {
     final notes = chemical?.notes ?? apparatus!.notes;
     final status = chemical?.stockState ?? apparatus!.stockState;
     final progress = chemical?.stockProgress ?? apparatus!.stockProgress;
-    final itemLogs = state.logs
-        .where((log) => log.itemId == itemId)
-        .take(8)
-        .toList();
+    final history = _historyFor(state, itemId);
 
     return Hero(
       tag: '${kind.name}-$itemId',
@@ -1182,30 +1189,65 @@ class _ItemDetail extends ConsumerWidget {
             ],
             const SizedBox(height: 24),
             const PageHeading('history', trailing: SizedBox.shrink()),
-            if (itemLogs.isEmpty)
+            if (history.isEmpty)
               Text(
                 'No activity yet.',
                 style: TextStyle(color: context.mutedInkColor),
               )
             else
-              ...itemLogs.map(
-                (log) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    child: Icon(
-                      log.action == InventoryAction.restock
-                          ? Icons.add
-                          : Icons.remove,
+              for (final entry in history)
+                switch (entry) {
+                  _LogEntry(:final log) => ListTile(
+                    key: Key('history-log-${log.id}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      child: Icon(
+                        log.action == InventoryAction.restock
+                            ? Icons.add
+                            : Icons.remove,
+                      ),
+                    ),
+                    title: Text(
+                      '${log.action.name} ${formatQuantity(log.amount)} $unit',
+                    ),
+                    subtitle: Text(
+                      '${log.loggedAt.day}/${log.loggedAt.month}/${log.loggedAt.year}${log.note.isEmpty ? '' : ' · ${log.note}'}',
+                    ),
+                    trailing: isUndoable(log)
+                        ? TextButton(
+                            key: Key('undo-${log.id}'),
+                            onPressed: () => _undo(
+                              context,
+                              ref,
+                              log: log,
+                              name: name,
+                              unit: unit,
+                              quantity: quantity,
+                            ),
+                            child: const Text('undo'),
+                          )
+                        : null,
+                  ),
+                  _ReversalEntry(:final reversal) => ListTile(
+                    key: Key('history-undo-${reversal.id}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: context.ruledColor,
+                      child: Icon(Icons.undo, color: context.mutedInkColor),
+                    ),
+                    title: Text(
+                      '${reversal.action.name} ${formatQuantity(reversal.amount)} $unit',
+                      style: TextStyle(
+                        decoration: TextDecoration.lineThrough,
+                        color: context.mutedInkColor,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _reversalCaption(reversal),
+                      style: TextStyle(color: context.mutedInkColor),
                     ),
                   ),
-                  title: Text(
-                    '${log.action.name} ${formatQuantity(log.amount)} $unit',
-                  ),
-                  subtitle: Text(
-                    '${log.loggedAt.day}/${log.loggedAt.month}/${log.loggedAt.year}${log.note.isEmpty ? '' : ' · ${log.note}'}',
-                  ),
-                ),
-              ),
+                },
             const SizedBox(height: 24),
             TextButton.icon(
               onPressed: () => _delete(context, ref, name),
@@ -1217,6 +1259,96 @@ class _ItemDetail extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  static List<_HistoryEntry> _historyFor(InventoryState state, String itemId) {
+    final entries = <_HistoryEntry>[
+      for (final log in state.logs)
+        if (log.itemId == itemId) _LogEntry(log),
+      for (final reversal in state.reversals)
+        if (reversal.itemId == itemId) _ReversalEntry(reversal),
+    ]..sort((a, b) => b.time.compareTo(a.time));
+    return entries.take(8).toList();
+  }
+
+  static String _reversalCaption(InventoryReversal reversal) {
+    final buffer = StringBuffer('undone ${relativeTime(reversal.reversedAt)}');
+    final original = reversal.originalLoggedAt;
+    if (original != null) {
+      buffer.write(' · was ${original.day}/${original.month}/${original.year}');
+    }
+    if (reversal.originalNote.isNotEmpty) {
+      buffer.write(' · ${reversal.originalNote}');
+    }
+    if (reversal.localOnly) buffer.write(' · noted on this device');
+    return buffer.toString();
+  }
+
+  Future<void> _undo(
+    BuildContext context,
+    WidgetRef ref, {
+    required ConsumptionLog log,
+    required String name,
+    required String unit,
+    required double quantity,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (log.action == InventoryAction.restock && quantity < log.amount) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cannot undo: only ${formatQuantity(quantity)} $unit left of the '
+            '${formatQuantity(log.amount)} that was restocked.',
+          ),
+        ),
+      );
+      return;
+    }
+    final queued =
+        log.operationId != null &&
+        ref
+            .read(inventoryProvider)
+            .outbox
+            .any((operation) => operation.id == log.operationId);
+    final restored = log.action == InventoryAction.restock
+        ? quantity - log.amount
+        : quantity + log.amount;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          'Undo ${log.action.name} of ${formatQuantity(log.amount)} $unit?',
+        ),
+        content: Text(
+          queued
+              ? 'This change has not reached the server yet, so it is simply '
+                    'cancelled. $name goes back to ${formatQuantity(restored)} $unit.'
+              : '$name goes back to ${formatQuantity(restored)} $unit. The '
+                    'entry is removed from the log and an "undone" note is kept '
+                    'in the history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Undo'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      final result = await ref
+          .read(inventoryProvider.notifier)
+          .undoAction(log.id);
+      HapticFeedback.mediumImpact();
+      messenger.showSnackBar(SnackBar(content: Text(undoMessage(result))));
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    }
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref, String name) async {
@@ -1338,6 +1470,53 @@ class _QuantityPreview extends StatelessWidget {
 }
 
 String _friendlyError(Object error) => friendlyErrorMessage(error);
+
+/// Undoes [logId] from a snackbar after the recording sheet has closed.
+Future<void> undoRecordedAction(
+  ProviderContainer container,
+  ScaffoldMessengerState messenger,
+  String logId,
+) async {
+  try {
+    final result = await container
+        .read(inventoryProvider.notifier)
+        .undoAction(logId);
+    messenger.showSnackBar(SnackBar(content: Text(undoMessage(result))));
+  } catch (error) {
+    messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+  }
+}
+
+/// One-line confirmation shown after an undo.
+String undoMessage(UndoResult result) {
+  if (result.cancelled) return 'Change cancelled before it synced';
+  if (result.alreadyUndone) return 'That entry was already undone elsewhere';
+  return 'Change undone';
+}
+
+sealed class _HistoryEntry {
+  const _HistoryEntry();
+
+  DateTime get time;
+}
+
+class _LogEntry extends _HistoryEntry {
+  const _LogEntry(this.log);
+
+  final ConsumptionLog log;
+
+  @override
+  DateTime get time => log.loggedAt;
+}
+
+class _ReversalEntry extends _HistoryEntry {
+  const _ReversalEntry(this.reversal);
+
+  final InventoryReversal reversal;
+
+  @override
+  DateTime get time => reversal.reversedAt;
+}
 
 extension<T> on Iterable<T> {
   T? get firstOrNull {

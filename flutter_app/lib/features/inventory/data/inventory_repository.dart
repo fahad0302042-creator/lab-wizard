@@ -11,6 +11,7 @@ class InventorySnapshot {
     required this.logs,
     required this.outbox,
     required this.fromCache,
+    this.reversals = const [],
     this.lastSyncedAt,
   });
 
@@ -18,6 +19,9 @@ class InventorySnapshot {
   final List<Apparatus> apparatus;
   final List<ConsumptionLog> logs;
   final List<PendingOperation> outbox;
+
+  /// Undone actions, newest first (UX-04).
+  final List<InventoryReversal> reversals;
   final bool fromCache;
   final DateTime? lastSyncedAt;
 
@@ -32,6 +36,8 @@ class InventoryRepository {
   final SupabaseClient? remote;
   final Uuid _uuid = const Uuid();
   bool? _atomicRpcAvailable;
+  bool? _undoRpcAvailable;
+  bool? _reversalsTableAvailable;
 
   Future<InventorySnapshot> loadCached(String userId) async {
     final results = await Future.wait<dynamic>([
@@ -40,6 +46,7 @@ class InventoryRepository {
       local.loadRecords(userId, 'log'),
       local.pendingOperations(userId),
       lastSyncedAt(userId),
+      local.loadRecords(userId, 'reversal'),
     ]);
     return InventorySnapshot(
       chemicals: (results[0] as List<Map<String, dynamic>>)
@@ -54,8 +61,18 @@ class InventoryRepository {
       outbox: results[3] as List<PendingOperation>,
       fromCache: true,
       lastSyncedAt: results[4] as DateTime?,
+      reversals: _sortedReversals(
+        (results[5] as List<Map<String, dynamic>>).map(
+          InventoryReversal.fromMap,
+        ),
+      ),
     );
   }
+
+  static List<InventoryReversal> _sortedReversals(
+    Iterable<InventoryReversal> reversals,
+  ) => reversals.toList()
+    ..sort((a, b) => b.reversedAt.compareTo(a.reversedAt));
 
   Future<DateTime?> lastSyncedAt(String userId) async => DateTime.tryParse(
     await local.getMeta(userId, LocalDatabase.lastSyncKey) ?? '',
@@ -83,6 +100,7 @@ class InventoryRepository {
       local.replaceRecords(userId, 'apparatus', apparatusMaps),
       local.replaceRecords(userId, 'log', logMaps),
     ]);
+    final reversalMaps = await _refreshReversals(userId, client);
     final syncedAt = DateTime.now();
     await local.setMeta(
       userId,
@@ -97,7 +115,38 @@ class InventoryRepository {
       outbox: await local.pendingOperations(userId),
       fromCache: false,
       lastSyncedAt: syncedAt,
+      reversals: _sortedReversals(reversalMaps.map(InventoryReversal.fromMap)),
     );
+  }
+
+  /// Downloads undo records when the additive `inventory_reversals` table is
+  /// installed. Without it, reversals stay device-local.
+  Future<List<Map<String, dynamic>>> _refreshReversals(
+    String userId,
+    SupabaseClient client,
+  ) async {
+    if (_reversalsTableAvailable != false) {
+      try {
+        final rows = _mapList(
+          await client
+              .from('inventory_reversals')
+              .select()
+              .order('reversed_at', ascending: false),
+        );
+        _reversalsTableAvailable = true;
+        final localOnly = (await local.loadRecords(
+          userId,
+          'reversal',
+        )).where((record) => record['local_only'] == true);
+        final merged = [...rows, ...localOnly];
+        await local.replaceRecords(userId, 'reversal', merged);
+        return merged;
+      } on PostgrestException catch (error) {
+        if (!_isMissingRelation(error)) rethrow;
+        _reversalsTableAvailable = false;
+      }
+    }
+    return local.loadRecords(userId, 'reversal');
   }
 
   Future<Chemical> addChemical({
@@ -437,6 +486,202 @@ class InventoryRepository {
     });
   }
 
+  /// Reverses a recorded action (UX-04).
+  ///
+  /// * A change that is still queued on this device is simply cancelled.
+  /// * Otherwise the quantity is restored and the log entry removed, exactly
+  ///   like the web app's undo, and a reversal record keeps the history
+  ///   honest. Offline, the undo is queued and replayed idempotently.
+  Future<UndoResult> undoAction({
+    required String userId,
+    required ConsumptionLog log,
+    required double currentQuantity,
+    String reason = '',
+    String? itemName,
+    String? unit,
+  }) async {
+    final queued = log.operationId == null
+        ? null
+        : await local.operationById(log.operationId!);
+    if (queued != null && queued.type == 'inventory_action') {
+      await discardOperation(userId, queued);
+      return const UndoResult(cancelled: true);
+    }
+    if (log.action == InventoryAction.restock && currentQuantity < log.amount) {
+      throw StateError(
+        'Cannot undo: only ${formatQuantity(currentQuantity)} left of the '
+        '${formatQuantity(log.amount)} that was restocked.',
+      );
+    }
+    final delta = log.action == InventoryAction.restock
+        ? -log.amount
+        : log.amount;
+    final operationId = _uuid.v4();
+    final now = DateTime.now();
+    final payload = <String, dynamic>{
+      'operation_id': operationId,
+      'log_id': log.id,
+      'log': log.toMap(),
+      'item_id': log.itemId,
+      'item_type': log.itemType.name,
+      'action': log.action.name,
+      'amount': log.amount,
+      'reason': reason.trim(),
+      'previous_quantity': currentQuantity,
+      'new_quantity': currentQuantity + delta,
+    };
+    final optimistic = InventoryReversal(
+      id: operationId,
+      itemId: log.itemId,
+      itemType: log.itemType,
+      action: log.action,
+      amount: log.amount,
+      reversedAt: now,
+      originalLogId: log.id,
+      originalLoggedAt: log.loggedAt,
+      originalNote: log.note,
+      reason: reason.trim(),
+      operationId: operationId,
+    );
+
+    try {
+      if (remote == null) throw const _OfflineException();
+      final result = await _undoRemote(userId, payload);
+      await local.deleteRecord(userId, 'log', log.id);
+      final itemMap = result['item'];
+      if (itemMap is Map) {
+        await local.upsertRecord(
+          userId,
+          log.itemType.name,
+          Map<String, dynamic>.from(itemMap),
+        );
+      }
+      final reversalMap = result['reversal'];
+      final reversal = reversalMap is Map
+          ? InventoryReversal.fromMap(Map<String, dynamic>.from(reversalMap))
+          : null;
+      if (reversal != null) {
+        await local.upsertRecord(userId, 'reversal', reversal.toMap());
+      }
+      return UndoResult(
+        reversal: reversal,
+        item: itemMap is Map ? Map<String, dynamic>.from(itemMap) : null,
+        alreadyUndone: result['missing'] == true,
+      );
+    } catch (error) {
+      if (!_isConnectivityError(error) && error is! _OfflineException) rethrow;
+      await _shiftCachedQuantity(
+        userId: userId,
+        itemType: log.itemType,
+        itemId: log.itemId,
+        delta: delta,
+      );
+      await local.deleteRecord(userId, 'log', log.id);
+      await local.upsertRecord(userId, 'reversal', optimistic.toMap());
+      await local.enqueue(
+        PendingOperation(
+          id: operationId,
+          userId: userId,
+          type: 'undo_action',
+          payload: payload,
+          createdAt: now,
+          label:
+              'Undo: ${actionLabel(log.action, log.amount, unit ?? (log.itemType == ItemKind.apparatus ? 'pcs' : ''), itemName)}',
+        ),
+      );
+      return UndoResult(reversal: optimistic);
+    }
+  }
+
+  Future<Map<String, dynamic>> _undoRemote(
+    String userId,
+    Map<String, dynamic> payload,
+  ) async {
+    if (_undoRpcAvailable != false) {
+      try {
+        final response = await remote!.rpc(
+          'undo_inventory_action',
+          params: {
+            'p_operation_id': payload['operation_id'],
+            'p_log_id': payload['log_id'],
+            'p_reason': payload['reason'] ?? '',
+          },
+        );
+        _undoRpcAvailable = true;
+        return Map<String, dynamic>.from(response as Map);
+      } on PostgrestException catch (error) {
+        if (!_isMissingFunction(error)) rethrow;
+        _undoRpcAvailable = false;
+      }
+    }
+    return _compatibilityUndo(userId, payload);
+  }
+
+  /// Web-parity undo for deployments without the additive migration: restore
+  /// the quantity and delete the entry. The reversal record stays local.
+  Future<Map<String, dynamic>> _compatibilityUndo(
+    String userId,
+    Map<String, dynamic> payload,
+  ) async {
+    final table = payload['item_type'] == 'chemical'
+        ? 'chemicals'
+        : 'apparatus';
+    final itemId = payload['item_id'] as String;
+    final logId = payload['log_id'] as String;
+    final existing = await remote!
+        .from('consumption_logs')
+        .select('id')
+        .eq('id', logId)
+        .maybeSingle();
+    if (existing == null) {
+      return {'item': null, 'reversal': null, 'duplicate': true, 'missing': true};
+    }
+    final current = await remote!
+        .from(table)
+        .select('quantity')
+        .eq('id', itemId)
+        .single();
+    final quantity = _asNum(current['quantity']);
+    final amount = _asNum(payload['amount']);
+    final restock = payload['action'] == 'restock';
+    if (restock && quantity < amount) {
+      throw StateError(
+        'Cannot undo: only ${formatQuantity(quantity)} left of the '
+        '${formatQuantity(amount)} that was restocked.',
+      );
+    }
+    final updated = await remote!
+        .from(table)
+        .update({'quantity': restock ? quantity - amount : quantity + amount})
+        .eq('id', itemId)
+        .select()
+        .single();
+    await remote!.from('consumption_logs').delete().eq('id', logId);
+    final log = payload['log'];
+    final reversal = InventoryReversal(
+      id: payload['operation_id'] as String,
+      itemId: itemId,
+      itemType: payload['item_type'] == 'apparatus'
+          ? ItemKind.apparatus
+          : ItemKind.chemical,
+      action: InventoryAction.values.firstWhere(
+        (value) => value.name == payload['action'],
+        orElse: () => InventoryAction.consume,
+      ),
+      amount: amount,
+      reversedAt: DateTime.now(),
+      originalLogId: logId,
+      originalLoggedAt: log is Map
+          ? DateTime.tryParse(log['logged_at']?.toString() ?? '')
+          : null,
+      originalNote: log is Map ? (log['note']?.toString() ?? '') : '',
+      reason: payload['reason']?.toString() ?? '',
+      operationId: payload['operation_id'] as String,
+      localOnly: true,
+    );
+    return {'item': updated, 'reversal': reversal.toMap(), 'duplicate': false};
+  }
+
   Future<void> deleteItem({
     required String userId,
     required ItemKind type,
@@ -456,6 +701,11 @@ class InventoryRepository {
     await local.deleteRecordsWhere(
       userId,
       'log',
+      (record) => record['item_id'] == id,
+    );
+    await local.deleteRecordsWhere(
+      userId,
+      'reversal',
       (record) => record['item_id'] == id,
     );
   }
@@ -503,6 +753,16 @@ class InventoryRepository {
         await remote!.from('apparatus').upsert(operation.payload);
       case 'inventory_action':
         await _applyRemoteAction(userId, operation.payload);
+      case 'undo_action':
+        final result = await _undoRemote(userId, operation.payload);
+        final reversalMap = result['reversal'];
+        if (reversalMap is Map) {
+          await local.upsertRecord(
+            userId,
+            'reversal',
+            Map<String, dynamic>.from(reversalMap),
+          );
+        }
       case 'update_item':
         final table = operation.payload['item_type'] == 'chemical'
             ? 'chemicals'
@@ -562,6 +822,32 @@ class InventoryRepository {
                 _asNum(payload['new_quantity']),
           );
         }
+      case 'undo_action':
+        await local.deleteRecord(
+          userId,
+          'reversal',
+          payload['operation_id'] as String,
+        );
+        if (cacheStillOptimistic) {
+          final log = payload['log'];
+          if (log is Map) {
+            await local.upsertRecord(
+              userId,
+              'log',
+              Map<String, dynamic>.from(log),
+            );
+          }
+          await _shiftCachedQuantity(
+            userId: userId,
+            itemType: payload['item_type'] == 'apparatus'
+                ? ItemKind.apparatus
+                : ItemKind.chemical,
+            itemId: payload['item_id'] as String,
+            delta:
+                _asNum(payload['previous_quantity']) -
+                _asNum(payload['new_quantity']),
+          );
+        }
       case 'update_item':
         final previous = payload['previous'];
         if (cacheStillOptimistic && previous is Map && previous.isNotEmpty) {
@@ -609,6 +895,12 @@ class InventoryRepository {
       error.code == 'PGRST202' ||
       error.message.toLowerCase().contains('function');
 
+  static bool _isMissingRelation(PostgrestException error) =>
+      error.code == 'PGRST205' ||
+      error.code == '42P01' ||
+      error.message.toLowerCase().contains('does not exist') ||
+      error.message.toLowerCase().contains('schema cache');
+
   static bool _isConnectivityError(Object error) {
     final message = error.toString().toLowerCase();
     return message.contains('socket') ||
@@ -618,6 +910,28 @@ class InventoryRepository {
         message.contains('failed host lookup') ||
         message.contains('clientexception');
   }
+}
+
+/// Outcome of [InventoryRepository.undoAction].
+class UndoResult {
+  const UndoResult({
+    this.reversal,
+    this.item,
+    this.cancelled = false,
+    this.alreadyUndone = false,
+  });
+
+  /// The reversal record, when the change had already reached the server.
+  final InventoryReversal? reversal;
+
+  /// Fresh item row returned by the server, when available.
+  final Map<String, dynamic>? item;
+
+  /// True when the change was still queued on this device and was cancelled.
+  final bool cancelled;
+
+  /// True when the entry had already been undone elsewhere (e.g. on the web).
+  final bool alreadyUndone;
 }
 
 class _OfflineException implements Exception {

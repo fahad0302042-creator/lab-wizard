@@ -253,6 +253,88 @@ class ConsumptionLog {
   };
 }
 
+/// How long after recording a change it can still be undone (UX-04).
+const undoWindow = Duration(days: 7);
+
+/// Whether [log] is recent enough to be reversed from the app.
+bool isUndoable(ConsumptionLog log, {DateTime? now}) =>
+    (now ?? DateTime.now()).difference(log.createdAt) <= undoWindow;
+
+/// A reversed inventory action. The original log entry is deleted (exactly
+/// what the web app's undo does) and this record keeps the audit trail honest.
+class InventoryReversal {
+  const InventoryReversal({
+    required this.id,
+    required this.itemId,
+    required this.itemType,
+    required this.action,
+    required this.amount,
+    required this.reversedAt,
+    this.originalLogId,
+    this.originalLoggedAt,
+    this.originalNote = '',
+    this.reason = '',
+    this.operationId,
+    this.localOnly = false,
+  });
+
+  final String id;
+  final String itemId;
+  final ItemKind itemType;
+  final InventoryAction action;
+  final double amount;
+  final DateTime reversedAt;
+  final String? originalLogId;
+  final DateTime? originalLoggedAt;
+  final String originalNote;
+  final String reason;
+  final String? operationId;
+
+  /// True when the server does not have the reversal table yet and the
+  /// record only exists on this device.
+  final bool localOnly;
+
+  factory InventoryReversal.fromMap(Map<String, dynamic> map) =>
+      InventoryReversal(
+        id: map['id'] as String,
+        itemId: map['item_id'] as String,
+        itemType: map['item_type'] == 'apparatus'
+            ? ItemKind.apparatus
+            : ItemKind.chemical,
+        action: InventoryAction.values.firstWhere(
+          (value) => value.name == map['action'],
+          orElse: () => InventoryAction.consume,
+        ),
+        amount: _asDouble(map['amount']),
+        reversedAt:
+            DateTime.tryParse((map['reversed_at'] as String?) ?? '') ??
+            DateTime.now(),
+        originalLogId: map['original_log_id'] as String?,
+        originalLoggedAt: DateTime.tryParse(
+          (map['original_logged_at'] as String?) ?? '',
+        ),
+        originalNote: (map['original_note'] as String?) ?? '',
+        reason: (map['reason'] as String?) ?? '',
+        operationId: map['operation_id'] as String?,
+        localOnly: map['local_only'] == true,
+      );
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'item_id': itemId,
+    'item_type': itemType.name,
+    'action': action.name,
+    'amount': amount,
+    'reversed_at': reversedAt.toIso8601String(),
+    'original_log_id': originalLogId,
+    'original_logged_at': originalLoggedAt?.toIso8601String(),
+    'original_note': originalNote,
+    'reason': reason,
+    'operation_id': operationId,
+    if (localOnly) 'local_only': true,
+  };
+}
+
 /// Whether a queued change is still waiting for a connection or needs the
 /// user to look at it (SYNC-01).
 enum PendingStatus { pending, failed }

@@ -48,6 +48,8 @@ For atomic, retry-safe inventory updates, apply the optional additive migration 
 
 The migration adds columns, constraints, an idempotency index, and an RPC function. It does not remove or rename anything used by the web app. Until it is installed, Flutter uses a compatibility flow against the existing schema.
 
+Undo support on Android (UX-04) has its own optional additive migration, [`flutter_app/supabase/002_undo_inventory_action.sql`](flutter_app/supabase/002_undo_inventory_action.sql). It adds an `inventory_reversals` table (RLS: own rows only) and an idempotent `undo_inventory_action` RPC. Undo behaves exactly like the web app's undo — the quantity is restored and the log entry removed — and additionally records the reversal so the mobile history can show it. Without the migration the app falls back to the web-parity flow and keeps the reversal note on the device only.
+
 ## Improvement program
 
 The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.
