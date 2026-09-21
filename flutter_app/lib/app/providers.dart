@@ -11,6 +11,7 @@ import '../core/database/local_database.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/models.dart';
 import '../features/sync/data/incremental_sync.dart';
+import '../features/sync/domain/sync_conflict.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
   return AppConfig.hasSupabase ? Supabase.instance.client : null;
@@ -644,6 +645,32 @@ class InventoryController extends Notifier<InventoryState> {
     }
   }
 
+  /// Applies a decision about a conflicting change (SYNC-04) and sends the
+  /// result straight away.
+  Future<void> resolveConflict(
+    String operationId,
+    ConflictResolution resolution,
+  ) async {
+    final userId = _requireUser();
+    final operation = state.outbox
+        .where((entry) => entry.id == operationId)
+        .firstOrNull;
+    if (operation == null) return;
+    if (resolution == ConflictResolution.discard) {
+      await discardOperation(operationId);
+      return;
+    }
+    state = state.copyWith(refreshing: true);
+    try {
+      await _repository.resolveConflict(userId, operation, resolution);
+      _applySnapshot(await _repository.refresh(userId));
+    } catch (_) {
+      await _reloadOutbox(
+        error: 'Still offline — the change stays in the queue.',
+      );
+    }
+  }
+
   /// Removes a queued change from this device without sending it.
   Future<void> discardOperation(String operationId) async {
     final userId = _requireUser();
@@ -770,10 +797,13 @@ class InventoryController extends Notifier<InventoryState> {
     );
   }
 
+  /// Saves an edit. Throws [ItemConflictException] when the same fields
+  /// changed on the server in the meantime; [force] overwrites them.
   Future<void> updateItem({
     required ItemKind type,
     required String id,
     required Map<String, dynamic> changes,
+    bool force = false,
   }) async {
     final userId = _requireUser();
     final saved = await _repository.updateItem(
@@ -782,6 +812,7 @@ class InventoryController extends Notifier<InventoryState> {
       id: id,
       changes: changes,
       itemName: _nameOf(type, id),
+      force: force,
     );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(

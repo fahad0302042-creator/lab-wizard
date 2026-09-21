@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/database/local_database.dart';
 import '../../sync/data/incremental_sync.dart';
+import '../../sync/domain/sync_conflict.dart';
 import '../domain/models.dart';
 
 class InventorySnapshot {
@@ -348,36 +349,50 @@ class InventoryRepository {
     }
   }
 
+  /// Saves an edit (SYNC-04 aware).
+  ///
+  /// Only the fields that differ from the copy this device last saw are
+  /// sent, and the server applies them only while those fields still hold
+  /// the last-seen values. An edit made elsewhere in the meantime therefore
+  /// surfaces as an [ItemConflictException] instead of being overwritten;
+  /// [force] sends the edit regardless. Offline, the change is queued with
+  /// the same base values so the replay gets the same protection.
   Future<Map<String, dynamic>> updateItem({
     required String userId,
     required ItemKind type,
     required String id,
     required Map<String, dynamic> changes,
     String? itemName,
+    bool force = false,
   }) async {
     final table = type == ItemKind.chemical ? 'chemicals' : 'apparatus';
+    final records = await local.loadRecords(userId, type.name);
+    final current = records.where((row) => row['id'] == id).firstOrNull;
+    final effective = current == null
+        ? Map<String, dynamic>.from(changes)
+        : changedFields(changes, current);
+    if (effective.isEmpty && current != null) return current;
+    final previous = <String, dynamic>{
+      for (final key in effective.keys)
+        if (current != null && current.containsKey(key)) key: current[key],
+    };
     try {
-      final data = await remote!
-          .from(table)
-          .update(changes)
-          .eq('id', id)
-          .select()
-          .single();
-      final saved = Map<String, dynamic>.from(data);
+      if (remote == null) throw const _OfflineException();
+      final saved = await _updateWithBase(
+        table: table,
+        id: id,
+        changes: effective,
+        previous: previous,
+        force: force,
+      );
       await local.upsertRecord(userId, type.name, saved);
       return saved;
     } catch (error) {
-      if (remote != null && !_isConnectivityError(error)) rethrow;
-      final records = await local.loadRecords(userId, type.name);
-      final current = records.where((row) => row['id'] == id).firstOrNull;
+      if (error is! _OfflineException && !_isConnectivityError(error)) rethrow;
       if (current == null) {
         throw StateError('The item is not available offline.');
       }
-      final previous = {
-        for (final key in changes.keys)
-          if (current.containsKey(key)) key: current[key],
-      };
-      final saved = <String, dynamic>{...current, ...changes, 'id': id};
+      final saved = <String, dynamic>{...current, ...effective, 'id': id};
       await local.upsertRecord(userId, type.name, saved);
       await local.enqueue(
         PendingOperation(
@@ -387,8 +402,9 @@ class InventoryRepository {
           payload: {
             'id': id,
             'item_type': type.name,
-            'changes': changes,
+            'changes': effective,
             'previous': previous,
+            if (force) 'force': true,
           },
           createdAt: DateTime.now(),
           label: 'Update ${itemName ?? current['name'] ?? 'item'}',
@@ -397,6 +413,119 @@ class InventoryRepository {
       return saved;
     }
   }
+
+  /// The subset of [changes] that differs from [current].
+  static Map<String, dynamic> changedFields(
+    Map<String, dynamic> changes,
+    Map<String, dynamic> current,
+  ) => {
+    for (final entry in changes.entries)
+      if (!current.containsKey(entry.key) ||
+          !valuesMatch(current[entry.key], entry.value))
+        entry.key: entry.value,
+  };
+
+  /// Conditional update: writes [changes] only while every field still
+  /// holds its [previous] value on the server (compare-and-set through
+  /// PostgREST filters, no server changes needed). Returns the saved row.
+  ///
+  /// Throws [ItemConflictException] when the row is gone or when a changed
+  /// field was changed on the server too. Fields the server already has at
+  /// the wanted value do not count as conflicts.
+  Future<Map<String, dynamic>> _updateWithBase({
+    required String table,
+    required String id,
+    required Map<String, dynamic> changes,
+    required Map<String, dynamic> previous,
+    bool force = false,
+  }) async {
+    Future<Map<String, dynamic>?> fetch() async {
+      final row = await remote!.from(table).select().eq('id', id).maybeSingle();
+      return row == null ? null : Map<String, dynamic>.from(row);
+    }
+
+    Future<Map<String, dynamic>> plainUpdate() async {
+      final rows = await remote!
+          .from(table)
+          .update(changes)
+          .eq('id', id)
+          .select();
+      if (rows.isEmpty) throw ItemConflictException(SyncConflict.deleted());
+      return Map<String, dynamic>.from(rows.first);
+    }
+
+    if (changes.isEmpty) {
+      final row = await fetch();
+      if (row == null) throw ItemConflictException(SyncConflict.deleted());
+      return row;
+    }
+    final guards = {
+      for (final entry in previous.entries)
+        if (changes.containsKey(entry.key)) entry.key: entry.value,
+    };
+    if (force || guards.isEmpty) return plainUpdate();
+
+    // Array columns (hazard classes) cannot be compared reliably through a
+    // filter, so they are checked against a fresh copy before writing.
+    final unguarded = guards.entries
+        .where((entry) => entry.value is List || entry.value is Map)
+        .map((entry) => entry.key)
+        .toList();
+    if (unguarded.isNotEmpty) {
+      final row = await fetch();
+      if (row == null) throw ItemConflictException(SyncConflict.deleted());
+      final clashes = _clashes(changes, guards, row, only: unguarded);
+      if (clashes.isNotEmpty) {
+        throw ItemConflictException(SyncConflict.changed(clashes));
+      }
+    }
+
+    var query = remote!.from(table).update(changes).eq('id', id);
+    for (final entry in guards.entries) {
+      final value = entry.value;
+      if (value == null) {
+        query = query.isFilter(entry.key, null);
+      } else if (value is num || value is String || value is bool) {
+        query = query.eq(entry.key, value);
+      }
+    }
+    final rows = await query.select();
+    if (rows.isNotEmpty) return Map<String, dynamic>.from(rows.first);
+
+    // Nothing matched: either the row is gone, a guarded field moved, or a
+    // filter was stricter than the data (e.g. '' versus null, 5 versus
+    // 5.0 in text).
+    final row = await fetch();
+    if (row == null) throw ItemConflictException(SyncConflict.deleted());
+    final clashes = _clashes(changes, guards, row);
+    if (clashes.isNotEmpty) {
+      throw ItemConflictException(SyncConflict.changed(clashes));
+    }
+    final alreadyApplied = changes.entries.every(
+      (entry) => valuesMatch(row[entry.key], entry.value),
+    );
+    return alreadyApplied ? row : plainUpdate();
+  }
+
+  /// Fields whose server value differs from both the base this device edited
+  /// from and the value it wants to write.
+  static List<FieldConflict> _clashes(
+    Map<String, dynamic> changes,
+    Map<String, dynamic> guards,
+    Map<String, dynamic> server, {
+    List<String>? only,
+  }) => [
+    for (final entry in guards.entries)
+      if ((only == null || only.contains(entry.key)) &&
+          !valuesMatch(server[entry.key], entry.value) &&
+          !valuesMatch(server[entry.key], changes[entry.key]))
+        FieldConflict(
+          field: entry.key,
+          base: entry.value,
+          local: changes[entry.key],
+          server: server[entry.key],
+        ),
+  ];
 
   Future<ConsumptionLog> applyAction({
     required String userId,
@@ -435,6 +564,7 @@ class InventoryRepository {
       'note': note.trim(),
       'logged_at': optimisticLog.loggedAt.toUtc().toIso8601String(),
       'local_log_id': optimisticLog.id,
+      'unit': unit ?? (itemType == ItemKind.apparatus ? 'pcs' : ''),
     };
 
     try {
@@ -536,13 +666,51 @@ class InventoryRepository {
         ? 'chemicals'
         : 'apparatus';
     final itemId = payload['item_id'] as String;
-    final previous = _asNum(payload['previous_quantity']);
-    final updated = await remote!
+    var previous = _asNum(payload['previous_quantity']);
+    // Only write the precomputed quantity while the server still has the
+    // quantity it was computed from; otherwise re-apply the delta on top of
+    // the server's value like the RPC does (SYNC-04).
+    final guarded = await remote!
         .from(table)
         .update({'quantity': payload['new_quantity']})
         .eq('id', itemId)
-        .select()
-        .single();
+        .eq('quantity', previous)
+        .select();
+    Map<String, dynamic> updated;
+    if (guarded.isNotEmpty) {
+      updated = Map<String, dynamic>.from(guarded.first);
+    } else {
+      final row = await remote!
+          .from(table)
+          .select('quantity')
+          .eq('id', itemId)
+          .maybeSingle();
+      if (row == null) throw ItemConflictException(SyncConflict.deleted());
+      previous = _asNum(row['quantity']);
+      final amount = _asNum(payload['amount']);
+      final action = InventoryAction.values.firstWhere(
+        (value) => value.name == payload['action'],
+        orElse: () => InventoryAction.consume,
+      );
+      if (action != InventoryAction.restock && previous < amount) {
+        throw ItemConflictException(
+          SyncConflict.stock(
+            available: previous,
+            requested: amount,
+            unit: payload['unit'] as String?,
+            partialAllowed: true,
+          ),
+        );
+      }
+      updated = Map<String, dynamic>.from(
+        await remote!
+            .from(table)
+            .update({'quantity': _quantityAfter(previous, action, amount)})
+            .eq('id', itemId)
+            .select()
+            .single(),
+      );
+    }
     try {
       final logPayload = {
         'id': payload['local_log_id'],
@@ -1119,6 +1287,11 @@ class InventoryRepository {
       operations = operations
           .where((operation) => !operation.isFailed)
           .toList();
+    } else {
+      // "Retry all" never re-sends conflicts; they wait for a decision.
+      operations = operations
+          .where((operation) => !operation.isConflict)
+          .toList();
     }
     for (final operation in operations) {
       try {
@@ -1126,10 +1299,126 @@ class InventoryRepository {
         await local.completeOperation(operation.id);
       } catch (error) {
         final offline = _isConnectivityError(error);
-        await local.markAttempt(operation.id, error, failed: !offline);
+        final conflict = offline ? null : conflictFor(operation, error);
+        if (conflict != null) {
+          await local.markConflict(operation.id, conflict);
+        } else {
+          await local.markAttempt(operation.id, error, failed: !offline);
+        }
         if (offline) break;
       }
     }
+  }
+
+  /// Interprets a replay error as a conflict when the server said so
+  /// (SYNC-04): stale stock, a deleted item, or an edit that lost a race.
+  static SyncConflict? conflictFor(PendingOperation operation, Object error) {
+    final payload = operation.payload;
+    return switch (operation.type) {
+      'inventory_action' => conflictFromError(
+        error,
+        requested: _asNum(payload['amount']),
+        unit: payload['unit'] as String?,
+        partialAllowed: payload['action'] != InventoryAction.restock.name,
+      ),
+      'undo_action' => conflictFromError(
+        error,
+        requested: _asNum(payload['amount']),
+        unit: payload['unit'] as String?,
+      ),
+      'update_item' => conflictFromError(error),
+      _ => error is ItemConflictException ? error.conflict : null,
+    };
+  }
+
+  /// Applies the user's decision about a conflicting change and replays it
+  /// straight away (SYNC-04).
+  Future<void> resolveConflict(
+    String userId,
+    PendingOperation operation,
+    ConflictResolution resolution,
+  ) async {
+    final conflict = operation.conflict;
+    if (conflict == null) return;
+    final payload = Map<String, dynamic>.from(operation.payload);
+    switch (resolution) {
+      case ConflictResolution.discard:
+        await discardOperation(userId, operation);
+        return;
+      case ConflictResolution.keepMine:
+        if (operation.type != 'update_item') {
+          throw StateError('Only edits can overwrite the server.');
+        }
+        payload['force'] = true;
+      case ConflictResolution.useServer:
+        if (operation.type != 'update_item') {
+          throw StateError('Only edits can take the server values.');
+        }
+        final changes = Map<String, dynamic>.from(payload['changes'] as Map);
+        final previous = Map<String, dynamic>.from(
+          (payload['previous'] as Map?) ?? const {},
+        );
+        final kind = payload['item_type'] == ItemKind.apparatus.name
+            ? ItemKind.apparatus.name
+            : ItemKind.chemical.name;
+        final rows = await local.loadRecords(userId, kind);
+        final cached = rows
+            .where((row) => row['id'] == payload['id'])
+            .firstOrNull;
+        for (final field in conflict.fields) {
+          changes.remove(field.field);
+          previous.remove(field.field);
+          if (cached != null) cached[field.field] = field.server;
+        }
+        if (cached != null) await local.upsertRecord(userId, kind, cached);
+        if (changes.isEmpty) {
+          await local.completeOperation(operation.id);
+          return;
+        }
+        payload['changes'] = changes;
+        payload['previous'] = previous;
+      case ConflictResolution.useAvailable:
+        final available = conflict.available;
+        if (operation.type != 'inventory_action' ||
+            available == null ||
+            available <= 0) {
+          throw StateError('This change cannot be applied partially.');
+        }
+        final original = _asNum(payload['amount']);
+        final itemType = payload['item_type'] == ItemKind.apparatus.name
+            ? ItemKind.apparatus
+            : ItemKind.chemical;
+        payload['amount'] = available;
+        payload['new_quantity'] = _quantityAfter(
+          _asNum(payload['previous_quantity']),
+          InventoryAction.values.firstWhere(
+            (value) => value.name == payload['action'],
+            orElse: () => InventoryAction.consume,
+          ),
+          available,
+        );
+        // Keep the optimistic copy honest: give back what will not be used.
+        await _shiftCachedQuantity(
+          userId: userId,
+          itemType: itemType,
+          itemId: payload['item_id'] as String,
+          delta: original - available,
+        );
+        final logId = payload['local_log_id'] as String?;
+        if (logId != null) {
+          final logs = await local.loadRecords(userId, 'log');
+          final log = logs.where((row) => row['id'] == logId).firstOrNull;
+          if (log != null) {
+            await local.upsertRecord(userId, 'log', {
+              ...log,
+              'amount': available,
+            });
+          }
+        }
+    }
+    await local.updatePayload(operation.id, payload);
+    await local.resetOperation(operation.id);
+    await syncPending(userId, operationId: operation.id);
   }
 
   Future<void> _replay(String userId, PendingOperation operation) async {
@@ -1151,15 +1440,27 @@ class InventoryRepository {
           );
         }
       case 'update_item':
-        final table = operation.payload['item_type'] == 'chemical'
-            ? 'chemicals'
-            : 'apparatus';
-        await remote!
-            .from(table)
-            .update(
-              Map<String, dynamic>.from(operation.payload['changes'] as Map),
-            )
-            .eq('id', operation.payload['id']);
+        final payload = operation.payload;
+        final kind = payload['item_type'] == ItemKind.apparatus.name
+            ? ItemKind.apparatus
+            : ItemKind.chemical;
+        final changes = Map<String, dynamic>.from(payload['changes'] as Map);
+        final previous = Map<String, dynamic>.from(
+          (payload['previous'] as Map?) ?? const {},
+        );
+        // Older queue entries carried every form field; only send the ones
+        // that were actually edited so unrelated server changes survive.
+        final effective = previous.isEmpty
+            ? changes
+            : changedFields(changes, previous);
+        final saved = await _updateWithBase(
+          table: kind == ItemKind.chemical ? 'chemicals' : 'apparatus',
+          id: payload['id'] as String,
+          changes: effective,
+          previous: previous,
+          force: payload['force'] == true,
+        );
+        await local.upsertRecord(userId, kind.name, saved);
       case 'checkout_apparatus':
         await remote!.from('apparatus_checkouts').upsert(operation.payload);
       case 'return_apparatus':

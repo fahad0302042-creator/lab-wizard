@@ -35,6 +35,7 @@ class _FakeInventory extends InventoryController {
     required ItemKind type,
     required String id,
     required Map<String, dynamic> changes,
+    bool force = false,
   }) async {
     updates.add(changes);
   }

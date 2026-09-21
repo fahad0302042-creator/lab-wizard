@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:intl/intl.dart';
 
+import '../../sync/domain/sync_conflict.dart';
+
 enum ItemKind { chemical, apparatus }
 
 enum InventoryAction { consume, restock, breakage }
@@ -970,6 +972,7 @@ class PendingOperation {
     this.status = PendingStatus.pending,
     this.label,
     this.lastAttemptAt,
+    this.conflict,
   });
 
   final String id;
@@ -983,7 +986,18 @@ class PendingOperation {
   final String? label;
   final DateTime? lastAttemptAt;
 
+  /// Why the server refused the change, when it was a conflict rather than
+  /// a transient error (SYNC-04). Conflicts wait for a decision instead of
+  /// being retried blindly.
+  final SyncConflict? conflict;
+
   bool get isFailed => status == PendingStatus.failed;
+
+  bool get isConflict => conflict != null;
+
+  /// Whether "retry" makes sense: plain failures do, conflicts need a
+  /// decision first.
+  bool get canRetry => isFailed && !isConflict;
 
   /// The inventory item this change belongs to, when it has one.
   String? get itemId =>
@@ -1023,6 +1037,7 @@ class PendingOperation {
     'status': status.name,
     'label': label,
     'last_attempt_at': lastAttemptAt?.toIso8601String(),
+    'conflict': conflict?.encode(),
   };
 
   factory PendingOperation.fromDatabase(Map<String, Object?> row) =>
@@ -1041,6 +1056,7 @@ class PendingOperation {
         lastAttemptAt: DateTime.tryParse(
           (row['last_attempt_at'] as String?) ?? '',
         ),
+        conflict: SyncConflict.decode(row['conflict'] as String?),
       );
 }
 

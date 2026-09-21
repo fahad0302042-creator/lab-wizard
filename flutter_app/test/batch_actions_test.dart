@@ -58,6 +58,7 @@ class _FakeInventory extends InventoryController {
     required ItemKind type,
     required String id,
     required Map<String, dynamic> changes,
+    bool force = false,
   }) async {
     if (changes.containsKey('low_stock_threshold')) {
       thresholds.add((id, (changes['low_stock_threshold'] as num).toDouble()));

@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../../features/inventory/domain/models.dart';
+import '../../features/sync/domain/sync_conflict.dart';
 
 /// Per-user SQLite cache plus the outbox of changes waiting for the server.
 ///
@@ -13,10 +14,12 @@ import '../../features/inventory/domain/models.dart';
 ///    `sync_meta` table used by the sync center (SYNC-01).
 /// 3. Index on `cache_records (user_id, kind)` for incremental upserts and
 ///    per-kind loads (SYNC-02). Cursors live in `sync_meta`.
+/// 4. Outbox `conflict` column holding the server-side conflict a change
+///    is waiting on (SYNC-04).
 class LocalDatabase {
   LocalDatabase({this._factory, this._path});
 
-  static const schemaVersion = 3;
+  static const schemaVersion = 4;
   static const lastSyncKey = 'last_sync_at';
 
   final DatabaseFactory? _factory;
@@ -38,10 +41,12 @@ class LocalDatabase {
           await _createVersion1(db);
           await _upgradeToVersion2(db);
           await _upgradeToVersion3(db);
+          await _upgradeToVersion4(db);
         },
         onUpgrade: (db, oldVersion, _) async {
           if (oldVersion < 2) await _upgradeToVersion2(db);
           if (oldVersion < 3) await _upgradeToVersion3(db);
+          if (oldVersion < 4) await _upgradeToVersion4(db);
         },
       ),
     );
@@ -95,6 +100,10 @@ class LocalDatabase {
       'CREATE INDEX IF NOT EXISTS cache_records_user_kind '
       'ON cache_records(user_id, kind)',
     );
+  }
+
+  static Future<void> _upgradeToVersion4(DatabaseExecutor db) async {
+    await db.execute('ALTER TABLE outbox ADD COLUMN conflict TEXT');
   }
 
   Future<List<Map<String, dynamic>>> loadRecords(
@@ -306,11 +315,29 @@ class LocalDatabase {
     final db = await database;
     await db.rawUpdate(
       'UPDATE outbox SET attempts = attempts + 1, last_error = ?, '
-      'last_attempt_at = ?, status = ? WHERE id = ?',
+      'last_attempt_at = ?, status = ?, conflict = NULL WHERE id = ?',
       [
         error.toString(),
         DateTime.now().toIso8601String(),
         failed ? PendingStatus.failed.name : PendingStatus.pending.name,
+        id,
+      ],
+    );
+  }
+
+  /// Parks a change that the server refused because of a conflict
+  /// (SYNC-04). It counts as an attempt and stays `failed` until the user
+  /// decides what to do.
+  Future<void> markConflict(String id, SyncConflict conflict) async {
+    final db = await database;
+    await db.rawUpdate(
+      'UPDATE outbox SET attempts = attempts + 1, last_error = ?, '
+      'last_attempt_at = ?, status = ?, conflict = ? WHERE id = ?',
+      [
+        conflict.summary,
+        DateTime.now().toIso8601String(),
+        PendingStatus.failed.name,
+        conflict.encode(),
         id,
       ],
     );
@@ -321,7 +348,19 @@ class LocalDatabase {
     final db = await database;
     await db.update(
       'outbox',
-      {'status': PendingStatus.pending.name},
+      {'status': PendingStatus.pending.name, 'conflict': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Rewrites what a queued change will send (used when a conflict is
+  /// resolved by adjusting the change instead of dropping it).
+  Future<void> updatePayload(String id, Map<String, dynamic> payload) async {
+    final db = await database;
+    await db.update(
+      'outbox',
+      {'payload': jsonEncode(payload)},
       where: 'id = ?',
       whereArgs: [id],
     );

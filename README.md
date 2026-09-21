@@ -62,6 +62,8 @@ Incremental sync (SYNC-02) adds [`flutter_app/supabase/007_incremental_sync.sql`
 
 Background sync (SYNC-03) needs no database change: it reuses the incremental download and the idempotent outbox from an Android WorkManager job.
 
+Conflict resolution (SYNC-04) needs no database change either: the phone sends only the fields it changed, as a compare-and-set on their last-seen values (plain PostgREST filters), so an edit made in the web app in the meantime is never overwritten silently — the phone shows the conflict and asks.
+
 ## Improvement program
 
 The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.

@@ -10,6 +10,7 @@ import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../background/background_sync_providers.dart';
 import '../data/incremental_sync.dart';
+import '../domain/sync_conflict.dart';
 import 'background_sync_card.dart';
 
 /// Lists every change waiting on this device, why it is waiting, and lets the
@@ -146,6 +147,8 @@ class SyncCenterScreen extends ConsumerWidget {
                     operation: operation,
                     busy: inventory.refreshing,
                     onRetry: () => controller.retryOperation(operation.id),
+                    onResolve: (resolution) =>
+                        controller.resolveConflict(operation.id, resolution),
                     onDiscard: () => _confirmDiscard(
                       context,
                       operation,
@@ -157,7 +160,8 @@ class SyncCenterScreen extends ConsumerWidget {
               Text(
                 'Changes are sent in the order they were made. Connection '
                 'problems retry automatically; any other error waits here '
-                'until you retry or discard it.',
+                'until you retry or discard it. A change that clashes with '
+                'something done on the server waits for your decision.',
                 style: TextStyle(color: context.mutedInkColor, fontSize: 12),
               ),
             ],
@@ -389,19 +393,22 @@ class _OperationCard extends StatelessWidget {
     required this.operation,
     required this.busy,
     required this.onRetry,
+    required this.onResolve,
     required this.onDiscard,
   });
 
   final PendingOperation operation;
   final bool busy;
   final VoidCallback onRetry;
+  final ValueChanged<ConflictResolution> onResolve;
   final VoidCallback onDiscard;
 
   @override
   Widget build(BuildContext context) {
     final failed = operation.isFailed;
+    final conflict = operation.conflict;
     final statusColor = failed ? context.marginRedColor : context.lowColor;
-    final error = operation.lastError;
+    final error = conflict == null ? operation.lastError : null;
     final details = StringBuffer('queued ${relativeTime(operation.createdAt)}');
     if (operation.attempts > 0) {
       details.write(
@@ -445,7 +452,11 @@ class _OperationCard extends StatelessWidget {
                     vertical: 3,
                   ),
                   child: Text(
-                    failed ? 'needs attention' : 'waiting',
+                    conflict != null
+                        ? 'conflict'
+                        : failed
+                        ? 'needs attention'
+                        : 'waiting',
                     style: TextStyle(
                       color: statusColor,
                       fontFamily: 'Caveat',
@@ -470,18 +481,44 @@ class _OperationCard extends StatelessWidget {
               style: TextStyle(color: context.marginRedColor, fontSize: 12),
             ),
           ],
+          if (conflict != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              key: Key('conflict-${operation.id}'),
+              conflict.explanation,
+              style: TextStyle(color: context.marginRedColor, fontSize: 13),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _adviceFor(conflict),
+              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 4),
-          Row(
+          Wrap(
+            spacing: 6,
             children: [
-              TextButton.icon(
-                onPressed: busy ? null : onRetry,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                ),
-                icon: const Icon(Icons.replay, size: 18),
-                label: const Text('retry now'),
-              ),
-              const SizedBox(width: 6),
+              if (conflict == null)
+                TextButton.icon(
+                  onPressed: busy ? null : onRetry,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                  ),
+                  icon: const Icon(Icons.replay, size: 18),
+                  label: const Text('retry now'),
+                )
+              else
+                for (final resolution in conflict.resolutions)
+                  if (resolution != ConflictResolution.discard)
+                    TextButton.icon(
+                      key: Key('${_keyFor(resolution)}-${operation.id}'),
+                      onPressed: busy ? null : () => onResolve(resolution),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                      icon: Icon(_iconForResolution(resolution), size: 18),
+                      label: Text(_labelFor(resolution, conflict)),
+                    ),
               TextButton.icon(
                 onPressed: busy ? null : onDiscard,
                 style: TextButton.styleFrom(
@@ -489,7 +526,11 @@ class _OperationCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                 ),
                 icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text('discard'),
+                label: Text(
+                  conflict?.kind == ConflictKind.deleted
+                      ? 'remove change'
+                      : 'discard',
+                ),
               ),
             ],
           ),
@@ -497,6 +538,42 @@ class _OperationCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _adviceFor(SyncConflict conflict) => switch (conflict.kind) {
+    ConflictKind.changed =>
+      'Keep the server values, or overwrite them with yours.',
+    ConflictKind.deleted =>
+      'Remove the change; add the item again if it is still needed.',
+    ConflictKind.stock =>
+      conflict.resolutions.contains(ConflictResolution.useAvailable)
+          ? 'Apply only what is available, or discard the change.'
+          : 'Discard the change and record the correct amount.',
+  };
+
+  static String _keyFor(ConflictResolution resolution) => switch (resolution) {
+    ConflictResolution.keepMine => 'conflict-keep-mine',
+    ConflictResolution.useServer => 'conflict-use-server',
+    ConflictResolution.useAvailable => 'conflict-use-available',
+    ConflictResolution.discard => 'conflict-discard',
+  };
+
+  static String _labelFor(ConflictResolution resolution, SyncConflict c) =>
+      switch (resolution) {
+        ConflictResolution.keepMine => 'overwrite with mine',
+        ConflictResolution.useServer => 'keep server values',
+        ConflictResolution.useAvailable =>
+          'apply ${formatQuantity(c.available ?? 0)}'
+              '${(c.unit ?? '').isEmpty ? '' : ' ${c.unit}'}',
+        ConflictResolution.discard => 'discard',
+      };
+
+  static IconData _iconForResolution(ConflictResolution resolution) =>
+      switch (resolution) {
+        ConflictResolution.keepMine => Icons.upload_outlined,
+        ConflictResolution.useServer => Icons.cloud_download_outlined,
+        ConflictResolution.useAvailable => Icons.call_split,
+        ConflictResolution.discard => Icons.delete_outline,
+      };
 
   static IconData _iconFor(PendingOperation operation) {
     switch (operation.type) {

@@ -10,6 +10,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../sync/domain/sync_conflict.dart';
 import '../data/inventory_repository.dart';
 import '../domain/apparatus_history.dart';
 import '../domain/duplicates.dart';
@@ -692,7 +693,30 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     );
   }
 
-  Future<void> _save() async {
+  Map<String, dynamic> _changes() {
+    final details = _details.value;
+    final gear = _gear.value;
+    return widget.kind == ItemKind.chemical
+        ? {
+            'name': _name.text.trim(),
+            'formula': _subtitle.text.trim(),
+            'unit': _unit,
+            'low_stock_threshold': double.parse(_threshold.text.trim()),
+            'notes': _notes.text.trim(),
+            // Metadata columns are only sent when they changed, so
+            // databases without migration 003 keep working.
+            if (!details.sameAs(_originalDetails)) ...details.toChanges(),
+          }
+        : {
+            'name': _name.text.trim(),
+            'category': _category,
+            'low_stock_threshold': double.parse(_threshold.text.trim()),
+            'notes': _notes.text.trim(),
+            if (!gear.sameAs(_originalGear)) ...gear.toChanges(),
+          };
+  }
+
+  Future<void> _save({bool force = false}) async {
     if (!_formKey.currentState!.validate()) {
       if (_details.validate() != null) _details.expanded = true;
       if (_gear.validate() != null) _gear.expanded = true;
@@ -700,32 +724,13 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     }
     setState(() => _saving = true);
     try {
-      final details = _details.value;
-      final gear = _gear.value;
       await ref
           .read(inventoryProvider.notifier)
           .updateItem(
             type: widget.kind,
             id: widget.itemId,
-            changes: widget.kind == ItemKind.chemical
-                ? {
-                    'name': _name.text.trim(),
-                    'formula': _subtitle.text.trim(),
-                    'unit': _unit,
-                    'low_stock_threshold': double.parse(_threshold.text.trim()),
-                    'notes': _notes.text.trim(),
-                    // Metadata columns are only sent when they changed, so
-                    // databases without migration 003 keep working.
-                    if (!details.sameAs(_originalDetails))
-                      ...details.toChanges(),
-                  }
-                : {
-                    'name': _name.text.trim(),
-                    'category': _category,
-                    'low_stock_threshold': double.parse(_threshold.text.trim()),
-                    'notes': _notes.text.trim(),
-                    if (!gear.sameAs(_originalGear)) ...gear.toChanges(),
-                  },
+            changes: _changes(),
+            force: force,
           );
       HapticFeedback.mediumImpact();
       if (!mounted) return;
@@ -733,11 +738,92 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       messenger.showSnackBar(const SnackBar(content: Text('Item updated')));
+    } on ItemConflictException catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      await _resolveConflict(error.conflict);
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    }
+  }
+
+  /// The same fields changed on the server while this form was open
+  /// (SYNC-04): let the user pick a side instead of overwriting silently.
+  Future<void> _resolveConflict(SyncConflict conflict) async {
+    if (conflict.kind == ConflictKind.deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This item was deleted on the server.'),
+        ),
+      );
+      unawaited(ref.read(inventoryProvider.notifier).refresh());
+      return;
+    }
+    final choice = await showDialog<ConflictResolution>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Changed on the server'),
+        content: Text(
+          '${conflict.explanation}\n\nKeep the server values (your other '
+          'edits are still saved) or overwrite them with yours?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const Key('conflict-use-server'),
+            onPressed: () =>
+                Navigator.pop(context, ConflictResolution.useServer),
+            child: const Text('Keep server values'),
+          ),
+          FilledButton(
+            key: const Key('conflict-keep-mine'),
+            onPressed: () => Navigator.pop(context, ConflictResolution.keepMine),
+            child: const Text('Overwrite with mine'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case ConflictResolution.keepMine:
+        await _save(force: true);
+      case ConflictResolution.useServer:
+        // Fetch the server's copy, then send only the non-conflicting edits.
+        await ref.read(inventoryProvider.notifier).refresh();
+        if (!mounted) return;
+        final conflicting = conflict.fields.map((f) => f.field).toSet();
+        final changes = _changes()
+          ..removeWhere((key, _) => conflicting.contains(key));
+        setState(() => _saving = true);
+        try {
+          await ref
+              .read(inventoryProvider.notifier)
+              .updateItem(
+                type: widget.kind,
+                id: widget.itemId,
+                changes: changes,
+              );
+          if (!mounted) return;
+          _dirty = false;
+          final messenger = ScaffoldMessenger.of(context);
+          Navigator.pop(context);
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Saved with the server values')),
+          );
+        } catch (error) {
+          if (!mounted) return;
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+        }
+      case ConflictResolution.useAvailable || ConflictResolution.discard:
+        break;
     }
   }
 }
