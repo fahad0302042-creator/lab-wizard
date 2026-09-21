@@ -140,7 +140,10 @@ void main() {
         events.firstWhere((e) => e.key == 'checkout-c1').detail,
         'due ${DateFormat('d MMM yyyy').format(DateTime(2026, 9, 5))}',
       );
-      expect(events.firstWhere((e) => e.key == 'undo-r1').title, 'Undid used 1 pcs');
+      expect(
+        events.firstWhere((e) => e.key == 'undo-r1').title,
+        'Undid used 1 pcs',
+      );
       expect(events.firstWhere((e) => e.key == 'breakage-l1').detail, 'lid');
       expect(events.where((e) => e.sourceId == 'other'), isEmpty);
     });
@@ -210,8 +213,14 @@ void main() {
       expect(HistoryFilter.stock.matches(ApparatusEventKind.undo), isTrue);
       expect(HistoryFilter.stock.matches(ApparatusEventKind.checkout), isFalse);
       expect(HistoryFilter.loans.matches(ApparatusEventKind.returned), isTrue);
-      expect(HistoryFilter.service.matches(ApparatusEventKind.scheduled), isTrue);
-      expect(HistoryFilter.service.matches(ApparatusEventKind.breakage), isFalse);
+      expect(
+        HistoryFilter.service.matches(ApparatusEventKind.scheduled),
+        isTrue,
+      );
+      expect(
+        HistoryFilter.service.matches(ApparatusEventKind.breakage),
+        isFalse,
+      );
       expect(HistoryFilter.all.matches(ApparatusEventKind.completed), isTrue);
     });
   });
@@ -238,13 +247,13 @@ void main() {
     testWidgets('history screen shows summary, timeline and filters', (
       tester,
     ) async {
-      await pumpScreen(
-        tester,
-        const ApparatusHistoryScreen(apparatusId: 'a1'),
-      );
+      await pumpScreen(tester, const ApparatusHistoryScreen(apparatusId: 'a1'));
       expect(find.byKey(const Key('history-summary')), findsOneWidget);
       expect(find.text('3 pcs in stock · 1 out'), findsOneWidget);
-      expect(find.textContaining('2 loans · 1 open · 1 returned late'), findsOneWidget);
+      expect(
+        find.textContaining('2 loans · 1 open · 1 returned late'),
+        findsOneWidget,
+      );
       expect(
         find.textContaining(
           'last calibration ${DateFormat('d MMM yyyy').format(DateTime(2026, 9, 4))}',
@@ -307,8 +316,14 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('history-all')));
-      expect(find.byKey(const Key('history-event-checkout-c2')), findsOneWidget);
-      expect(find.byKey(const Key('history-event-completed-s1')), findsOneWidget);
+      expect(
+        find.byKey(const Key('history-event-checkout-c2')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('history-event-completed-s1')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('history-log-l1')), findsOneWidget);
       expect(find.byKey(const Key('history-undo-r1')), findsOneWidget);
       // Only the latest eight entries stay in the sheet.
