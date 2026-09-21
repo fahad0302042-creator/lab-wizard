@@ -1,0 +1,50 @@
+name: Update golden screenshots
+
+# Regenerates flutter_app/test/golden/goldens/*.png on Linux (the only
+# platform the comparisons run on) and commits them to the branch that was
+# dispatched. Run it after an intentional visual change; the regular CI run
+# then compares against the new images (TEST-01).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  goldens:
+    name: Render goldens on Linux and commit them
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Render goldens
+        run: flutter test --update-goldens --tags golden test/golden
+
+      - name: Commit the images
+        run: |
+          git add -A test/golden/goldens
+          if git diff --cached --quiet; then
+            echo "Goldens are unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test: update golden screenshots (CI)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

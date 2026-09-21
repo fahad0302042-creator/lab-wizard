@@ -139,6 +139,7 @@ Future<void> pumpScreen(
   List<Override> overrides = const [],
   double scale = 1,
   Size size = smallPhone,
+  bool dark = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -154,7 +155,10 @@ Future<void> pumpScreen(
         isOnlineProvider.overrideWithValue(() async => true),
         ...overrides,
       ],
-      child: MaterialApp(theme: AppTheme.light(), home: home),
+      child: MaterialApp(
+        theme: dark ? AppTheme.dark() : AppTheme.light(),
+        home: home,
+      ),
     ),
   );
   await tester.pumpAndSettle();

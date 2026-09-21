@@ -91,9 +91,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             index: _index,
             sizing: StackFit.expand,
             children: List.generate(pages.length, (pageIndex) {
+              // Inactive tabs keep their state but do not tick, paint or
+              // take input; the RepaintBoundary makes "did not paint"
+              // observable (TEST-02).
               return TickerMode(
                 enabled: pageIndex == _index,
-                child: KeyedSubtree(
+                child: RepaintBoundary(
                   key: ValueKey('main-page-$pageIndex'),
                   child: pages[pageIndex],
                 ),

@@ -158,7 +158,10 @@ void main() {
       await tester.scrollUntilVisible(
         find.textContaining('Hydrochloric'),
         120,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find.descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        ),
       );
       final ethanol = tester.getTopLeft(find.text('Ethanol')).dy;
       final acid = tester.getTopLeft(find.textContaining('Hydrochloric')).dy;
