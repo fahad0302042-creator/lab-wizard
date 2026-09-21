@@ -21,7 +21,7 @@ The Flutter work is isolated from the web source and does not require inventory 
 
 Future APKs use the same GitHub development signing key, so they can be installed as updates without deleting the app. Supabase remains the source of truth for synced data.
 
-> The repository-visible signing key is intended only for direct GitHub development builds. A Play Store release must use private Play App Signing credentials.
+> The repository-visible signing key is intended only for direct GitHub development builds. For private production signing and Google Play deployment, see the [Release & Google Play Guide](docs/RELEASE_AND_PLAY_STORE_GUIDE.md).
 
 ## Automatic Android releases
 

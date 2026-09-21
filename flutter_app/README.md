@@ -232,6 +232,11 @@ Off by default. Settings → *crash reports* turns on a local, opt-in log of err
 
 **Navigation paint regression.** `test/navigation_paint_test.dart` mounts the home shell and checks that inactive tabs stay mounted (state survives) but never paint (their `RepaintBoundary` has no layer), cannot be hit, are absent from the semantics tree and have muted tickers — and that switching tabs flips all of that.
 
-## Signing
+## Signing and Google Play Distribution (RELEASE-01, RELEASE-02)
 
-GitHub builds use `android/app/lab-wizard-github.jks`, a stable development-distribution key committed intentionally so phone-only testers can install future APKs as updates. Do not use this key for Play Store production. Configure private Play App Signing before publishing commercially.
+The Gradle configuration (`android/app/build.gradle.kts`) and GitHub Actions workflows feature **dual-mode signing**:
+
+1. **Development Mode (Default)**: Uses `android/app/lab-wizard-github.jks`, a stable development key committed intentionally so phone testers can install and update APKs directly from GitHub Releases without configuring secrets.
+2. **Production Mode (Private)**: When private credentials (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) are added to GitHub Secrets (or locally in `key.properties`), the build automatically signs with the private keystore and produces both the universal APK and the Google Play Android App Bundle (`.aab`).
+
+For complete instructions on keystore generation, key rotation/recovery, Google Play App Signing, and the Play Console Data Safety questionnaire, consult [`docs/RELEASE_AND_PLAY_STORE_GUIDE.md`](../docs/RELEASE_AND_PLAY_STORE_GUIDE.md).

@@ -17,6 +17,31 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
+    val keyProps = java.util.Properties()
+    val keyPropsFile = rootProject.file("key.properties")
+    if (keyPropsFile.exists()) {
+        keyProps.load(java.io.FileInputStream(keyPropsFile))
+    }
+
+    val prodKeyFile = System.getenv("ANDROID_KEYSTORE_PATH")?.let { path ->
+        val f = file(path)
+        if (f.exists()) f else rootProject.file(path)
+    } ?: keyProps.getProperty("storeFile")?.let { path ->
+        val f = file(path)
+        if (f.exists()) f else rootProject.file(path)
+    }
+    val prodStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        ?: keyProps.getProperty("storePassword")
+    val prodKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+        ?: keyProps.getProperty("keyAlias")
+    val prodKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        ?: keyProps.getProperty("keyPassword")
+
+    val hasProductionSigning = prodKeyFile != null && prodKeyFile.exists() &&
+        !prodStorePassword.isNullOrBlank() &&
+        !prodKeyAlias.isNullOrBlank() &&
+        !prodKeyPassword.isNullOrBlank()
+
     signingConfigs {
         // Stable key for installable GitHub development builds. This key is
         // intentionally repository-visible and must not be used for Play Store
@@ -26,6 +51,15 @@ android {
             storePassword = "labwizard-github"
             keyAlias = "labwizard"
             keyPassword = "labwizard-github"
+        }
+
+        if (hasProductionSigning) {
+            create("production") {
+                storeFile = prodKeyFile
+                storePassword = prodStorePassword
+                keyAlias = prodKeyAlias
+                keyPassword = prodKeyPassword
+            }
         }
     }
 
@@ -45,7 +79,11 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("githubRelease")
+            signingConfig = if (hasProductionSigning) {
+                signingConfigs.getByName("production")
+            } else {
+                signingConfigs.getByName("githubRelease")
+            }
         }
     }
 }

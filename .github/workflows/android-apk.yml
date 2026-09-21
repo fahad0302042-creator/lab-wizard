@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build-and-release:
-    name: Test, build, and publish APK
+    name: Test, build, and publish APK and AAB
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,6 +55,28 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      # RELEASE-01: Decodes private production keystore from repository secrets
+      # if available, otherwise falls back to lab-wizard-github.jks for public builds.
+      - name: Configure production signing (if secrets provided)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "Decoding private release keystore from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/production.jks
+            echo "ANDROID_KEYSTORE_PATH=production.jks" >> $GITHUB_ENV
+            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+            echo "PRODUCTION_SIGNING=true" >> $GITHUB_ENV
+            echo "Signing with private production key."
+          else
+            echo "No production keystore secrets found; using repository development key (lab-wizard-github.jks)."
+          fi
+
       # versionCode is minutes since the epoch (always larger than the earlier
       # run-number based codes) so releases install as updates over any branch
       # verification build from flutter-branch-ci.yml.
@@ -62,17 +84,36 @@ jobs:
         run: >-
           flutter build apk --release
           --dart-define-from-file=config/production.json
+          --dart-define=APP_BUILD=1.0.${{ github.run_number }}
           --build-name=1.0.${{ github.run_number }}
           --build-number=$(( $(date +%s) / 60 ))
 
-      - name: Name APK for download
-        run: cp build/app/outputs/flutter-apk/app-release.apk "Lab-Wizard-Android-1.0.${{ github.run_number }}.apk"
+      # RELEASE-02: Android App Bundle (.aab) required for Google Play Console distribution.
+      - name: Build Android App Bundle (AAB for Google Play)
+        run: >-
+          flutter build appbundle --release
+          --dart-define-from-file=config/production.json
+          --dart-define=APP_BUILD=1.0.${{ github.run_number }}
+          --build-name=1.0.${{ github.run_number }}
+          --build-number=$(( $(date +%s) / 60 ))
 
-      - name: Upload Actions artifact
+      - name: Name artifacts for download
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk "Lab-Wizard-Android-1.0.${{ github.run_number }}.apk"
+          cp build/app/outputs/bundle/release/app-release.aab "Lab-Wizard-Android-1.0.${{ github.run_number }}.aab"
+
+      - name: Upload Actions APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Lab-Wizard-Android-1.0.${{ github.run_number }}
+          name: Lab-Wizard-Android-1.0.${{ github.run_number }}-apk
           path: flutter_app/Lab-Wizard-Android-1.0.${{ github.run_number }}.apk
+          if-no-files-found: error
+
+      - name: Upload Actions AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lab-Wizard-Android-1.0.${{ github.run_number }}-aab
+          path: flutter_app/Lab-Wizard-Android-1.0.${{ github.run_number }}.aab
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -81,9 +122,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: android-1.0.${{ github.run_number }}
           APK: Lab-Wizard-Android-1.0.${{ github.run_number }}.apk
+          AAB: Lab-Wizard-Android-1.0.${{ github.run_number }}.aab
         run: |
-          gh release create "$TAG" "$APK" \
+          gh release create "$TAG" "$APK" "$AAB" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "Lab Wizard Android 1.0.${{ github.run_number }}" \
-            --notes "Install this APK directly on Android. Allow installs from your browser or GitHub app if Android asks. Sign in with the same Lab Wizard account to load existing Supabase data. This is a GitHub development build, not a Play Store release."
+            --notes "Install the APK directly on Android, or upload the AAB to Google Play Console. Allow installs from your browser or GitHub app if Android asks. Sign in with the same Lab Wizard account to load existing Supabase data."

@@ -104,6 +104,28 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" --input failure-comment.json --silent || echo "::warning::Could not post the commit comment"
           exit 1
 
+      # RELEASE-01: Decodes private production keystore from repository secrets
+      # if available, otherwise falls back to lab-wizard-github.jks.
+      - name: Configure production signing (if secrets provided)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "Decoding private release keystore from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/production.jks
+            echo "ANDROID_KEYSTORE_PATH=production.jks" >> $GITHUB_ENV
+            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+            echo "PRODUCTION_SIGNING=true" >> $GITHUB_ENV
+            echo "Signing with private production key."
+          else
+            echo "No production keystore secrets found; using repository development key (lab-wizard-github.jks)."
+          fi
+
       # versionCode is minutes since the epoch so that branch builds and main
       # releases always increase together and can be installed as updates over
       # each other without uninstalling.
