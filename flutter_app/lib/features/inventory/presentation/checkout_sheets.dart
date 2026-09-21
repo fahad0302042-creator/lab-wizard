@@ -16,9 +16,8 @@ Future<void> showCheckoutSheet(BuildContext context, String apparatusId) =>
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => NotebookSheetFrame(
-        child: _CheckoutForm(apparatusId: apparatusId),
-      ),
+      builder: (_) =>
+          NotebookSheetFrame(child: _CheckoutForm(apparatusId: apparatusId)),
     );
 
 /// Takes pieces back from an open loan.
@@ -27,9 +26,8 @@ Future<void> showReturnSheet(BuildContext context, String checkoutId) =>
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => NotebookSheetFrame(
-        child: _ReturnForm(checkoutId: checkoutId),
-      ),
+      builder: (_) =>
+          NotebookSheetFrame(child: _ReturnForm(checkoutId: checkoutId)),
     );
 
 /// Short due-date copy such as "due in 3 days" or "overdue by 2 days".
@@ -356,7 +354,8 @@ class _CheckoutFormState extends ConsumerState<_CheckoutForm> {
   Future<void> _pickDue() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    var initial = parseDateOnly(_due.text) ?? today.add(const Duration(days: 7));
+    var initial =
+        parseDateOnly(_due.text) ?? today.add(const Duration(days: 7));
     if (initial.isBefore(today)) initial = today;
     final picked = await showDatePicker(
       context: context,
@@ -399,9 +398,8 @@ class _CheckoutFormState extends ConsumerState<_CheckoutForm> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     }
   }
 }
@@ -551,9 +549,8 @@ class _ReturnFormState extends ConsumerState<_ReturnForm> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     }
   }
 }

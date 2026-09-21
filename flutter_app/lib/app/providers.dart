@@ -437,9 +437,9 @@ class InventoryState {
   ];
 
   /// Pieces of one apparatus currently lent out.
-  double checkedOutCount(String apparatusId) => openCheckoutsFor(
-    apparatusId,
-  ).fold<double>(0, (sum, checkout) => sum + checkout.outstanding);
+  double checkedOutCount(String apparatusId) =>
+      openCheckoutsFor(apparatusId)
+          .fold<double>(0, (sum, checkout) => sum + checkout.outstanding);
 
   /// Pieces of one apparatus that can still be lent.
   double availableCount(Apparatus item) {

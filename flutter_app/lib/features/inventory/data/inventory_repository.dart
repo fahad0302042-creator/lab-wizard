@@ -811,9 +811,8 @@ class InventoryRepository {
             type: 'checkout_apparatus',
             payload: payload,
             createdAt: now,
-            label:
-                'Check out ${itemName ?? 'apparatus'} to ${checkout.person}'
-                    .trim(),
+            label: 'Check out ${itemName ?? 'apparatus'} to ${checkout.person}'
+                .trim(),
           ),
         );
         return checkout;
@@ -882,9 +881,7 @@ class InventoryRepository {
               'changes': changes,
               'previous': {
                 'returned_quantity': checkout.returnedQuantity,
-                'returned_at': checkout.returnedAt
-                    ?.toUtc()
-                    .toIso8601String(),
+                'returned_at': checkout.returnedAt?.toUtc().toIso8601String(),
                 'return_note': checkout.returnNote,
               },
             },

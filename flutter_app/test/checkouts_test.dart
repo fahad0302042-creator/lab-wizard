@@ -210,10 +210,7 @@ void main() {
             showItemDetailSheet(context, ref, ItemKind.apparatus, 'a1'),
       );
       await tester.ensureVisible(find.byKey(const Key('checkout-open')));
-      expect(
-        find.text('2 of 4 available · 2 checked out'),
-        findsOneWidget,
-      );
+      expect(find.text('2 of 4 available · 2 checked out'), findsOneWidget);
       expect(find.byKey(const Key('checkout-c1')), findsOneWidget);
       expect(find.textContaining('overdue by 1 day'), findsOneWidget);
       expect(find.byKey(const Key('return-c1')), findsOneWidget);
@@ -261,10 +258,7 @@ void main() {
       expect(find.text('Only 2 available'), findsOneWidget);
       expect(fake.checkouts, isEmpty);
 
-      await tester.enterText(
-        find.byKey(const Key('checkout-quantity')),
-        '1.5',
-      );
+      await tester.enterText(find.byKey(const Key('checkout-quantity')), '1.5');
       await tester.tap(find.byKey(const Key('checkout-submit')));
       await tester.pumpAndSettle();
       expect(find.text('Whole pieces only'), findsOneWidget);
@@ -308,7 +302,10 @@ void main() {
       await tester.enterText(find.byKey(const Key('checkout-person')), 'Sara');
       await tester.tap(find.byKey(const Key('checkout-submit')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('005_apparatus_checkouts.sql'), findsOneWidget);
+      expect(
+        find.textContaining('005_apparatus_checkouts.sql'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('checkout-submit')), findsOneWidget);
     });
 
