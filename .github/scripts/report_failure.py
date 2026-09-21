@@ -104,13 +104,25 @@ elif KIND == "test":
 else:
     dart_error = re.compile(r"^\s*((?:lib|test)/\S+?\.dart):(\d+):(\d+): Error: (.*)$")
     other = re.compile(r"(FAILURE:|What went wrong|error:|Error:|Exception)")
+    capture_block = False
+    block_lines = []
     for line in lines:
         match = dart_error.match(line)
         if match:
             path, line_no, _, message = match.groups()
             findings.append((path, line_no, "Compile error", message))
+            continue
+        if "FAILURE: Build failed" in line or "* What went wrong:" in line or capture_block:
+            capture_block = True
+            block_lines.append(line)
+            if len(block_lines) >= 35 or "* Try:" in line:
+                findings.append((None, None, "Gradle failure", "\n".join(block_lines)))
+                block_lines = []
+                capture_block = False
         elif other.search(line):
             findings.append((None, None, "Build", line.strip()))
+    if block_lines:
+        findings.append((None, None, "Gradle failure", "\n".join(block_lines)))
     headline = f"flutter build apk: {len(findings)} error line(s)"
 
 # --- annotations -------------------------------------------------------------
