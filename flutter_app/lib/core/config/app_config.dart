@@ -3,6 +3,10 @@
 /// Run with:
 /// flutter run --dart-define-from-file=config/local.json
 abstract final class AppConfig {
+  /// Build name stamped by the CI build (`--dart-define=APP_BUILD=…`);
+  /// "dev" for local runs. Shown in settings and in diagnostics (OBS-01).
+  static const build = String.fromEnvironment('APP_BUILD', defaultValue: 'dev');
+
   static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 

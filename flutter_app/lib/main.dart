@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/app_config.dart';
+import 'features/diagnostics/diagnostics_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,5 +14,14 @@ Future<void> main() async {
       publishableKey: AppConfig.supabaseAnonKey,
     );
   }
-  runApp(const ProviderScope(child: LabWizardApp()));
+  // One container for the whole app so the crash-diagnostics hooks (OBS-01)
+  // can reach the same providers as the widgets.
+  final container = ProviderContainer();
+  installDiagnosticsHooks(container);
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const LabWizardApp(),
+    ),
+  );
 }

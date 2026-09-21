@@ -61,7 +61,7 @@ Future<void> _pumpShelf(
   required InventoryState state,
   ItemKind kind = ItemKind.chemical,
 }) async {
-  tester.view.physicalSize = const Size(420, 900);
+  tester.view.physicalSize = const Size(420, 1400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(

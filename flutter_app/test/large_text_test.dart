@@ -140,7 +140,7 @@ void main() {
       );
       expect(find.textContaining('Aisha'), findsWidgets);
       await tester.scrollUntilVisible(
-        find.text('chemicals').first,
+        find.text('actions this week'),
         200,
         scrollable: find.byType(Scrollable).first,
       );

@@ -278,7 +278,7 @@ void main() {
     testWidgets('shelf rows flag condition, assignee and warranty', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(420, 840);
+      tester.view.physicalSize = const Size(420, 1300);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);

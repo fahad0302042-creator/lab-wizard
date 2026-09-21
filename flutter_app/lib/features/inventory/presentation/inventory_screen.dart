@@ -193,17 +193,31 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 ),
                 child: const Icon(Icons.add, size: 27),
               ),
-        body: Column(
+        body: LayoutBuilder(
+          builder: (context, constraints) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // The heading and controls never take more than ~55 % of the
+            // height (landscape, large text); the rest stays with the list
+            // (A11Y-02/03). Within that box they scroll if they must.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: math.max(120, constraints.maxHeight * .55),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
             // UX-03: the handwritten heading collapses once the list scrolls so
             // the search, filter, and sort controls stay reachable without
-            // hiding most of the shelf.
+            // hiding most of the shelf. Short screens (phone landscape) start
+            // collapsed.
             AnimatedSize(
               duration: motion,
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
-              child: _headingCollapsed
+              child: _headingCollapsed || constraints.maxHeight < 480
                   ? const SizedBox(width: double.infinity)
                   : Padding(
                       padding: const EdgeInsets.fromLTRB(54, 18, 20, 0),
@@ -250,6 +264,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           : InventoryDensity.compact,
                     ),
                 onMenu: (value) => _handleMenu(value, state),
+              ),
+            ),
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -383,6 +401,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   : const SizedBox(width: double.infinity),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -1656,7 +1675,8 @@ class _CompactRow extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             onLongPress: onLongPress,
-            child: Padding(
+            child: LayoutBuilder(
+              builder: (context, constraints) => Padding(
               padding: const EdgeInsets.fromLTRB(2, 6, 0, 6),
               child: Row(
                 children: [
@@ -1746,7 +1766,10 @@ class _CompactRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 2),
-                  if (!selecting) ...[
+                  // Below ~300 px of row width the two 48 dp buttons would
+                  // leave no room for the name; swipe, long-press and the
+                  // details sheet still offer the same actions (A11Y-03).
+                  if (!selecting && constraints.maxWidth >= 300) ...[
                     IconButton(
                       tooltip: chemical ? 'Use' : 'Report damage',
                       onPressed: onConsume,
@@ -1768,6 +1791,7 @@ class _CompactRow extends StatelessWidget {
                   ] else
                     const SizedBox(width: 8),
                 ],
+              ),
               ),
             ),
           ),

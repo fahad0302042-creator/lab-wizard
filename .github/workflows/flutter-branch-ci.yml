@@ -114,6 +114,7 @@ jobs:
           set -o pipefail
           if flutter build apk --release \
               --dart-define-from-file=config/production.json \
+              --dart-define=APP_BUILD=1.1.${{ github.run_number }} \
               --build-name=1.1.${{ github.run_number }} \
               --build-number=$(( $(date +%s) / 60 )) 2>&1 | tee build.log; then
             exit 0

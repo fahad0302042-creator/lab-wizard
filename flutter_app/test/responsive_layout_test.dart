@@ -93,11 +93,11 @@ void main() {
           size: size,
         );
         await tester.scrollUntilVisible(
-          find.text('chemicals').first,
+          find.text('actions this week'),
           200,
           scrollable: find.byType(Scrollable).first,
         );
-        expect(find.text('chemicals'), findsWidgets);
+        expect(find.text('actions this week'), findsOneWidget);
       });
 
       testWidgets('${entry.key}: reports', (tester) async {
@@ -105,6 +105,11 @@ void main() {
           tester,
           const Scaffold(body: ReportsScreen()),
           size: size,
+        );
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('metric-consume')),
+          200,
+          scrollable: find.byType(Scrollable).first,
         );
         expect(find.byKey(const Key('metric-consume')), findsOneWidget);
       });
@@ -191,7 +196,7 @@ void main() {
         size: _sizes['small tablet']!,
       );
       await tester.scrollUntilVisible(
-        find.text('need attention').first,
+        find.text('need attention'),
         200,
         scrollable: find.byType(Scrollable).first,
       );

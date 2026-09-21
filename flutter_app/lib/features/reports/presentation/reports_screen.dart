@@ -198,11 +198,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               children: [
                 const Icon(Icons.science_outlined, size: 19),
                 const SizedBox(width: 4),
-                NotebookFilterWord(
-                  label: 'chemicals',
-                  selected: _kind == ItemKind.chemical,
-                  onTap: () => setState(() => _kind = ItemKind.chemical),
-                  fontSize: 21,
+                Flexible(
+                  child: NotebookFilterWord(
+                    label: 'chemicals',
+                    selected: _kind == ItemKind.chemical,
+                    onTap: () => setState(() => _kind = ItemKind.chemical),
+                    fontSize: 21,
+                  ),
                 ),
               ],
             ),
@@ -211,11 +213,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               children: [
                 const Icon(Icons.precision_manufacturing_outlined, size: 19),
                 const SizedBox(width: 4),
-                NotebookFilterWord(
-                  label: 'apparatus',
-                  selected: _kind == ItemKind.apparatus,
-                  onTap: () => setState(() => _kind = ItemKind.apparatus),
-                  fontSize: 21,
+                Flexible(
+                  child: NotebookFilterWord(
+                    label: 'apparatus',
+                    selected: _kind == ItemKind.apparatus,
+                    onTap: () => setState(() => _kind = ItemKind.apparatus),
+                    fontSize: 21,
+                  ),
                 ),
               ],
             ),

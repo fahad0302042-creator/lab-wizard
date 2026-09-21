@@ -645,7 +645,11 @@ class NotebookFilterWord extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: Text(
+          // Scales down rather than overflowing when a word is wider than
+          // the space it gets (very large text on a narrow screen).
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
             label,
             style: TextStyle(
               color: selected ? context.marginRedColor : context.mutedInkColor,
@@ -657,6 +661,7 @@ class NotebookFilterWord extends StatelessWidget {
               decorationColor: context.marginRedColor,
               decorationThickness: 2,
             ),
+          ),
           ),
         ),
       ),

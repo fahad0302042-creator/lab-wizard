@@ -365,7 +365,7 @@ void main() {
     testWidgets('shelf marks expiring chemicals and can filter to them', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(420, 840);
+      tester.view.physicalSize = const Size(420, 1300);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);

@@ -109,7 +109,7 @@ Future<_FakeInventory> _pump(
   InventoryState seed, {
   Set<String> failFor = const {},
   bool online = true,
-  double height = 900,
+  double height = 1400,
 }) async {
   tester.view.physicalSize = Size(420, height);
   tester.view.devicePixelRatio = 1;
