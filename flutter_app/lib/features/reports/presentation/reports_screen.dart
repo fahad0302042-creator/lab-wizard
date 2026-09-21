@@ -869,74 +869,74 @@ class _ActivityChart extends StatelessWidget {
       label: activityChartSummary(buckets),
       excludeSemantics: true,
       child: SizedBox(
-      height: 180,
-      child: BarChart(
-        BarChartData(
-          maxY: maxY + 1,
-          alignment: BarChartAlignment.spaceAround,
-          borderData: FlBorderData(show: false),
-          gridData: const FlGridData(show: false),
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipItem: (group, _, rod, _) {
-                final bucket = buckets[group.x];
-                final when = bucket.isSingleDay
-                    ? DateFormat('d MMM').format(bucket.start)
-                    : '${DateFormat('d MMM').format(bucket.start)} – '
-                          '${DateFormat('d MMM').format(bucket.end)}';
-                return BarTooltipItem(
-                  '$when\n${rod.toY.toInt()} '
-                  'action${rod.toY.toInt() == 1 ? '' : 's'}',
-                  const TextStyle(color: Colors.white, fontSize: 11),
-                );
-              },
-            ),
-          ),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(),
-            rightTitles: const AxisTitles(),
-            leftTitles: const AxisTitles(),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 24,
-                interval: 1,
-                getTitlesWidget: (value, _) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= buckets.length) {
-                    return const SizedBox.shrink();
-                  }
-                  if (index % interval != 0) return const SizedBox.shrink();
-                  return Text(
-                    buckets[index].label,
-                    style: const TextStyle(fontSize: 9),
+        height: 180,
+        child: BarChart(
+          BarChartData(
+            maxY: maxY + 1,
+            alignment: BarChartAlignment.spaceAround,
+            borderData: FlBorderData(show: false),
+            gridData: const FlGridData(show: false),
+            barTouchData: BarTouchData(
+              enabled: true,
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipItem: (group, _, rod, _) {
+                  final bucket = buckets[group.x];
+                  final when = bucket.isSingleDay
+                      ? DateFormat('d MMM').format(bucket.start)
+                      : '${DateFormat('d MMM').format(bucket.start)} – '
+                            '${DateFormat('d MMM').format(bucket.end)}';
+                  return BarTooltipItem(
+                    '$when\n${rod.toY.toInt()} '
+                    'action${rod.toY.toInt() == 1 ? '' : 's'}',
+                    const TextStyle(color: Colors.white, fontSize: 11),
                   );
                 },
               ),
             ),
-          ),
-          barGroups: [
-            for (var index = 0; index < buckets.length; index++)
-              BarChartGroupData(
-                x: index,
-                barRods: [
-                  BarChartRodData(
-                    toY: buckets[index].count.toDouble(),
-                    width: buckets.length > 31 ? 8 : 5,
-                    color: LabColors.marginRed,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(4),
-                    ),
-                  ),
-                ],
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(),
+              rightTitles: const AxisTitles(),
+              leftTitles: const AxisTitles(),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 24,
+                  interval: 1,
+                  getTitlesWidget: (value, _) {
+                    final index = value.toInt();
+                    if (index < 0 || index >= buckets.length) {
+                      return const SizedBox.shrink();
+                    }
+                    if (index % interval != 0) return const SizedBox.shrink();
+                    return Text(
+                      buckets[index].label,
+                      style: const TextStyle(fontSize: 9),
+                    );
+                  },
+                ),
               ),
-          ],
+            ),
+            barGroups: [
+              for (var index = 0; index < buckets.length; index++)
+                BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: buckets[index].count.toDouble(),
+                      width: buckets.length > 31 ? 8 : 5,
+                      color: LabColors.marginRed,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 500),
         ),
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 500),
-      ),
       ),
     );
   }

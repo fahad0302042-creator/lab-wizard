@@ -149,33 +149,33 @@ class _SketchTitleState extends State<SketchTitle>
     return Semantics(
       header: true,
       child: RepaintBoundary(
-      child: Transform.rotate(
-        angle: -.012,
-        alignment: Alignment.centerLeft,
-        child: CustomPaint(
-          painter: _UnderlinePainter(
-            progress: reduceMotion
-                ? const AlwaysStoppedAnimation(1)
-                : _controller,
-            color: context.marginRedColor,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              widget.text,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Caveat',
-                fontSize: widget.fontSize,
-                height: .98,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -.4,
+        child: Transform.rotate(
+          angle: -.012,
+          alignment: Alignment.centerLeft,
+          child: CustomPaint(
+            painter: _UnderlinePainter(
+              progress: reduceMotion
+                  ? const AlwaysStoppedAnimation(1)
+                  : _controller,
+              color: context.marginRedColor,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                widget.text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Caveat',
+                  fontSize: widget.fontSize,
+                  height: .98,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.4,
+                ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -555,29 +555,29 @@ class StatusBadge extends StatelessWidget {
       label: stockSpoken(status),
       excludeSemantics: true,
       child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: status == StockState.empty
-            ? LabColors.highlighter.withValues(alpha: .75)
-            : color.withValues(alpha: .12),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(2),
-          topRight: Radius.circular(9),
-          bottomLeft: Radius.circular(8),
-          bottomRight: Radius.circular(3),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        child: Text(
-          stockCaption(status),
-          style: TextStyle(
-            color: status == StockState.empty ? context.inkColor : color,
-            fontFamily: 'Caveat',
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
+        decoration: BoxDecoration(
+          color: status == StockState.empty
+              ? LabColors.highlighter.withValues(alpha: .75)
+              : color.withValues(alpha: .12),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(2),
+            topRight: Radius.circular(9),
+            bottomLeft: Radius.circular(8),
+            bottomRight: Radius.circular(3),
           ),
         ),
-      ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          child: Text(
+            stockCaption(status),
+            style: TextStyle(
+              color: status == StockState.empty ? context.inkColor : color,
+              fontFamily: 'Caveat',
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
       ),
     );
   }

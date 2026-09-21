@@ -1290,171 +1290,171 @@ class _InventoryCard extends StatelessWidget {
       selecting: selecting,
       selected: selected,
       child: Stack(
-      clipBehavior: Clip.none,
-      children: [
-        if (flagged)
-          Positioned(
-            left: -43,
-            top: 10,
-            width: 38,
-            child: MarginNote(
-              item.status == StockState.empty ? 'empty!' : 'order!',
+        clipBehavior: Clip.none,
+        children: [
+          if (flagged)
+            Positioned(
+              left: -43,
+              top: 10,
+              width: 38,
+              child: MarginNote(
+                item.status == StockState.empty ? 'empty!' : 'order!',
+              ),
             ),
-          ),
-        Dismissible(
-          key: ValueKey('${kind.name}-${item.id}'),
-          direction: selecting
-              ? DismissDirection.none
-              : DismissDirection.horizontal,
-          confirmDismiss: (direction) async {
-            HapticFeedback.mediumImpact();
-            if (direction == DismissDirection.startToEnd) {
-              onRestock();
-            } else {
-              onConsume();
-            }
-            return false;
-          },
-          background: _SwipeBackground(
-            alignment: Alignment.centerLeft,
-            color: context.healthyColor,
-            icon: Icons.add,
-            text: 'restock',
-          ),
-          secondaryBackground: _SwipeBackground(
-            alignment: Alignment.centerRight,
-            color: kind == ItemKind.chemical
-                ? context.lowColor
-                : context.marginRedColor,
-            icon: kind == ItemKind.chemical
-                ? Icons.remove
-                : Icons.report_problem_outlined,
-            text: kind == ItemKind.chemical ? 'use' : 'damage',
-          ),
-          child: Hero(
-            tag: '${kind.name}-${item.id}',
-            child: NotebookCard(
-              onTap: onTap,
-              onLongPress: onLongPress,
-              tape: tape,
-              accent: selected ? context.inkColor : null,
-              paperclip: item.status == StockState.empty,
-              alternate: index.isOdd,
-              rotation: index.isEven ? -.008 : .009,
-              padding: const EdgeInsets.fromLTRB(15, 17, 15, 12),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (selecting)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 10, top: 2),
-                          child: _SelectionMark(
-                            selected: selected,
-                            key: Key('select-mark-${item.id}'),
+          Dismissible(
+            key: ValueKey('${kind.name}-${item.id}'),
+            direction: selecting
+                ? DismissDirection.none
+                : DismissDirection.horizontal,
+            confirmDismiss: (direction) async {
+              HapticFeedback.mediumImpact();
+              if (direction == DismissDirection.startToEnd) {
+                onRestock();
+              } else {
+                onConsume();
+              }
+              return false;
+            },
+            background: _SwipeBackground(
+              alignment: Alignment.centerLeft,
+              color: context.healthyColor,
+              icon: Icons.add,
+              text: 'restock',
+            ),
+            secondaryBackground: _SwipeBackground(
+              alignment: Alignment.centerRight,
+              color: kind == ItemKind.chemical
+                  ? context.lowColor
+                  : context.marginRedColor,
+              icon: kind == ItemKind.chemical
+                  ? Icons.remove
+                  : Icons.report_problem_outlined,
+              text: kind == ItemKind.chemical ? 'use' : 'damage',
+            ),
+            child: Hero(
+              tag: '${kind.name}-${item.id}',
+              child: NotebookCard(
+                onTap: onTap,
+                onLongPress: onLongPress,
+                tape: tape,
+                accent: selected ? context.inkColor : null,
+                paperclip: item.status == StockState.empty,
+                alternate: index.isOdd,
+                rotation: index.isEven ? -.008 : .009,
+                padding: const EdgeInsets.fromLTRB(15, 17, 15, 12),
+                child: Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (selecting)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 10, top: 2),
+                            child: _SelectionMark(
+                              selected: selected,
+                              key: Key('select-mark-${item.id}'),
+                            ),
+                          ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'ArchitectsDaughter',
+                                  fontSize: 21,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: context.mutedInkColor,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              _MetadataMarks(item),
+                            ],
                           ),
                         ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              item.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            AnimatedQuantity(
+                              item.quantity,
+                              suffix: ' ${item.unit}',
                               style: const TextStyle(
-                                fontFamily: 'ArchitectsDaughter',
-                                fontSize: 21,
+                                fontSize: 20,
                                 height: 1.1,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(height: 2),
                             Text(
-                              item.subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              item.threshold > 0
+                                  ? 'min ${formatQuantity(item.threshold)} ${item.unit}'
+                                  : item.unit,
                               style: TextStyle(
                                 color: context.mutedInkColor,
-                                fontSize: 15,
+                                fontSize: 11,
                               ),
                             ),
-                            _MetadataMarks(item),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          AnimatedQuantity(
-                            item.quantity,
-                            suffix: ' ${item.unit}',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              height: 1.1,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            item.threshold > 0
-                                ? 'min ${formatQuantity(item.threshold)} ${item.unit}'
-                                : item.unit,
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    StockBar(progress: item.progress, status: item.status),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            stockCaption(item.status),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: context.mutedInkColor,
-                              fontSize: 11,
+                              color: item.status == StockState.healthy
+                                  ? context.inkColor
+                                  : item.status == StockState.low
+                                  ? context.lowColor
+                                  : context.marginRedColor,
+                              fontFamily: 'Caveat',
+                              fontSize: 18,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                              backgroundColor: item.status == StockState.empty
+                                  ? LabColors.highlighter.withValues(alpha: .72)
+                                  : null,
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  StockBar(progress: item.progress, status: item.status),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          stockCaption(item.status),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: item.status == StockState.healthy
-                                ? context.inkColor
-                                : item.status == StockState.low
-                                ? context.lowColor
-                                : context.marginRedColor,
-                            fontFamily: 'Caveat',
-                            fontSize: 18,
-                            height: 1,
-                            fontWeight: FontWeight.w700,
-                            backgroundColor: item.status == StockState.empty
-                                ? LabColors.highlighter.withValues(alpha: .72)
-                                : null,
                           ),
                         ),
-                      ),
-                      _CardAction(
-                        label: kind == ItemKind.chemical ? 'use' : 'damage',
-                        color: context.marginRedColor,
-                        onTap: selecting ? onTap : onConsume,
-                      ),
-                      const SizedBox(width: 10),
-                      _CardAction(
-                        label: '+ stock',
-                        color: context.healthyColor,
-                        onTap: selecting ? onTap : onRestock,
-                      ),
-                    ],
-                  ),
-                ],
+                        _CardAction(
+                          label: kind == ItemKind.chemical ? 'use' : 'damage',
+                          color: context.marginRedColor,
+                          onTap: selecting ? onTap : onConsume,
+                        ),
+                        const SizedBox(width: 10),
+                        _CardAction(
+                          label: '+ stock',
+                          color: context.healthyColor,
+                          onTap: selecting ? onTap : onRestock,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -1507,148 +1507,148 @@ class _CompactRow extends StatelessWidget {
       selecting: selecting,
       selected: selected,
       child: Dismissible(
-      key: ValueKey('${kind.name}-${item.id}'),
-      direction: selecting
-          ? DismissDirection.none
-          : DismissDirection.horizontal,
-      confirmDismiss: (direction) async {
-        HapticFeedback.mediumImpact();
-        if (direction == DismissDirection.startToEnd) {
-          onRestock();
-        } else {
-          onConsume();
-        }
-        return false;
-      },
-      background: _SwipeBackground(
-        alignment: Alignment.centerLeft,
-        color: context.healthyColor,
-        icon: Icons.add,
-        text: 'restock',
-      ),
-      secondaryBackground: _SwipeBackground(
-        alignment: Alignment.centerRight,
-        color: chemical ? context.lowColor : context.marginRedColor,
-        icon: chemical ? Icons.remove : Icons.report_problem_outlined,
-        text: chemical ? 'use' : 'damage',
-      ),
-      child: Material(
-        color: selected
-            ? context.inkColor.withValues(alpha: .06)
-            : Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(2, 6, 0, 6),
-            child: Row(
-              children: [
-                if (selecting)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: _SelectionMark(
-                      selected: selected,
-                      key: Key('select-mark-${item.id}'),
+        key: ValueKey('${kind.name}-${item.id}'),
+        direction: selecting
+            ? DismissDirection.none
+            : DismissDirection.horizontal,
+        confirmDismiss: (direction) async {
+          HapticFeedback.mediumImpact();
+          if (direction == DismissDirection.startToEnd) {
+            onRestock();
+          } else {
+            onConsume();
+          }
+          return false;
+        },
+        background: _SwipeBackground(
+          alignment: Alignment.centerLeft,
+          color: context.healthyColor,
+          icon: Icons.add,
+          text: 'restock',
+        ),
+        secondaryBackground: _SwipeBackground(
+          alignment: Alignment.centerRight,
+          color: chemical ? context.lowColor : context.marginRedColor,
+          icon: chemical ? Icons.remove : Icons.report_problem_outlined,
+          text: chemical ? 'use' : 'damage',
+        ),
+        child: Material(
+          color: selected
+              ? context.inkColor.withValues(alpha: .06)
+              : Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(2, 6, 0, 6),
+              child: Row(
+                children: [
+                  if (selecting)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _SelectionMark(
+                        selected: selected,
+                        key: Key('select-mark-${item.id}'),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: item.status == StockState.healthy
+                            ? statusColor.withValues(alpha: .35)
+                            : statusColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: statusColor, width: 1.6),
+                      ),
                     ),
-                  )
-                else
-                  Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: item.status == StockState.healthy
-                          ? statusColor.withValues(alpha: .35)
-                          : statusColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: statusColor, width: 1.6),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'ArchitectsDaughter',
+                            fontSize: 16,
+                            height: 1.15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          item.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.mutedInkColor,
+                            fontSize: 12,
+                            height: 1.2,
+                          ),
+                        ),
+                        _MetadataMarks(item, compact: true),
+                      ],
                     ),
                   ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        item.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      AnimatedQuantity(
+                        item.quantity,
+                        suffix: ' ${item.unit}',
                         style: const TextStyle(
-                          fontFamily: 'ArchitectsDaughter',
-                          fontSize: 16,
+                          fontSize: 15,
                           height: 1.15,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        item.subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        statusText,
                         style: TextStyle(
-                          color: context.mutedInkColor,
-                          fontSize: 12,
-                          height: 1.2,
+                          color: item.status == StockState.healthy
+                              ? context.mutedInkColor
+                              : statusColor,
+                          fontFamily: 'Caveat',
+                          fontSize: 14,
+                          height: 1,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      _MetadataMarks(item, compact: true),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    AnimatedQuantity(
-                      item.quantity,
-                      suffix: ' ${item.unit}',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        height: 1.15,
-                        fontWeight: FontWeight.w700,
+                  const SizedBox(width: 2),
+                  if (!selecting) ...[
+                    IconButton(
+                      tooltip: chemical ? 'Use' : 'Report damage',
+                      onPressed: onConsume,
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 21,
+                      color: context.marginRedColor,
+                      icon: Icon(
+                        chemical
+                            ? Icons.remove_circle_outline
+                            : Icons.report_problem_outlined,
                       ),
                     ),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        color: item.status == StockState.healthy
-                            ? context.mutedInkColor
-                            : statusColor,
-                        fontFamily: 'Caveat',
-                        fontSize: 14,
-                        height: 1,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    IconButton(
+                      tooltip: 'Restock',
+                      onPressed: onRestock,
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 21,
+                      color: context.healthyColor,
+                      icon: const Icon(Icons.add_circle_outline),
                     ),
-                  ],
-                ),
-                const SizedBox(width: 2),
-                if (!selecting) ...[
-                  IconButton(
-                    tooltip: chemical ? 'Use' : 'Report damage',
-                    onPressed: onConsume,
-                    visualDensity: VisualDensity.compact,
-                    iconSize: 21,
-                    color: context.marginRedColor,
-                    icon: Icon(
-                      chemical
-                          ? Icons.remove_circle_outline
-                          : Icons.report_problem_outlined,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Restock',
-                    onPressed: onRestock,
-                    visualDensity: VisualDensity.compact,
-                    iconSize: 21,
-                    color: context.healthyColor,
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                ] else
-                  const SizedBox(width: 8),
-              ],
+                  ] else
+                    const SizedBox(width: 8),
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -1832,20 +1832,20 @@ class _CardAction extends StatelessWidget {
     return Semantics(
       button: true,
       child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontFamily: 'Caveat',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            decoration: TextDecoration.underline,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontFamily: 'Caveat',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              decoration: TextDecoration.underline,
+            ),
           ),
         ),
-      ),
       ),
     );
   }

@@ -626,40 +626,40 @@ class _MetricCard extends StatelessWidget {
     // Value and caption are one spoken item ("3, low stock, button").
     return MergeSemantics(
       child: StaggerIn(
-      index: index,
-      child: NotebookCard(
-        onTap: onTap,
-        tape: switch (index % 4) {
-          0 => NotebookTape.yellow,
-          1 => NotebookTape.blue,
-          2 => NotebookTape.pink,
-          _ => NotebookTape.green,
-        },
-        accent: color,
-        rotation: index.isEven ? -.008 : .008,
-        padding: const EdgeInsets.all(13),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 21),
-            AnimatedQuantity(
-              value,
-              style: const TextStyle(
-                fontSize: 28,
-                height: 1.1,
-                fontWeight: FontWeight.w900,
+        index: index,
+        child: NotebookCard(
+          onTap: onTap,
+          tape: switch (index % 4) {
+            0 => NotebookTape.yellow,
+            1 => NotebookTape.blue,
+            2 => NotebookTape.pink,
+            _ => NotebookTape.green,
+          },
+          accent: color,
+          rotation: index.isEven ? -.008 : .008,
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 21),
+              AnimatedQuantity(
+                value,
+                style: const TextStyle(
+                  fontSize: 28,
+                  height: 1.1,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-            ),
-          ],
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -747,44 +747,44 @@ class _SyncBanner extends StatelessWidget {
     // Icon, message and chevron read as one button.
     return MergeSemantics(
       child: Material(
-      color: color.withValues(alpha: .12),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
+        color: color.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const SyncCenterScreen()),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          child: Row(
-            children: [
-              Icon(
-                failed
-                    ? Icons.error_outline
-                    : pending
-                    ? Icons.cloud_upload_outlined
-                    : Icons.cloud_off_outlined,
-                size: 19,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const SyncCenterScreen()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                Icon(
                   failed
-                      ? '${state.failedCount} change${state.failedCount == 1 ? '' : 's'} need${state.failedCount == 1 ? 's' : ''} attention — open sync center'
+                      ? Icons.error_outline
                       : pending
-                      ? '${state.pendingCount} change${state.pendingCount == 1 ? '' : 's'} waiting to sync — tap for details'
-                      : state.error!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                      ? Icons.cloud_upload_outlined
+                      : Icons.cloud_off_outlined,
+                  size: 19,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    failed
+                        ? '${state.failedCount} change${state.failedCount == 1 ? '' : 's'} need${state.failedCount == 1 ? 's' : ''} attention — open sync center'
+                        : pending
+                        ? '${state.pendingCount} change${state.pendingCount == 1 ? '' : 's'} waiting to sync — tap for details'
+                        : state.error!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              const Icon(Icons.chevron_right, size: 18),
-            ],
+                const Icon(Icons.chevron_right, size: 18),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -827,48 +827,51 @@ class _WeekActivity extends StatelessWidget {
                 '($maxCount)',
       excludeSemantics: true,
       child: SizedBox(
-      height: 130,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(7, (index) {
-          final ratio = counts[index] / maxCount;
-          return Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  counts[index] == 0 ? '' : '${counts[index]}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+        height: 130,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(7, (index) {
+            final ratio = counts[index] / maxCount;
+            return Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    counts[index] == 0 ? '' : '${counts[index]}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                TweenAnimationBuilder<double>(
-                  tween: Tween(end: ratio),
-                  duration: Duration(milliseconds: 400 + index * 55),
-                  curve: Curves.easeOutBack,
-                  builder: (_, value, _) => Container(
-                    height: 68 * value + 5,
-                    width: 13,
-                    decoration: BoxDecoration(
-                      color: LabColors.marginRed.withValues(alpha: .78),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(8),
+                  const SizedBox(height: 3),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(end: ratio),
+                    duration: Duration(milliseconds: 400 + index * 55),
+                    curve: Curves.easeOutBack,
+                    builder: (_, value, _) => Container(
+                      height: 68 * value + 5,
+                      width: 13,
+                      decoration: BoxDecoration(
+                        color: LabColors.marginRed.withValues(alpha: .78),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(8),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  DateFormat.E().format(days[index]).substring(0, 1),
-                  style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-                ),
-              ],
-            ),
-          );
-        }),
-      ),
+                  const SizedBox(height: 7),
+                  Text(
+                    DateFormat.E().format(days[index]).substring(0, 1),
+                    style: TextStyle(
+                      color: context.mutedInkColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

@@ -130,9 +130,7 @@ void main() {
       _chemical('c3', 'Ethanol', quantity: 0),
     ];
 
-    testWidgets('every tappable node on the shelf has a label', (
-      tester,
-    ) async {
+    testWidgets('every tappable node on the shelf has a label', (tester) async {
       final handle = tester.ensureSemantics();
       await _pumpShelf(tester, state: InventoryState(chemicals: chemicals));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
@@ -157,7 +155,10 @@ void main() {
       final benzene = _node(tester, RegExp(r'^Benzene'));
       expect(benzene.label, contains('expired'));
       expect(benzene.label, contains('hazards: flammable, toxic'));
-      expect(_node(tester, RegExp(r'^Ethanol')).label, contains('out of stock'));
+      expect(
+        _node(tester, RegExp(r'^Ethanol')).label,
+        contains('out of stock'),
+      );
 
       // The heading is navigable as a heading.
       expect(_node(tester, 'chemicals shelf').flagsCollection.isHeader, isTrue);
