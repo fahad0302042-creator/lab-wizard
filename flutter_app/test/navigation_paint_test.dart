@@ -7,8 +7,6 @@ import 'package:lab_wizard/core/theme/app_theme.dart';
 import 'package:lab_wizard/features/home/presentation/dashboard_screen.dart';
 import 'package:lab_wizard/features/home/presentation/home_shell.dart';
 import 'package:lab_wizard/features/inventory/presentation/inventory_screen.dart';
-import 'package:lab_wizard/features/notifications/data/notification_gateway.dart';
-import 'package:lab_wizard/features/notifications/domain/alerts.dart';
 import 'package:lab_wizard/features/notifications/notification_providers.dart';
 import 'package:lab_wizard/features/reports/presentation/reports_screen.dart';
 import 'package:lab_wizard/features/sync/background/background_sync.dart';
@@ -81,8 +79,10 @@ Future<void> _pumpShell(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-RenderRepaintBoundary _page(WidgetTester tester, int index) => tester
-    .renderObject<RenderRepaintBoundary>(find.byKey(ValueKey('main-page-$index')));
+RenderRepaintBoundary _page(WidgetTester tester, int index) =>
+    tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(ValueKey('main-page-$index')),
+    );
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -113,10 +113,7 @@ void main() {
       TickerMode.of(tester.element(find.byType(InventoryScreen).first)),
       isFalse,
     );
-    expect(
-      TickerMode.of(tester.element(find.byType(DashboardScreen))),
-      isTrue,
-    );
+    expect(TickerMode.of(tester.element(find.byType(DashboardScreen))), isTrue);
 
     // Switching tabs flips all of the above.
     await tester.tap(find.text('chems'));
