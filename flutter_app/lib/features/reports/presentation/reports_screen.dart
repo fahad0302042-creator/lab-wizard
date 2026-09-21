@@ -566,8 +566,7 @@ class _ReportMetric extends StatelessWidget {
                         // More restocking is good news; more usage or
                         // damage is flagged.
                         color:
-                            (change! > 0) ==
-                                (action == InventoryAction.restock)
+                            (change! > 0) == (action == InventoryAction.restock)
                             ? context.healthyColor
                             : context.marginRedColor,
                       ),

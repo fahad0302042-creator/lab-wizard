@@ -66,7 +66,10 @@ void main() {
       'g': 20,
       '': 1,
     });
-    expect(stats.of(InventoryAction.consume).quantityLabel, '350 mL · 20 g · 1');
+    expect(
+      stats.of(InventoryAction.consume).quantityLabel,
+      '350 mL · 20 g · 1',
+    );
     expect(stats.of(InventoryAction.restock).count, 1);
     expect(stats.of(InventoryAction.restock).quantityLabel, '500 mL');
     expect(stats.of(InventoryAction.breakage).count, 0);
@@ -113,7 +116,10 @@ void main() {
     expect(trend.previous.range.start, DateTime(2026, 9, 8));
     expect(trend.previous.range.end, DateTime(2026, 9, 14));
     expect(trend.countChange(InventoryAction.consume), closeTo(0.5, 1e-9));
-    expect(trend.quantityChange(InventoryAction.consume, 'mL'), closeTo(2, 1e-9));
+    expect(
+      trend.quantityChange(InventoryAction.consume, 'mL'),
+      closeTo(2, 1e-9),
+    );
     expect(trend.countChange(InventoryAction.restock), -1);
     expect(trend.countChange(InventoryAction.breakage), isNull);
     expect(trend.describe(InventoryAction.consume), '+50% vs previous 7 days');
@@ -121,7 +127,10 @@ void main() {
       trend.describe(InventoryAction.restock),
       'none, 1 in the previous 7 days',
     );
-    expect(trend.describe(InventoryAction.breakage), 'none in the previous 7 days');
+    expect(
+      trend.describe(InventoryAction.breakage),
+      'none in the previous 7 days',
+    );
     expect(trend.previousLabel, 'previous 7 days');
 
     final empty = TrendComparison.compute(
