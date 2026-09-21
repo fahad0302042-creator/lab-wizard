@@ -11,9 +11,11 @@ import '../../../core/utils/errors.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../data/inventory_repository.dart';
+import '../domain/apparatus_history.dart';
 import '../domain/duplicates.dart';
 import '../domain/models.dart';
 import 'apparatus_details.dart';
+import 'apparatus_history_screen.dart';
 import 'checkout_sheets.dart';
 import 'chemical_details.dart';
 import 'service_sheets.dart';
@@ -1230,7 +1232,7 @@ class _ItemDetail extends ConsumerWidget {
     final notes = chemical?.notes ?? apparatus!.notes;
     final status = chemical?.stockState ?? apparatus!.stockState;
     final progress = chemical?.stockProgress ?? apparatus!.stockProgress;
-    final history = _historyFor(state, itemId);
+    final history = _historyFor(state, itemId, apparatus: apparatus != null);
 
     return Hero(
       tag: '${kind.name}-$itemId',
@@ -1398,6 +1400,25 @@ class _ItemDetail extends ConsumerWidget {
                           )
                         : null,
                   ),
+                  _EventEntry(:final event) => ListTile(
+                    key: Key('history-event-${event.key}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: historyColor(
+                        context,
+                        event.kind,
+                      ).withValues(alpha: .15),
+                      child: Icon(
+                        historyIcon(event.kind),
+                        color: historyColor(context, event.kind),
+                      ),
+                    ),
+                    title: Text(event.title),
+                    subtitle: Text(
+                      '${event.time.day}/${event.time.month}/${event.time.year}'
+                      '${event.detail.isEmpty ? '' : ' · ${event.detail}'}',
+                    ),
+                  ),
                   _ReversalEntry(:final reversal) => ListTile(
                     key: Key('history-undo-${reversal.id}'),
                     contentPadding: EdgeInsets.zero,
@@ -1418,6 +1439,21 @@ class _ItemDetail extends ConsumerWidget {
                     ),
                   ),
                 },
+            if (apparatus != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('history-all'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ApparatusHistoryScreen(apparatusId: itemId),
+                    ),
+                  ),
+                  icon: const Icon(Icons.timeline_outlined, size: 18),
+                  label: const Text('Full history & report'),
+                ),
+              ),
             const SizedBox(height: 24),
             TextButton.icon(
               onPressed: () => _delete(context, ref, name),
@@ -1431,12 +1467,25 @@ class _ItemDetail extends ConsumerWidget {
     );
   }
 
-  static List<_HistoryEntry> _historyFor(InventoryState state, String itemId) {
+  static List<_HistoryEntry> _historyFor(
+    InventoryState state,
+    String itemId, {
+    bool apparatus = false,
+  }) {
     final entries = <_HistoryEntry>[
       for (final log in state.logs)
         if (log.itemId == itemId) _LogEntry(log),
       for (final reversal in state.reversals)
         if (reversal.itemId == itemId) _ReversalEntry(reversal),
+      // Loans and service tasks join the apparatus timeline (GEAR-04);
+      // stock changes above already cover logs and undo notes.
+      if (apparatus)
+        for (final event in buildApparatusHistory(
+          apparatusId: itemId,
+          checkouts: state.checkouts,
+          services: state.services,
+        ))
+          _EventEntry(event),
     ]..sort((a, b) => b.time.compareTo(a.time));
     return entries.take(8).toList();
   }
@@ -1764,6 +1813,15 @@ class _ReversalEntry extends _HistoryEntry {
 
   @override
   DateTime get time => reversal.reversedAt;
+}
+
+class _EventEntry extends _HistoryEntry {
+  const _EventEntry(this.event);
+
+  final ApparatusEvent event;
+
+  @override
+  DateTime get time => event.time;
 }
 
 extension<T> on Iterable<T> {
