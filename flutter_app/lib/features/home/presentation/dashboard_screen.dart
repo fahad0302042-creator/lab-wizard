@@ -1001,12 +1001,16 @@ class _LabChip extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 5),
-            Text(
-              isPersonal ? 'Personal Lab' : (activeLab?.name ?? 'Lab'),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: context.inkColor,
+            Flexible(
+              child: Text(
+                isPersonal ? 'Personal Lab' : (activeLab?.name ?? 'Lab'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.inkColor,
+                ),
               ),
             ),
             const SizedBox(width: 4),
