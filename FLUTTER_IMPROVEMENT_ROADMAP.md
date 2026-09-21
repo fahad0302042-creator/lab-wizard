@@ -1,6 +1,6 @@
 # Lab Wizard Flutter Improvement Roadmap
 
-This is the authoritative checklist for the post-1.0.4 Android improvement program. Items are implemented in ID order unless a prerequisite requires otherwise. An item is only marked complete after source validation, automated tests, a successful signed GitHub APK build, and phone verification where applicable.
+This is the authoritative checklist for the post-1.0.4 Android improvement program. Items are implemented in ID order unless a prerequisite requires otherwise. An item is only marked complete after source validation, automated tests, a successful signed GitHub APK build, and phone verification where applicable (see [docs/PHONE_VERIFICATION_CHECKLIST.md](docs/PHONE_VERIFICATION_CHECKLIST.md) for the physical device acceptance protocol).
 
 Status legend: `TODO`, `IN PROGRESS`, `BLOCKED`, `VALIDATING`, `RELEASED`.
 
