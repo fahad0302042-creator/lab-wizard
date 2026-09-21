@@ -229,11 +229,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                     ? 'add reagent'
                                     : 'add apparatus',
                                 icon: Icons.add,
-                                onPressed: () => showAddItemSheet(
-                                  context,
-                                  ref,
-                                  widget.kind,
-                                ),
+                                onPressed: () =>
+                                    showAddItemSheet(context, ref, widget.kind),
                               ),
                             ),
                           )
@@ -276,11 +273,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                 label: _isChemical
                                     ? '~ add new reagent ~'
                                     : '~ add new apparatus ~',
-                                onTap: () => showAddItemSheet(
-                                  context,
-                                  ref,
-                                  widget.kind,
-                                ),
+                                onTap: () =>
+                                    showAddItemSheet(context, ref, widget.kind),
                               ),
                             ),
                           ),
@@ -364,9 +358,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       case _ShelfMenu.printLabels:
         _printQrLabels(state.chemicals);
       case _ShelfMenu.settings:
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
     }
   }
 
@@ -613,14 +607,10 @@ class _ShelfControls extends StatelessWidget {
             const SizedBox(width: 2),
             IconButton(
               key: const Key('inventory-density-toggle'),
-              tooltip: compact
-                  ? 'Show detailed cards'
-                  : 'Show compact rows',
+              tooltip: compact ? 'Show detailed cards' : 'Show compact rows',
               onPressed: onToggleDensity,
               icon: Icon(
-                compact
-                    ? Icons.view_agenda_outlined
-                    : Icons.view_list_outlined,
+                compact ? Icons.view_agenda_outlined : Icons.view_list_outlined,
               ),
             ),
             PopupMenuButton<_ShelfMenu>(
@@ -766,7 +756,10 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
         );
         final fontSize = math.min(11.5, slot * .74);
         final stripHeight = slot * letters.length;
-        final stripTop = math.max(0.0, (constraints.maxHeight - stripHeight) / 2);
+        final stripTop = math.max(
+          0.0,
+          (constraints.maxHeight - stripHeight) / 2,
+        );
         final activeIndex = _active == null ? -1 : letters.indexOf(_active!);
         return SizedBox(
           width: 78,
@@ -792,10 +785,7 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                     decoration: BoxDecoration(
                       color: context.cardColor.withValues(alpha: .82),
                       borderRadius: BorderRadius.circular(11),
-                      border: Border.all(
-                        color: context.ruledColor,
-                        width: 1,
-                      ),
+                      border: Border.all(color: context.ruledColor, width: 1),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,

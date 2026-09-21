@@ -127,9 +127,7 @@ void main() {
     testWidgets('UX-01: compact preference is restored on launch', (
       tester,
     ) async {
-      SharedPreferences.setMockInitialValues({
-        'inventory_density': 'compact',
-      });
+      SharedPreferences.setMockInitialValues({'inventory_density': 'compact'});
       await _pumpPhone(
         tester,
         _app(state: InventoryState(chemicals: _chemicals())),
@@ -165,9 +163,7 @@ void main() {
     testWidgets('UX-02: strip follows search results and compact mode', (
       tester,
     ) async {
-      SharedPreferences.setMockInitialValues({
-        'inventory_density': 'compact',
-      });
+      SharedPreferences.setMockInitialValues({'inventory_density': 'compact'});
       await _pumpPhone(
         tester,
         _app(state: InventoryState(chemicals: _chemicals())),
