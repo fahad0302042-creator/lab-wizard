@@ -653,9 +653,7 @@ class _RunOutSectionState extends State<_RunOutSection> {
                             estimate.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
                         const SizedBox(width: 8),

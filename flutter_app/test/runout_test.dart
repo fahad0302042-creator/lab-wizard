@@ -76,23 +76,20 @@ void main() {
   });
 
   test('no estimate without adequate history', () {
+    expect((_estimate(40, []) as RunOutMissing).gap, RunOutGap.noUse);
     expect(
-      (_estimate(40, []) as RunOutMissing).gap,
-      RunOutGap.noUse,
-    );
-    expect(
-      (_estimate(40, [_use('1', 0, 10), _use('2', 30, 10)]) as RunOutMissing)
-          .gap,
+      (_estimate(40, [
+        _use('1', 0, 10),
+        _use('2', 30, 10),
+      ]) as RunOutMissing).gap,
       RunOutGap.tooFewEntries,
     );
     expect(
       (_estimate(40, [
-                _use('1', 0, 10),
-                _use('2', 1, 10),
-                _use('3', 5, 10), // only 6 days of history
-              ])
-              as RunOutMissing)
-          .gap,
+        _use('1', 0, 10),
+        _use('2', 1, 10),
+        _use('3', 5, 10), // only 6 days of history
+      ]) as RunOutMissing).gap,
       RunOutGap.tooShortHistory,
     );
     // Exactly the minimum span counts.
@@ -102,9 +99,11 @@ void main() {
     );
     // Zero-amount entries are not uses.
     expect(
-      (_estimate(40, [_use('1', 0, 0), _use('2', 1, 0), _use('3', 9, 0)])
-              as RunOutMissing)
-          .gap,
+      (_estimate(40, [
+        _use('1', 0, 0),
+        _use('2', 1, 0),
+        _use('3', 9, 0),
+      ]) as RunOutMissing).gap,
       RunOutGap.noUse,
     );
   });
@@ -133,12 +132,16 @@ void main() {
       _use('6', 19, 1, itemId: 'b'),
       _use('7', 0, 1, itemId: 'c'),
     ];
-    final report = runOutReportForChemicals([
-      _chemical('a', 'Acetone', 300),
-      _chemical('b', 'Buffer', 3),
-      _chemical('c', 'Citric acid', 50),
-      _chemical('d', 'Dye', 50),
-    ], logs, now: _today);
+    final report = runOutReportForChemicals(
+      [
+        _chemical('a', 'Acetone', 300),
+        _chemical('b', 'Buffer', 3),
+        _chemical('c', 'Citric acid', 50),
+        _chemical('d', 'Dye', 50),
+      ],
+      logs,
+      now: _today,
+    );
     expect(report.estimates.map((e) => e.name), ['Buffer', 'Acetone']);
     expect(report.estimates.first.daysLeft, 20);
     expect(report.estimates.last.daysLeft, 200);
@@ -150,8 +153,11 @@ void main() {
       'last 90 days).',
     );
     expect(
-      runOutReportForChemicals([_chemical('a', 'Acetone', 1)], [], now: _today)
-          .gapSummary,
+      runOutReportForChemicals(
+        [_chemical('a', 'Acetone', 1)],
+        [],
+        now: _today,
+      ).gapSummary,
       '1 item has too little history (need 3+ uses over 7+ days in the '
       'last 90 days).',
     );
