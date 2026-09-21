@@ -108,44 +108,13 @@ class ApparatusDetailsFields extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            InkWell(
+            DetailsToggle(
               key: const Key('apparatus-details-toggle'),
+              expanded: controller.expanded,
+              summary: filled
+                  ? 'serial · condition · assignee · dates'
+                  : 'optional',
               onTap: () => controller.expanded = !controller.expanded,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      controller.expanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      color: context.mutedInkColor,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'more details',
-                        style: TextStyle(
-                          fontFamily: 'Caveat',
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: context.inkColor,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      filled
-                          ? 'serial · condition · assignee · dates'
-                          : 'optional',
-                      style: TextStyle(
-                        color: context.mutedInkColor,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
             Visibility(
               visible: controller.expanded,
@@ -163,6 +132,7 @@ class ApparatusDetailsFields extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     key: const Key('gear-condition'),
                     initialValue: controller.condition?.name ?? '',
                     decoration: const InputDecoration(labelText: 'Condition'),

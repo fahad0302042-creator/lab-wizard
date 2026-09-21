@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_wizard/app/providers.dart';
@@ -274,8 +275,22 @@ void main() {
       await tester.tap(find.byKey(const Key('menu-print-labels')));
       await tester.pumpAndSettle();
       expect(find.text('2 QR labels on A4'), findsOneWidget);
-      // Printing goes through a platform channel that does not exist in
-      // tests; the failure must surface as a message, not a crash.
+      // The print service is simulated as unavailable; the failure must
+      // surface as a message, not a crash.
+      const printing = MethodChannel('net.nfet.printing');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        printing,
+        (call) async => throw PlatformException(
+          code: 'unavailable',
+          message: 'No print service on this phone',
+        ),
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          printing,
+          null,
+        ),
+      );
       await tester.tap(find.byKey(const Key('label-sheet-print')));
       await tester.pumpAndSettle();
       expect(find.textContaining('Could not export'), findsOneWidget);

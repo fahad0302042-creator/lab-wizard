@@ -117,42 +117,13 @@ class ChemicalDetailsFields extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            InkWell(
+            DetailsToggle(
               key: const Key('chemical-details-toggle'),
+              expanded: controller.expanded,
+              summary: filled
+                  ? 'supplier · CAS · expiry · hazards'
+                  : 'optional',
               onTap: () => controller.expanded = !controller.expanded,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      controller.expanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      color: context.mutedInkColor,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'more details',
-                        style: TextStyle(
-                          fontFamily: 'Caveat',
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: context.inkColor,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      filled ? 'supplier · CAS · expiry · hazards' : 'optional',
-                      style: TextStyle(
-                        color: context.mutedInkColor,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
             // The fields stay in the tree while collapsed so validators run.
             Visibility(

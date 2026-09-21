@@ -118,11 +118,13 @@ class NotebookSheetFrame extends StatelessWidget {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * maxHeightFactor,
         ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: context.paperColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
+        // A Material rather than a DecoratedBox: list tiles and ink
+        // splashes inside the sheet paint on the nearest Material, and a
+        // coloured box in between would hide them (Flutter asserts on it).
+        child: Material(
+          color: context.paperColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
             child: child,
@@ -248,6 +250,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               )
             else
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: _categories
@@ -300,6 +303,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                   SizedBox(
                     width: 105,
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _unit,
                       decoration: const InputDecoration(labelText: 'Unit'),
                       items: _units
@@ -611,6 +615,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
                   SizedBox(
                     width: 100,
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _unit,
                       decoration: const InputDecoration(labelText: 'Unit'),
                       items: _units
@@ -631,6 +636,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
               )
             else
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: _categories

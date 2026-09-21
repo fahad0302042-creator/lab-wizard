@@ -188,24 +188,36 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        Row(
+        Wrap(
+          spacing: 20,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Icon(Icons.science_outlined, size: 19),
-            const SizedBox(width: 4),
-            NotebookFilterWord(
-              label: 'chemicals',
-              selected: _kind == ItemKind.chemical,
-              onTap: () => setState(() => _kind = ItemKind.chemical),
-              fontSize: 21,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.science_outlined, size: 19),
+                const SizedBox(width: 4),
+                NotebookFilterWord(
+                  label: 'chemicals',
+                  selected: _kind == ItemKind.chemical,
+                  onTap: () => setState(() => _kind = ItemKind.chemical),
+                  fontSize: 21,
+                ),
+              ],
             ),
-            const SizedBox(width: 20),
-            const Icon(Icons.precision_manufacturing_outlined, size: 19),
-            const SizedBox(width: 4),
-            NotebookFilterWord(
-              label: 'apparatus',
-              selected: _kind == ItemKind.apparatus,
-              onTap: () => setState(() => _kind = ItemKind.apparatus),
-              fontSize: 21,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.precision_manufacturing_outlined, size: 19),
+                const SizedBox(width: 4),
+                NotebookFilterWord(
+                  label: 'apparatus',
+                  selected: _kind == ItemKind.apparatus,
+                  onTap: () => setState(() => _kind = ItemKind.apparatus),
+                  fontSize: 21,
+                ),
+              ],
             ),
           ],
         ),

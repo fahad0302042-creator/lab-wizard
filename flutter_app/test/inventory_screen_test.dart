@@ -171,9 +171,15 @@ void main() {
 
       await tester.tap(find.byKey(const Key('alpha-Z')));
       await tester.pumpAndSettle();
+      // The last row cannot be aligned with the top of a short list: the
+      // shelf scrolls as far as it can and the row is on screen.
       final listTop = tester.getTopLeft(find.byType(CustomScrollView)).dy;
+      final listBottom = tester.getBottomLeft(find.byType(CustomScrollView)).dy;
       final zincTop = tester.getTopLeft(find.text('Zinc sulfate')).dy;
-      expect(zincTop - listTop, lessThan(60));
+      expect(zincTop, greaterThanOrEqualTo(listTop));
+      expect(zincTop, lessThan(listBottom));
+      final position = _listPosition(tester);
+      expect(position.pixels, closeTo(position.maxScrollExtent, 1));
 
       await tester.enterText(find.byType(TextField), 'chlor');
       await tester.pumpAndSettle();

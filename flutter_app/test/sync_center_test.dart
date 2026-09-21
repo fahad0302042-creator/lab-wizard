@@ -47,6 +47,10 @@ void main() {
   testWidgets('SYNC-01: sync center lists, retries and discards changes', (
     tester,
   ) async {
+    // A tall phone so every queued change is built (the list is lazy).
+    tester.view.physicalSize = const Size(420, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final now = DateTime.now();
     final seed = InventoryState(
       lastSyncedAt: now.subtract(const Duration(minutes: 10)),

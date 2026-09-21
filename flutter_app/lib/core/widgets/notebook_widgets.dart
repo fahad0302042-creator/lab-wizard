@@ -603,6 +603,71 @@ class NotebookFilterWord extends StatelessWidget {
   }
 }
 
+/// Header of a collapsible "more details" block: chevron, title and a short
+/// summary. Title and summary share one paragraph so the summary simply
+/// wraps under the title on narrow screens or with large text instead of
+/// pushing the row past its edge.
+class DetailsToggle extends StatelessWidget {
+  const DetailsToggle({
+    required this.expanded,
+    required this.summary,
+    required this.onTap,
+    this.title = 'more details',
+    super.key,
+  });
+
+  final bool expanded;
+  final String summary;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              expanded ? Icons.expand_less : Icons.expand_more,
+              color: context.mutedInkColor,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: title,
+                      style: TextStyle(
+                        fontFamily: 'Caveat',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: context.inkColor,
+                      ),
+                    ),
+                    const TextSpan(text: '   '),
+                    TextSpan(
+                      text: summary,
+                      style: TextStyle(
+                        color: context.mutedInkColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class CircledNotebookButton extends StatelessWidget {
   const CircledNotebookButton({
     required this.label,

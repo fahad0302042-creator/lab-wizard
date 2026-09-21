@@ -76,7 +76,7 @@ class _LabelSheetDialogState extends State<_LabelSheetDialog> {
                       key: Key('label-layout-${layout.name}'),
                       value: layout,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(layout.name),
+                      title: Text(layout.title),
                       subtitle: Text(layout.hint),
                     ),
                 ],

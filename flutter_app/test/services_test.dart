@@ -257,7 +257,8 @@ void main() {
       expect(find.textContaining('due in 40 days'), findsOneWidget);
       expect(find.byKey(const Key('service-past-s3')), findsOneWidget);
       expect(find.text('Maintenance · pass'), findsOneWidget);
-      expect(find.textContaining('by Sara'), findsOneWidget);
+      // Once in the service history, once in the apparatus timeline (GEAR-04).
+      expect(find.textContaining('by Sara'), findsAtLeastNWidgets(1));
       expect(find.byKey(const Key('service-empty')), findsNothing);
     });
 

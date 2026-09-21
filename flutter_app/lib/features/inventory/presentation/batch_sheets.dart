@@ -410,7 +410,9 @@ class _BatchRestockFormState extends ConsumerState<_BatchRestockForm> {
     });
     if (outcome.hasFailures) return;
     HapticFeedback.mediumImpact();
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = ScaffoldMessenger.of(context)
+      // A stale "check the amounts" note must not delay the result.
+      ..clearSnackBars();
     Navigator.pop(context);
     messenger.showSnackBar(
       SnackBar(
@@ -672,7 +674,9 @@ class _BatchThresholdFormState extends ConsumerState<_BatchThresholdForm> {
     });
     if (outcome.hasFailures) return;
     HapticFeedback.mediumImpact();
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = ScaffoldMessenger.of(context)
+      // A stale "check the amounts" note must not delay the result.
+      ..clearSnackBars();
     Navigator.pop(context);
     messenger.showSnackBar(
       SnackBar(
@@ -806,6 +810,7 @@ class _BatchFieldFormState extends ConsumerState<_BatchFieldForm> {
             ],
           ] else
             DropdownButtonFormField<String>(
+              isExpanded: true,
               key: const Key('batch-field-category'),
               initialValue: _category,
               decoration: const InputDecoration(labelText: 'new category'),
@@ -920,7 +925,9 @@ class _BatchFieldFormState extends ConsumerState<_BatchFieldForm> {
     });
     if (outcome.hasFailures) return;
     HapticFeedback.mediumImpact();
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = ScaffoldMessenger.of(context)
+      // A stale "check the amounts" note must not delay the result.
+      ..clearSnackBars();
     Navigator.pop(context);
     messenger.showSnackBar(
       SnackBar(
@@ -1156,7 +1163,9 @@ class _BatchDeleteFormState extends ConsumerState<_BatchDeleteForm> {
     });
     if (outcome.hasFailures) return;
     HapticFeedback.mediumImpact();
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = ScaffoldMessenger.of(context)
+      // A stale "check the amounts" note must not delay the result.
+      ..clearSnackBars();
     Navigator.pop(context);
     messenger.showSnackBar(
       SnackBar(

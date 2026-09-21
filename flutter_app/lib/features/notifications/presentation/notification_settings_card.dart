@@ -253,7 +253,12 @@ class NotificationSettingsCard extends ConsumerWidget {
               ],
             ),
           ),
-          Row(
+          // Wraps so the status note drops under the button on narrow
+          // screens and with large text instead of overflowing.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
             children: [
               TextButton.icon(
                 key: const Key('notify-test'),
@@ -263,7 +268,6 @@ class NotificationSettingsCard extends ConsumerWidget {
                 icon: const Icon(Icons.notifications_none, size: 18),
                 label: const Text('Send a test notification'),
               ),
-              const Spacer(),
               if (status.lastDispatchAt != null)
                 Text(
                   '${status.scheduledCount} scheduled · '

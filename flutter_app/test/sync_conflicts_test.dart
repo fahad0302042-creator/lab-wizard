@@ -792,6 +792,10 @@ void main() {
     testWidgets('conflicts explain themselves and offer decisions', (
       tester,
     ) async {
+      // A tall phone so all three conflict cards are built (the list is lazy).
+      tester.view.physicalSize = const Size(420, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final now = DateTime.now();
       final seed = InventoryState(
         outbox: [

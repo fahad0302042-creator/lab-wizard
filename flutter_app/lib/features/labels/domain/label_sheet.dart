@@ -6,20 +6,23 @@ import 'label_spec.dart';
 /// Grid options for an A4 sheet of labels (QR-01/QR-02). The 40-per-page
 /// grid is the one the web app prints; the larger grids suit equipment.
 enum LabelSheetLayout {
-  small(columns: 5, rows: 8, name: '40 per page', hint: 'about 38 × 35 mm'),
-  medium(columns: 4, rows: 6, name: '24 per page', hint: 'about 48 × 46 mm'),
-  large(columns: 3, rows: 4, name: '12 per page', hint: 'about 63 × 69 mm');
+  small(columns: 5, rows: 8, title: '40 per page', hint: 'about 38 × 35 mm'),
+  medium(columns: 4, rows: 6, title: '24 per page', hint: 'about 48 × 46 mm'),
+  large(columns: 3, rows: 4, title: '12 per page', hint: 'about 63 × 69 mm');
 
   const LabelSheetLayout({
     required this.columns,
     required this.rows,
-    required this.name,
+    required this.title,
     required this.hint,
   });
 
   final int columns;
   final int rows;
-  final String name;
+
+  /// Human label; deliberately not called `name`, which is the enum
+  /// identifier (`small` / `medium` / `large`) used in widget keys.
+  final String title;
   final String hint;
 
   int get perPage => columns * rows;
