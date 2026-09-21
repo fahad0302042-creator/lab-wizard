@@ -12,6 +12,7 @@ import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
+import '../domain/report_range.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -21,25 +22,50 @@ class ReportsScreen extends ConsumerStatefulWidget {
 }
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  ReportRange _range = ReportRange.month(
+    DateTime.now().year,
+    DateTime.now().month,
+  );
   ItemKind _kind = ItemKind.chemical;
   bool _exporting = false;
 
-  bool get _isCurrentMonth {
+  void _choose(ReportRangeKind kind) {
+    switch (kind) {
+      case ReportRangeKind.last7:
+        setState(() => _range = ReportRange.lastDays(7));
+      case ReportRangeKind.last30:
+        setState(() => _range = ReportRange.lastDays(30));
+      case ReportRangeKind.month:
+        final now = DateTime.now();
+        setState(() => _range = ReportRange.month(now.year, now.month));
+      case ReportRangeKind.custom:
+        _pickCustomRange();
+    }
+  }
+
+  Future<void> _pickCustomRange() async {
     final now = DateTime.now();
-    return _month.year == now.year && _month.month == now.month;
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: today,
+      initialDateRange: DateTimeRange(
+        start: _range.start.isAfter(today) ? today : _range.start,
+        end: _range.end.isAfter(today) ? today : _range.end,
+      ),
+      helpText: 'Report range (inclusive)',
+      saveText: 'Use range',
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _range = ReportRange.custom(picked.start, picked.end));
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inventoryProvider);
     final logs = state.logs
-        .where(
-          (log) =>
-              log.itemType == _kind &&
-              log.loggedAt.toLocal().year == _month.year &&
-              log.loggedAt.toLocal().month == _month.month,
-        )
+        .where((log) => log.itemType == _kind && _range.contains(log.loggedAt))
         .toList();
     final consumed = logs
         .where((log) => log.action == InventoryAction.consume)
@@ -64,40 +90,81 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
       children: [
-        const PageHeading('monthly report'),
+        const PageHeading('report'),
         const SizedBox(height: 2),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            for (final kind in ReportRangeKind.values)
+              ChoiceChip(
+                key: Key('report-range-${kind.name}'),
+                label: Text(kind.label),
+                selected: _range.kind == kind,
+                onSelected: (_) => _choose(kind),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
         NotebookCard(
           tape: NotebookTape.yellow,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
             children: [
-              IconButton(
-                tooltip: 'Previous month',
-                onPressed: () => setState(
-                  () => _month = DateTime(_month.year, _month.month - 1),
-                ),
-                icon: const Icon(Icons.chevron_left),
-              ),
+              if (_range.kind == ReportRangeKind.month)
+                IconButton(
+                  tooltip: 'Previous month',
+                  onPressed: () => setState(() => _range = _range.previous),
+                  icon: const Icon(Icons.chevron_left),
+                )
+              else
+                const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  DateFormat('MMMM yyyy').format(_month),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Caveat',
-                    fontSize: 23,
-                    fontWeight: FontWeight.w700,
+                child: Semantics(
+                  button: true,
+                  label: 'Report range ${_range.label}, ${_range.dates}',
+                  child: InkWell(
+                    key: const Key('report-range-label'),
+                    onTap: _pickCustomRange,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(
+                        children: [
+                          Text(
+                            _range.label,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Caveat',
+                              fontSize: 23,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '${_range.dates} · ${_range.dayCount} '
+                            'day${_range.dayCount == 1 ? '' : 's'}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: context.mutedInkColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-              IconButton(
-                tooltip: 'Next month',
-                onPressed: _isCurrentMonth
-                    ? null
-                    : () => setState(
-                        () => _month = DateTime(_month.year, _month.month + 1),
-                      ),
-                icon: const Icon(Icons.chevron_right),
-              ),
+              if (_range.kind == ReportRangeKind.month)
+                IconButton(
+                  tooltip: 'Next month',
+                  onPressed: _range.isCurrentMonth()
+                      ? null
+                      : () => setState(() => _range = _range.nextMonth!),
+                  icon: const Icon(Icons.chevron_right),
+                )
+              else
+                const SizedBox(width: 12),
             ],
           ),
         ),
@@ -196,10 +263,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        const PageHeading('activity by day'),
-        NotebookCard(
-          child: _MonthChart(month: _month, logs: logs),
-        ),
+        PageHeading(_range.dayCount > 62 ? 'activity by week' : 'activity by day'),
+        NotebookCard(child: _ActivityChart(range: _range, logs: logs)),
         if (topUsage.isNotEmpty) ...[
           const SizedBox(height: 24),
           PageHeading(
@@ -239,8 +304,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         if (logs.isEmpty)
           const EmptyNotebookState(
             icon: Icons.query_stats,
-            title: 'no activity this month',
-            message: 'Choose another month or start logging inventory actions.',
+            title: 'no activity in this range',
+            message: 'Choose another range or start logging inventory actions.',
           )
         else
           ...logs.asMap().entries.map(
@@ -262,7 +327,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       final bytes = await _buildPdf(state, logs);
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'lab-wizard-${DateFormat('yyyy-MM').format(_month)}.pdf',
+        filename: 'lab-wizard-${_kind.name}-${_range.fileStem}.pdf',
       );
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -274,7 +339,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     List<ConsumptionLog> logs,
   ) async {
     final document = pw.Document(
-      title: 'Lab Wizard ${DateFormat('MMMM yyyy').format(_month)} report',
+      title: 'Lab Wizard report ${_range.dates}',
       author: 'Lab Wizard',
     );
     document.addPage(
@@ -287,7 +352,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             style: pw.TextStyle(fontSize: 26, fontWeight: pw.FontWeight.bold),
           ),
           pw.Text(
-            '${_kind == ItemKind.chemical ? 'Chemical' : 'Apparatus'} report — ${DateFormat('MMMM yyyy').format(_month)}',
+            '${_kind == ItemKind.chemical ? 'Chemical' : 'Apparatus'} report — '
+            '${_range.label} (${_range.dates})',
           ),
           pw.SizedBox(height: 20),
           pw.TableHelper.fromTextArray(
@@ -295,7 +361,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             data: logs
                 .map(
                   (log) => [
-                    DateFormat('dd MMM').format(log.loggedAt.toLocal()),
+                    DateFormat('dd MMM yyyy').format(log.loggedAt.toLocal()),
                     _itemName(state, log),
                     log.action.name,
                     formatQuantity(log.amount),
@@ -445,26 +511,23 @@ class _ReportMetric extends StatelessWidget {
   }
 }
 
-class _MonthChart extends StatelessWidget {
-  const _MonthChart({required this.month, required this.logs});
+class _ActivityChart extends StatelessWidget {
+  const _ActivityChart({required this.range, required this.logs});
 
-  final DateTime month;
+  final ReportRange range;
   final List<ConsumptionLog> logs;
 
   @override
   Widget build(BuildContext context) {
-    final days = DateUtils.getDaysInMonth(month.year, month.month);
-    final groups = <int, int>{};
-    for (final log in logs) {
-      groups.update(
-        log.loggedAt.toLocal().day,
-        (value) => value + 1,
-        ifAbsent: () => 1,
-      );
-    }
-    final maxY = groups.values
-        .fold<int>(1, (max, value) => value > max ? value : max)
+    final buckets = bucketize(range, logs.map((log) => log.loggedAt));
+    final maxY = buckets
+        .fold<int>(1, (max, bucket) => bucket.count > max ? bucket.count : max)
         .toDouble();
+    final interval = buckets.length <= 10
+        ? 1
+        : buckets.length <= 31
+        ? 5
+        : (buckets.length / 6).ceil();
     return SizedBox(
       height: 180,
       child: BarChart(
@@ -473,7 +536,23 @@ class _MonthChart extends StatelessWidget {
           alignment: BarChartAlignment.spaceAround,
           borderData: FlBorderData(show: false),
           gridData: const FlGridData(show: false),
-          barTouchData: BarTouchData(enabled: true),
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipItem: (group, _, rod, _) {
+                final bucket = buckets[group.x];
+                final when = bucket.isSingleDay
+                    ? DateFormat('d MMM').format(bucket.start)
+                    : '${DateFormat('d MMM').format(bucket.start)} – '
+                          '${DateFormat('d MMM').format(bucket.end)}';
+                return BarTooltipItem(
+                  '$when\n${rod.toY.toInt()} '
+                  'action${rod.toY.toInt() == 1 ? '' : 's'}',
+                  const TextStyle(color: Colors.white, fontSize: 11),
+                );
+              },
+            ),
+          ),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(),
             rightTitles: const AxisTitles(),
@@ -482,30 +561,37 @@ class _MonthChart extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 24,
-                interval: 5,
-                getTitlesWidget: (value, _) => Text(
-                  value.toInt() == 0 ? '' : '${value.toInt()}',
-                  style: const TextStyle(fontSize: 9),
-                ),
+                interval: 1,
+                getTitlesWidget: (value, _) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= buckets.length) {
+                    return const SizedBox.shrink();
+                  }
+                  if (index % interval != 0) return const SizedBox.shrink();
+                  return Text(
+                    buckets[index].label,
+                    style: const TextStyle(fontSize: 9),
+                  );
+                },
               ),
             ),
           ),
-          barGroups: List.generate(days, (index) {
-            final day = index + 1;
-            return BarChartGroupData(
-              x: day,
-              barRods: [
-                BarChartRodData(
-                  toY: (groups[day] ?? 0).toDouble(),
-                  width: 5,
-                  color: LabColors.marginRed,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(4),
+          barGroups: [
+            for (var index = 0; index < buckets.length; index++)
+              BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: buckets[index].count.toDouble(),
+                    width: buckets.length > 31 ? 8 : 5,
+                    color: LabColors.marginRed,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(4),
+                    ),
                   ),
-                ),
-              ],
-            );
-          }),
+                ],
+              ),
+          ],
         ),
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
