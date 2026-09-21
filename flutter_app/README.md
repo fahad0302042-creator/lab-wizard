@@ -102,6 +102,10 @@ Run `supabase/008_external_barcodes.sql` once: it adds a nullable `barcode` colu
 
 The report page is no longer tied to a calendar month. Chips switch between *7 days*, *30 days*, *month* (with the previous/next arrows) and *custom*; tapping the range itself opens a date-range picker. A range is a run of inclusive local calendar days: a log stamped 23:59 on the last day is in, one stamped 00:00 the day after is out, whatever zone the entry was written in, and day arithmetic is done on dates rather than 24-hour spans so daylight-saving days do not shift anything. The card shows the label, the exact dates and the day count; the activity chart shows one bar per day up to 62 days and one per week beyond that (tap a bar for the exact period); the PDF file name and title carry the range.
 
+## Trends (REPORT-02)
+
+The three metric cards count usage actions, restocks and damage separately and, under the count, sum the quantities per unit — *350 mL · 20 g* — so grams and millilitres are never added together (apparatus is always pieces). Each card compares its count with the period of equal length just before the selected one (the previous calendar month for month ranges): *+50% vs before* with an arrow coloured good-or-bad for that action, *none before* when the earlier period had nothing (no percentage against zero), and a note under the cards names the exact comparison dates.
+
 ## Selecting several items (BATCH-01/02/03/04, QR-01)
 
 Long-press any card or row (or use the shelf menu → *select items…*) to enter selection mode. The bar at the bottom offers a batch restock with a separate amount and history entry per item, a batch low-stock threshold with an old → new preview, a batch storage location (chemicals) or category (apparatus) with the same preview — the field is decided by the shelf, so nothing is ever written to an item type that lacks it — QR labels for just the selected items (see *QR labels* above), and a guarded delete: unsynced items and offline devices are blocked, deleting five or more items requires typing `DELETE`, and every batch reports the rows that failed so they can be retried on their own.

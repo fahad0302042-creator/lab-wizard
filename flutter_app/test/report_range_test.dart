@@ -210,11 +210,29 @@ void main() {
       expect(find.text('last 7 days'), findsOneWidget);
       expect(find.byTooltip('Previous month'), findsNothing);
       expect(find.text('consume'), findsNWidgets(2));
+      // REPORT-02: quantities per unit and the change against the week before.
+      final usage = find.byKey(const Key('metric-consume'));
+      expect(
+        find.descendant(of: usage, matching: find.text('10 mL')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: usage, matching: find.text('none before')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('trend-note')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('report-range-last30')));
       await tester.pumpAndSettle();
       expect(find.text('last 30 days'), findsOneWidget);
       expect(find.text('consume'), findsNWidgets(3));
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('metric-consume')),
+          matching: find.text('+200% vs before'),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('report-range-month')));
       await tester.pumpAndSettle();

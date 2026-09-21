@@ -13,6 +13,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../domain/report_range.dart';
+import '../domain/report_stats.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -67,15 +68,18 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final logs = state.logs
         .where((log) => log.itemType == _kind && _range.contains(log.loggedAt))
         .toList();
-    final consumed = logs
-        .where((log) => log.action == InventoryAction.consume)
-        .length;
-    final restocked = logs
-        .where((log) => log.action == InventoryAction.restock)
-        .length;
-    final broken = logs
-        .where((log) => log.action == InventoryAction.breakage)
-        .length;
+    // REPORT-02: counts and unit-aware quantities next to the previous period.
+    final trend = TrendComparison.compute(
+      _range,
+      state.logs,
+      kind: _kind,
+      unitOf: (itemId) =>
+          state.chemicals
+              .where((item) => item.id == itemId)
+              .map((item) => item.unit)
+              .firstOrNull ??
+          '',
+    );
     final itemStates = _kind == ItemKind.chemical
         ? state.chemicals.map((item) => item.stockState).toList()
         : state.apparatus.map((item) => item.stockState).toList();
@@ -192,31 +196,46 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ),
         const SizedBox(height: 18),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: _ReportMetric(
+                key: const Key('metric-consume'),
                 label: 'usage actions',
-                value: consumed,
+                action: InventoryAction.consume,
+                trend: trend,
                 color: LabColors.amber,
               ),
             ),
             const SizedBox(width: 9),
             Expanded(
               child: _ReportMetric(
+                key: const Key('metric-restock'),
                 label: 'restocks',
-                value: restocked,
+                action: InventoryAction.restock,
+                trend: trend,
                 color: LabColors.green,
               ),
             ),
             const SizedBox(width: 9),
             Expanded(
               child: _ReportMetric(
+                key: const Key('metric-breakage'),
                 label: 'damage',
-                value: broken,
+                action: InventoryAction.breakage,
+                trend: trend,
                 color: LabColors.marginRed,
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Change is against the ${trend.previousLabel} '
+          '(${trend.previous.range.dates}); quantities are summed per unit '
+          'and never mixed.',
+          key: const Key('trend-note'),
+          style: TextStyle(color: context.mutedInkColor, fontSize: 12),
         ),
         const SizedBox(height: 24),
         const PageHeading('stock health'),
@@ -481,35 +500,95 @@ class _TopUsageRow extends StatelessWidget {
 class _ReportMetric extends StatelessWidget {
   const _ReportMetric({
     required this.label,
-    required this.value,
+    required this.action,
+    required this.trend,
     required this.color,
+    super.key,
   });
 
   final String label;
-  final int value;
+  final InventoryAction action;
+  final TrendComparison trend;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return NotebookCard(
-      accent: color,
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AnimatedQuantity(
-            value.toDouble(),
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              color: color,
+    final totals = trend.current.of(action);
+    final change = trend.countChange(action);
+    final quantities = totals.quantityLabel;
+    final muted = context.mutedInkColor;
+    final IconData? arrow = change == null || change == 0
+        ? null
+        : change > 0
+        ? Icons.arrow_upward
+        : Icons.arrow_downward;
+    return Semantics(
+      label:
+          '$label: ${totals.count}'
+          '${quantities.isEmpty ? '' : ', $quantities'}, '
+          '${trend.describe(action)}',
+      child: NotebookCard(
+        accent: color,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedQuantity(
+              totals.count.toDouble(),
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
             ),
-          ),
-          Text(
-            label,
-            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-          ),
-        ],
+            Text(label, style: TextStyle(color: muted, fontSize: 12)),
+            if (quantities.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  quantities,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  if (arrow != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 2),
+                      child: Icon(
+                        arrow,
+                        size: 12,
+                        // More restocking is good news; more usage or
+                        // damage is flagged.
+                        color:
+                            (change! > 0) ==
+                                (action == InventoryAction.restock)
+                            ? context.healthyColor
+                            : context.marginRedColor,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      change == null
+                          ? trend.previous.of(action).count == 0 &&
+                                    totals.count == 0
+                                ? 'none in either period'
+                                : 'none before'
+                          : '${formatChange(change)} vs before',
+                      maxLines: 2,
+                      style: TextStyle(color: muted, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
