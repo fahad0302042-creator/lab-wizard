@@ -12,6 +12,7 @@ class InventorySnapshot {
     required this.outbox,
     required this.fromCache,
     this.reversals = const [],
+    this.checkouts = const [],
     this.lastSyncedAt,
   });
 
@@ -22,6 +23,9 @@ class InventorySnapshot {
 
   /// Undone actions, newest first (UX-04).
   final List<InventoryReversal> reversals;
+
+  /// Apparatus loans, newest first (GEAR-02).
+  final List<ApparatusCheckout> checkouts;
   final bool fromCache;
   final DateTime? lastSyncedAt;
 
@@ -38,6 +42,11 @@ class InventoryRepository {
   bool? _atomicRpcAvailable;
   bool? _undoRpcAvailable;
   bool? _reversalsTableAvailable;
+  bool? _checkoutsTableAvailable;
+
+  /// Whether the last server round-trip found the `apparatus_checkouts`
+  /// table (null until the first refresh).
+  bool? get checkoutsAvailable => _checkoutsTableAvailable;
 
   Future<InventorySnapshot> loadCached(String userId) async {
     final results = await Future.wait<dynamic>([
@@ -47,6 +56,7 @@ class InventoryRepository {
       local.pendingOperations(userId),
       lastSyncedAt(userId),
       local.loadRecords(userId, 'reversal'),
+      local.loadRecords(userId, 'checkout'),
     ]);
     return InventorySnapshot(
       chemicals: (results[0] as List<Map<String, dynamic>>)
@@ -66,12 +76,23 @@ class InventoryRepository {
           InventoryReversal.fromMap,
         ),
       ),
+      checkouts: _sortedCheckouts(
+        (results[6] as List<Map<String, dynamic>>).map(
+          ApparatusCheckout.fromMap,
+        ),
+      ),
     );
   }
 
   static List<InventoryReversal> _sortedReversals(
     Iterable<InventoryReversal> reversals,
   ) => reversals.toList()..sort((a, b) => b.reversedAt.compareTo(a.reversedAt));
+
+  static List<ApparatusCheckout> _sortedCheckouts(
+    Iterable<ApparatusCheckout> checkouts,
+  ) =>
+      checkouts.toList()
+        ..sort((a, b) => b.checkedOutAt.compareTo(a.checkedOutAt));
 
   Future<DateTime?> lastSyncedAt(String userId) async => DateTime.tryParse(
     await local.getMeta(userId, LocalDatabase.lastSyncKey) ?? '',
@@ -100,6 +121,7 @@ class InventoryRepository {
       local.replaceRecords(userId, 'log', logMaps),
     ]);
     final reversalMaps = await _refreshReversals(userId, client);
+    final checkoutMaps = await _refreshCheckouts(userId, client);
     final syncedAt = DateTime.now();
     await local.setMeta(
       userId,
@@ -115,7 +137,46 @@ class InventoryRepository {
       fromCache: false,
       lastSyncedAt: syncedAt,
       reversals: _sortedReversals(reversalMaps.map(InventoryReversal.fromMap)),
+      checkouts: _sortedCheckouts(checkoutMaps.map(ApparatusCheckout.fromMap)),
     );
+  }
+
+  /// Downloads loans when the additive `apparatus_checkouts` table is
+  /// installed (GEAR-02). Rows that are still queued on this device are kept
+  /// so an offline checkout does not vanish from the screen after a refresh.
+  Future<List<Map<String, dynamic>>> _refreshCheckouts(
+    String userId,
+    SupabaseClient client,
+  ) async {
+    if (_checkoutsTableAvailable != false) {
+      try {
+        final rows = _mapList(
+          await client
+              .from('apparatus_checkouts')
+              .select()
+              .order('checked_out_at', ascending: false),
+        );
+        _checkoutsTableAvailable = true;
+        final queuedIds = <String>{
+          for (final operation in await local.pendingOperations(userId))
+            if (operation.type == 'checkout_apparatus')
+              operation.payload['id'] as String,
+        };
+        final serverIds = rows.map((row) => row['id']).toSet();
+        final queued = (await local.loadRecords(userId, 'checkout')).where(
+          (record) =>
+              queuedIds.contains(record['id']) &&
+              !serverIds.contains(record['id']),
+        );
+        final merged = [...rows, ...queued];
+        await local.replaceRecords(userId, 'checkout', merged);
+        return merged;
+      } on PostgrestException catch (error) {
+        if (!_isMissingRelation(error)) rethrow;
+        _checkoutsTableAvailable = false;
+      }
+    }
+    return local.loadRecords(userId, 'checkout');
   }
 
   /// Downloads undo records when the additive `inventory_reversals` table is
@@ -700,6 +761,145 @@ class InventoryRepository {
     return {'item': updated, 'reversal': reversal.toMap(), 'duplicate': false};
   }
 
+  /// Lends [quantity] pieces of an apparatus (GEAR-02). Works offline: the
+  /// loan is cached and queued as `checkout_apparatus`.
+  Future<ApparatusCheckout> checkoutApparatus({
+    required String userId,
+    required String apparatusId,
+    required double quantity,
+    required String person,
+    required String note,
+    DateTime? dueAt,
+    String? itemName,
+  }) async {
+    final now = DateTime.now();
+    final checkout = ApparatusCheckout(
+      id: _uuid.v4(),
+      apparatusId: apparatusId,
+      quantity: quantity,
+      person: person.trim(),
+      note: note.trim(),
+      checkedOutAt: now,
+      dueAt: dueAt,
+      operationId: _uuid.v4(),
+    );
+    final payload = {...checkout.toMap(), 'user_id': userId};
+    try {
+      if (remote == null) throw const _OfflineException();
+      final data = await remote!
+          .from('apparatus_checkouts')
+          .insert(payload)
+          .select()
+          .single();
+      final saved = ApparatusCheckout.fromMap(data);
+      _checkoutsTableAvailable = true;
+      await local.upsertRecord(userId, 'checkout', saved.toMap());
+      return saved;
+    } on PostgrestException catch (error) {
+      if (_isMissingRelation(error)) {
+        _checkoutsTableAvailable = false;
+        throw StateError(checkoutsMigrationHint);
+      }
+      rethrow;
+    } catch (error) {
+      if (error is _OfflineException || _isConnectivityError(error)) {
+        await local.upsertRecord(userId, 'checkout', checkout.toMap());
+        await local.enqueue(
+          PendingOperation(
+            id: _uuid.v4(),
+            userId: userId,
+            type: 'checkout_apparatus',
+            payload: payload,
+            createdAt: now,
+            label:
+                'Check out ${itemName ?? 'apparatus'} to ${checkout.person}'
+                    .trim(),
+          ),
+        );
+        return checkout;
+      }
+      rethrow;
+    }
+  }
+
+  /// Returns [quantity] pieces of a loan. The loan closes when everything is
+  /// back. Works offline through the `return_apparatus` queue entry.
+  Future<ApparatusCheckout> returnApparatus({
+    required String userId,
+    required ApparatusCheckout checkout,
+    required double quantity,
+    required String note,
+    String? itemName,
+  }) async {
+    final now = DateTime.now();
+    final returned = (checkout.returnedQuantity + quantity) > checkout.quantity
+        ? checkout.quantity
+        : checkout.returnedQuantity + quantity;
+    final complete = returned >= checkout.quantity;
+    final combinedNote = [
+      if (checkout.returnNote.isNotEmpty) checkout.returnNote,
+      if (note.trim().isNotEmpty) note.trim(),
+    ].join(' · ');
+    final changes = <String, dynamic>{
+      'returned_quantity': returned,
+      'returned_at': complete ? now.toUtc().toIso8601String() : null,
+      'return_note': combinedNote,
+    };
+    final updated = checkout.copyWith(
+      returnedQuantity: returned,
+      returnNote: combinedNote,
+      returnedAt: complete ? now : null,
+      clearReturnedAt: !complete,
+    );
+    try {
+      if (remote == null) throw const _OfflineException();
+      final data = await remote!
+          .from('apparatus_checkouts')
+          .update(changes)
+          .eq('id', checkout.id)
+          .select()
+          .single();
+      final saved = ApparatusCheckout.fromMap(data);
+      await local.upsertRecord(userId, 'checkout', saved.toMap());
+      return saved;
+    } on PostgrestException catch (error) {
+      if (_isMissingRelation(error)) {
+        _checkoutsTableAvailable = false;
+        throw StateError(checkoutsMigrationHint);
+      }
+      rethrow;
+    } catch (error) {
+      if (error is _OfflineException || _isConnectivityError(error)) {
+        await local.upsertRecord(userId, 'checkout', updated.toMap());
+        await local.enqueue(
+          PendingOperation(
+            id: _uuid.v4(),
+            userId: userId,
+            type: 'return_apparatus',
+            payload: {
+              'id': checkout.id,
+              'apparatus_id': checkout.apparatusId,
+              'changes': changes,
+              'previous': {
+                'returned_quantity': checkout.returnedQuantity,
+                'returned_at': checkout.returnedAt
+                    ?.toUtc()
+                    .toIso8601String(),
+                'return_note': checkout.returnNote,
+              },
+            },
+            createdAt: now,
+            label:
+                'Return ${formatQuantity(quantity)} × '
+                '${itemName ?? 'apparatus'}',
+          ),
+        );
+        return updated;
+      }
+      rethrow;
+    }
+  }
+
   Future<void> deleteItem({
     required String userId,
     required ItemKind type,
@@ -725,6 +925,11 @@ class InventoryRepository {
       userId,
       'reversal',
       (record) => record['item_id'] == id,
+    );
+    await local.deleteRecordsWhere(
+      userId,
+      'checkout',
+      (record) => record['apparatus_id'] == id,
     );
   }
 
@@ -791,6 +996,15 @@ class InventoryRepository {
               Map<String, dynamic>.from(operation.payload['changes'] as Map),
             )
             .eq('id', operation.payload['id']);
+      case 'checkout_apparatus':
+        await remote!.from('apparatus_checkouts').upsert(operation.payload);
+      case 'return_apparatus':
+        await remote!
+            .from('apparatus_checkouts')
+            .update(
+              Map<String, dynamic>.from(operation.payload['changes'] as Map),
+            )
+            .eq('id', operation.payload['id']);
       default:
         throw StateError('Unknown operation ${operation.type}');
     }
@@ -818,6 +1032,11 @@ class InventoryRepository {
           userId,
           'log',
           (record) => record['item_id'] == id,
+        );
+        await local.deleteRecordsWhere(
+          userId,
+          'checkout',
+          (record) => record['apparatus_id'] == id,
         );
         // Changes to an item that never reached the server can never apply.
         for (final other in await local.pendingOperations(userId)) {
@@ -883,6 +1102,30 @@ class InventoryRepository {
             });
           }
         }
+      case 'checkout_apparatus':
+        await local.deleteRecord(userId, 'checkout', payload['id'] as String);
+        // A return queued for a loan that never reached the server is moot.
+        for (final other in await local.pendingOperations(userId)) {
+          if (other.id != operation.id &&
+              other.type == 'return_apparatus' &&
+              other.payload['id'] == payload['id']) {
+            await local.completeOperation(other.id);
+          }
+        }
+      case 'return_apparatus':
+        final previous = payload['previous'];
+        if (previous is Map) {
+          final rows = await local.loadRecords(userId, 'checkout');
+          final current = rows
+              .where((row) => row['id'] == payload['id'])
+              .firstOrNull;
+          if (current != null) {
+            await local.upsertRecord(userId, 'checkout', {
+              ...current,
+              ...Map<String, dynamic>.from(previous),
+            });
+          }
+        }
       default:
         break;
     }
@@ -929,6 +1172,12 @@ class InventoryRepository {
         message.contains('clientexception');
   }
 }
+
+/// Shown when the `apparatus_checkouts` table has not been created yet.
+const checkoutsMigrationHint =
+    'Checkouts need the database update in '
+    'flutter_app/supabase/005_apparatus_checkouts.sql. Run it, then try '
+    'again.';
 
 /// Outcome of [InventoryRepository.undoAction].
 class UndoResult {

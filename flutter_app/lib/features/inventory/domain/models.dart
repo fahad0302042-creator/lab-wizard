@@ -730,6 +730,102 @@ class InventoryReversal {
   };
 }
 
+/// A loan of one or more pieces of an apparatus to a person (GEAR-02).
+/// Stored in the additive `apparatus_checkouts` table.
+class ApparatusCheckout {
+  const ApparatusCheckout({
+    required this.id,
+    required this.apparatusId,
+    required this.quantity,
+    required this.checkedOutAt,
+    this.returnedQuantity = 0,
+    this.person = '',
+    this.note = '',
+    this.returnNote = '',
+    this.dueAt,
+    this.returnedAt,
+    this.operationId,
+  });
+
+  final String id;
+  final String apparatusId;
+  final double quantity;
+  final double returnedQuantity;
+  final String person;
+  final String note;
+  final String returnNote;
+  final DateTime checkedOutAt;
+  final DateTime? dueAt;
+  final DateTime? returnedAt;
+  final String? operationId;
+
+  /// Pieces still out.
+  double get outstanding {
+    final left = quantity - returnedQuantity;
+    return left < 0 ? 0 : left;
+  }
+
+  bool get isOpen => returnedAt == null && outstanding > 0;
+
+  bool isOverdue({DateTime? now}) =>
+      isOpen && dueAt != null && dueAt!.isBefore(now ?? DateTime.now());
+
+  ApparatusCheckout copyWith({
+    double? returnedQuantity,
+    String? returnNote,
+    DateTime? returnedAt,
+    bool clearReturnedAt = false,
+  }) => ApparatusCheckout(
+    id: id,
+    apparatusId: apparatusId,
+    quantity: quantity,
+    checkedOutAt: checkedOutAt,
+    returnedQuantity: returnedQuantity ?? this.returnedQuantity,
+    person: person,
+    note: note,
+    returnNote: returnNote ?? this.returnNote,
+    dueAt: dueAt,
+    returnedAt: clearReturnedAt ? null : (returnedAt ?? this.returnedAt),
+    operationId: operationId,
+  );
+
+  factory ApparatusCheckout.fromMap(Map<String, dynamic> map) =>
+      ApparatusCheckout(
+        id: map['id'] as String,
+        apparatusId: map['apparatus_id'] as String,
+        quantity: _asDouble(map['quantity']),
+        returnedQuantity: _asDouble(map['returned_quantity']),
+        person: (map['person'] as String?) ?? '',
+        note: (map['note'] as String?) ?? '',
+        returnNote: (map['return_note'] as String?) ?? '',
+        checkedOutAt: _asLocalTime(map['checked_out_at']) ?? DateTime.now(),
+        dueAt: _asLocalTime(map['due_at']),
+        returnedAt: _asLocalTime(map['returned_at']),
+        operationId: map['operation_id'] as String?,
+      );
+
+  /// Timestamps travel as UTC ISO strings so the cache and Supabase agree.
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'apparatus_id': apparatusId,
+    'quantity': quantity,
+    'returned_quantity': returnedQuantity,
+    'person': person,
+    'note': note,
+    'return_note': returnNote,
+    'checked_out_at': checkedOutAt.toUtc().toIso8601String(),
+    'due_at': dueAt?.toUtc().toIso8601String(),
+    'returned_at': returnedAt?.toUtc().toIso8601String(),
+    'operation_id': operationId,
+  };
+
+  static DateTime? _asLocalTime(Object? value) {
+    if (value is DateTime) return value.toLocal();
+    if (value is! String || value.isEmpty) return null;
+    return DateTime.tryParse(value)?.toLocal();
+  }
+}
+
 /// Whether a queued change is still waiting for a connection or needs the
 /// user to look at it (SYNC-01).
 enum PendingStatus { pending, failed }
@@ -762,7 +858,9 @@ class PendingOperation {
   bool get isFailed => status == PendingStatus.failed;
 
   /// The inventory item this change belongs to, when it has one.
-  String? get itemId => (payload['item_id'] ?? payload['id']) as String?;
+  String? get itemId =>
+      (payload['item_id'] ?? payload['apparatus_id'] ?? payload['id'])
+          as String?;
 
   /// Human-readable summary shown in the sync center.
   String get description {
@@ -776,6 +874,9 @@ class PendingOperation {
         '${_capitalize(payload['action']?.toString() ?? 'change')} '
             '${formatQuantity(_asDouble(payload['amount']))}',
       'undo_action' => 'Undo a recorded change',
+      'checkout_apparatus' =>
+        'Check out apparatus to ${payload['person'] ?? ''}'.trim(),
+      'return_apparatus' => 'Return apparatus',
       _ => type.replaceAll('_', ' '),
     };
   }

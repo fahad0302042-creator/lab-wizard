@@ -382,6 +382,176 @@ void main() {
     });
   });
 
+  group('checkouts (GEAR-02)', () {
+    test('loans and returns queue offline and can be discarded', () async {
+      final local = openLocal('checkouts.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+
+      final item = await repository.addApparatus(
+        userId: 'u1',
+        name: 'Multimeter',
+        category: 'electronics',
+        quantity: 3,
+        threshold: 1,
+        notes: '',
+      );
+      final due = DateTime(2026, 10, 1, 23, 59);
+      final checkout = await repository.checkoutApparatus(
+        userId: 'u1',
+        apparatusId: item.id,
+        quantity: 2,
+        person: ' Aisha ',
+        note: 'lab 4',
+        dueAt: due,
+        itemName: item.name,
+      );
+      expect(checkout.person, 'Aisha');
+      expect(checkout.isOpen, isTrue);
+      expect(checkout.outstanding, 2);
+      expect(checkout.isOverdue(now: DateTime(2026, 9, 21)), isFalse);
+      expect(checkout.isOverdue(now: DateTime(2026, 10, 2)), isTrue);
+
+      var snapshot = await repository.loadCached('u1');
+      expect(snapshot.checkouts.single.id, checkout.id);
+      expect(snapshot.checkouts.single.dueAt, due);
+      expect(snapshot.outbox, hasLength(2));
+      final queued = snapshot.outbox.last;
+      expect(queued.type, 'checkout_apparatus');
+      expect(queued.description, 'Check out Multimeter to Aisha');
+      expect(queued.itemId, item.id);
+      expect(queued.payload['id'], checkout.id);
+      expect(queued.payload['user_id'], 'u1');
+      expect(queued.payload['operation_id'], isNotNull);
+      // Apparatus stock itself is untouched by a loan.
+      expect(snapshot.apparatus.single.quantity, 3);
+
+      // A partial return keeps the loan open.
+      final partial = await repository.returnApparatus(
+        userId: 'u1',
+        checkout: checkout,
+        quantity: 1,
+        note: 'one probe missing',
+        itemName: item.name,
+      );
+      expect(partial.isOpen, isTrue);
+      expect(partial.outstanding, 1);
+      expect(partial.returnedAt, isNull);
+      expect(partial.returnNote, 'one probe missing');
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.checkouts.single.returnedQuantity, 1);
+      expect(snapshot.outbox, hasLength(3));
+      expect(snapshot.outbox.last.type, 'return_apparatus');
+      expect(snapshot.outbox.last.description, 'Return 1 × Multimeter');
+      expect(snapshot.outbox.last.payload['previous'], {
+        'returned_quantity': 0,
+        'returned_at': null,
+        'return_note': '',
+      });
+
+      // Returning the rest closes the loan.
+      final closed = await repository.returnApparatus(
+        userId: 'u1',
+        checkout: partial,
+        quantity: 1,
+        note: '',
+        itemName: item.name,
+      );
+      expect(closed.isOpen, isFalse);
+      expect(closed.returnedAt, isNotNull);
+      expect(closed.outstanding, 0);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.checkouts.single.isOpen, isFalse);
+      expect(snapshot.outbox, hasLength(4));
+
+      // Discarding the last return reopens the loan with one piece out.
+      await repository.discardOperation('u1', snapshot.outbox.last);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.checkouts.single.isOpen, isTrue);
+      expect(snapshot.checkouts.single.outstanding, 1);
+      expect(snapshot.outbox, hasLength(3));
+
+      // Discarding the checkout drops the loan and its queued return.
+      await repository.discardOperation('u1', snapshot.outbox[1]);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.checkouts, isEmpty);
+      expect(snapshot.outbox.single.type, 'add_apparatus');
+    });
+
+    test('a loan on an unsynced apparatus disappears with it', () async {
+      final local = openLocal('checkout-cascade.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+
+      final item = await repository.addApparatus(
+        userId: 'u1',
+        name: 'Hot plate',
+        category: 'heating',
+        quantity: 1,
+        threshold: 0,
+        notes: '',
+      );
+      await repository.checkoutApparatus(
+        userId: 'u1',
+        apparatusId: item.id,
+        quantity: 1,
+        person: 'Bilal',
+        note: '',
+        itemName: item.name,
+      );
+      var snapshot = await repository.loadCached('u1');
+      expect(snapshot.checkouts, hasLength(1));
+      expect(snapshot.outbox, hasLength(2));
+
+      await repository.discardOperation('u1', snapshot.outbox.first);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.apparatus, isEmpty);
+      expect(snapshot.checkouts, isEmpty);
+      expect(snapshot.outbox, isEmpty);
+      // Other users never see the loan either.
+      expect((await repository.loadCached('u2')).checkouts, isEmpty);
+    });
+
+    test('checkout rows round-trip through the cache format', () {
+      final checkout = ApparatusCheckout(
+        id: 'c1',
+        apparatusId: 'a1',
+        quantity: 2,
+        returnedQuantity: 1,
+        person: 'Sara',
+        note: 'bench 2',
+        returnNote: 'scratched',
+        checkedOutAt: DateTime(2026, 9, 20, 10, 30),
+        dueAt: DateTime(2026, 9, 27, 23, 59),
+        operationId: 'op-1',
+      );
+      final map = checkout.toMap();
+      expect(map['checked_out_at'], endsWith('Z'));
+      expect(map['returned_at'], isNull);
+      final parsed = ApparatusCheckout.fromMap(map);
+      expect(parsed.checkedOutAt, checkout.checkedOutAt);
+      expect(parsed.dueAt, checkout.dueAt);
+      expect(parsed.outstanding, 1);
+      expect(parsed.isOpen, isTrue);
+      expect(parsed.operationId, 'op-1');
+      expect(parsed.copyWith(returnedQuantity: 2).isOpen, isFalse);
+      expect(
+        parsed.copyWith(returnedAt: DateTime(2026, 9, 21)).isOpen,
+        isFalse,
+      );
+      expect(
+        ApparatusCheckout.fromMap({
+          'id': 'c2',
+          'apparatus_id': 'a1',
+          'quantity': '3',
+          'returned_quantity': null,
+          'checked_out_at': null,
+        }).outstanding,
+        3,
+      );
+    });
+  });
+
   group('sync center copy', () {
     test('relative times read like a notebook note', () {
       final now = DateTime(2026, 9, 21, 12);

@@ -297,10 +297,22 @@ IconData conditionIcon(ApparatusCondition condition) => switch (condition) {
 /// Small condition / assignee marker for shelf rows. Hidden when the item is
 /// in good condition and unassigned.
 class ApparatusMarks extends StatelessWidget {
-  const ApparatusMarks(this.item, {super.key, this.compact = false});
+  const ApparatusMarks(
+    this.item, {
+    super.key,
+    this.compact = false,
+    this.checkedOut = 0,
+    this.overdue = false,
+  });
 
   final Apparatus item;
   final bool compact;
+
+  /// Pieces currently lent out (GEAR-02).
+  final double checkedOut;
+
+  /// Whether any open loan of this item is past its due date.
+  final bool overdue;
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +323,8 @@ class ApparatusMarks extends StatelessWidget {
     final warranty = item.warrantyState();
     final warrantyWarning =
         warranty == ExpiryState.expired || warranty == ExpiryState.expiringSoon;
-    if (!showCondition && !assigned && !warrantyWarning) {
+    final lent = checkedOut > 0;
+    if (!showCondition && !assigned && !warrantyWarning && !lent) {
       return const SizedBox.shrink();
     }
     final conditionMark = condition != null && showCondition
@@ -338,6 +351,16 @@ class ApparatusMarks extends StatelessWidget {
               icon: Icons.person_outline,
               text: item.assignedTo!,
               color: context.mutedInkColor,
+              fontSize: size,
+            ),
+          if (lent)
+            _Mark(
+              key: const Key('mark-checkout'),
+              icon: overdue ? Icons.alarm_outlined : Icons.outbox_outlined,
+              text: overdue
+                  ? '${formatQuantity(checkedOut)} out · overdue'
+                  : '${formatQuantity(checkedOut)} out',
+              color: overdue ? context.marginRedColor : context.mutedInkColor,
               fontSize: size,
             ),
           if (warrantyWarning)

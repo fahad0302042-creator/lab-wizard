@@ -127,7 +127,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final query = _searchController.text.trim().toLowerCase();
     final allItems = _isChemical
         ? state.chemicals.map(_InventoryView.chemical).toList()
-        : state.apparatus.map(_InventoryView.apparatus).toList();
+        : state.apparatus
+              .map(
+                (item) => _InventoryView.apparatus(
+                  item,
+                  checkedOut: state.checkedOutCount(item.id),
+                  overdue: state
+                      .openCheckoutsFor(item.id)
+                      .any((checkout) => checkout.isOverdue()),
+                ),
+              )
+              .toList();
 
     final items = allItems.where((item) => _matches(item, query)).toList()
       ..sort(
@@ -1086,6 +1096,8 @@ class _InventoryView {
     required this.status,
     this.chemical,
     this.apparatus,
+    this.checkedOut = 0,
+    this.overdue = false,
   });
 
   factory _InventoryView.chemical(Chemical item) => _InventoryView(
@@ -1104,7 +1116,11 @@ class _InventoryView {
     chemical: item,
   );
 
-  factory _InventoryView.apparatus(Apparatus item) => _InventoryView(
+  factory _InventoryView.apparatus(
+    Apparatus item, {
+    double checkedOut = 0,
+    bool overdue = false,
+  }) => _InventoryView(
     id: item.id,
     name: item.name,
     subtitle: item.category,
@@ -1118,6 +1134,8 @@ class _InventoryView {
     progress: item.stockProgress,
     status: item.stockState,
     apparatus: item,
+    checkedOut: checkedOut,
+    overdue: overdue,
   );
 
   final String id;
@@ -1135,6 +1153,12 @@ class _InventoryView {
 
   /// Source row for apparatus shelves; carries the GEAR-01 metadata.
   final Apparatus? apparatus;
+
+  /// Pieces of this apparatus currently lent out (GEAR-02).
+  final double checkedOut;
+
+  /// Whether an open loan of this apparatus is past due (GEAR-02).
+  final bool overdue;
 
   String get letter => indexLetterFor(name);
 
@@ -1155,7 +1179,14 @@ class _MetadataMarks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final apparatus = item.apparatus;
-    if (apparatus != null) return ApparatusMarks(apparatus, compact: compact);
+    if (apparatus != null) {
+      return ApparatusMarks(
+        apparatus,
+        compact: compact,
+        checkedOut: item.checkedOut,
+        overdue: item.overdue,
+      );
+    }
     final chemical = item.chemical;
     if (chemical == null) return const SizedBox.shrink();
     final hasExpiry = item.expiring;

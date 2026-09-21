@@ -390,6 +390,7 @@ class InventoryState {
     this.logs = const [],
     this.outbox = const [],
     this.reversals = const [],
+    this.checkouts = const [],
     this.loading = false,
     this.refreshing = false,
     this.fromCache = false,
@@ -407,6 +408,9 @@ class InventoryState {
 
   /// Undone actions, newest first (UX-04).
   final List<InventoryReversal> reversals;
+
+  /// Apparatus loans, newest first (GEAR-02).
+  final List<ApparatusCheckout> checkouts;
   final bool loading;
   final bool refreshing;
   final bool fromCache;
@@ -426,12 +430,36 @@ class InventoryState {
       chemicals.where((item) => item.stockState != StockState.healthy).length +
       apparatus.where((item) => item.stockState != StockState.healthy).length;
 
+  /// Open loans of one apparatus, newest first.
+  List<ApparatusCheckout> openCheckoutsFor(String apparatusId) => [
+    for (final checkout in checkouts)
+      if (checkout.apparatusId == apparatusId && checkout.isOpen) checkout,
+  ];
+
+  /// Pieces of one apparatus currently lent out.
+  double checkedOutCount(String apparatusId) => openCheckoutsFor(
+    apparatusId,
+  ).fold<double>(0, (sum, checkout) => sum + checkout.outstanding);
+
+  /// Pieces of one apparatus that can still be lent.
+  double availableCount(Apparatus item) {
+    final left = item.quantity - checkedOutCount(item.id);
+    return left < 0 ? 0 : left;
+  }
+
+  /// Loans past their due date, newest first.
+  List<ApparatusCheckout> overdueCheckouts({DateTime? now}) => [
+    for (final checkout in checkouts)
+      if (checkout.isOverdue(now: now)) checkout,
+  ];
+
   InventoryState copyWith({
     List<Chemical>? chemicals,
     List<Apparatus>? apparatus,
     List<ConsumptionLog>? logs,
     List<PendingOperation>? outbox,
     List<InventoryReversal>? reversals,
+    List<ApparatusCheckout>? checkouts,
     bool? loading,
     bool? refreshing,
     bool? fromCache,
@@ -444,6 +472,7 @@ class InventoryState {
     logs: logs ?? this.logs,
     outbox: outbox ?? this.outbox,
     reversals: reversals ?? this.reversals,
+    checkouts: checkouts ?? this.checkouts,
     loading: loading ?? this.loading,
     refreshing: refreshing ?? this.refreshing,
     fromCache: fromCache ?? this.fromCache,
@@ -588,6 +617,7 @@ class InventoryController extends Notifier<InventoryState> {
       logs: snapshot.logs,
       outbox: snapshot.outbox,
       reversals: snapshot.reversals,
+      checkouts: snapshot.checkouts,
       loading: loading,
       fromCache: snapshot.fromCache,
       lastUpdated: DateTime.now(),
@@ -821,7 +851,96 @@ class InventoryController extends Notifier<InventoryState> {
       reversals: state.reversals
           .where((reversal) => reversal.itemId != id)
           .toList(),
+      checkouts: state.checkouts
+          .where((checkout) => checkout.apparatusId != id)
+          .toList(),
     );
+  }
+
+  /// Lends pieces of an apparatus to a person (GEAR-02).
+  Future<ApparatusCheckout> checkoutApparatus({
+    required String apparatusId,
+    required double quantity,
+    required String person,
+    required String note,
+    DateTime? dueAt,
+  }) async {
+    if (quantity <= 0) throw ArgumentError('Quantity must be at least 1.');
+    if (quantity != quantity.roundToDouble()) {
+      throw ArgumentError('Check out whole pieces.');
+    }
+    if (person.trim().isEmpty) throw ArgumentError('Who is taking it?');
+    final userId = _requireUser();
+    final item = state.apparatus
+        .where((entry) => entry.id == apparatusId)
+        .firstOrNull;
+    if (item == null) throw StateError('The apparatus no longer exists.');
+    final available = state.availableCount(item);
+    if (quantity > available) {
+      throw StateError(
+        available <= 0
+            ? 'Every piece is already checked out.'
+            : 'Only ${formatQuantity(available)} available to check out.',
+      );
+    }
+    final checkout = await _repository.checkoutApparatus(
+      userId: userId,
+      apparatusId: apparatusId,
+      quantity: quantity,
+      person: person,
+      note: note,
+      dueAt: dueAt,
+      itemName: item.name,
+    );
+    final cached = await _repository.loadCached(userId);
+    state = state.copyWith(
+      checkouts: [
+        checkout,
+        ...state.checkouts.where((entry) => entry.id != checkout.id),
+      ],
+      outbox: cached.outbox,
+      fromCache: cached.pendingCount > 0,
+    );
+    return checkout;
+  }
+
+  /// Returns pieces from a loan; the loan closes when everything is back.
+  Future<ApparatusCheckout> returnApparatus({
+    required String checkoutId,
+    required double quantity,
+    required String note,
+  }) async {
+    final userId = _requireUser();
+    final checkout = state.checkouts
+        .where((entry) => entry.id == checkoutId)
+        .firstOrNull;
+    if (checkout == null) throw StateError('The loan no longer exists.');
+    if (!checkout.isOpen) throw StateError('This loan is already closed.');
+    if (quantity <= 0) throw ArgumentError('Return at least 1 piece.');
+    if (quantity != quantity.roundToDouble()) {
+      throw ArgumentError('Return whole pieces.');
+    }
+    if (quantity > checkout.outstanding) {
+      throw StateError(
+        'Only ${formatQuantity(checkout.outstanding)} still out on this loan.',
+      );
+    }
+    final updated = await _repository.returnApparatus(
+      userId: userId,
+      checkout: checkout,
+      quantity: quantity,
+      note: note,
+      itemName: _nameOf(ItemKind.apparatus, checkout.apparatusId),
+    );
+    final cached = await _repository.loadCached(userId);
+    state = state.copyWith(
+      checkouts: state.checkouts
+          .map((entry) => entry.id == updated.id ? updated : entry)
+          .toList(),
+      outbox: cached.outbox,
+      fromCache: cached.pendingCount > 0,
+    );
+    return updated;
   }
 
   void clearMemory() {

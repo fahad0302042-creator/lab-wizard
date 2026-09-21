@@ -20,7 +20,7 @@ Ground rules for every item:
 | UX-04 | VALIDATING | Undo inventory actions | Recent consume/restock/damage can be reversed safely; reversal is represented in the audit trail and works with offline outbox retries. | SYNC-01 |
 | BATCH-01 | VALIDATING | Batch restock | Multi-select chemicals/apparatus, validate amounts, show progress and record separate audit entries. | None |
 | BATCH-02 | VALIDATING | Batch threshold update | Multi-select items and set low-stock values with preview and validation. | None |
-| BATCH-03 | TODO | Batch category/location assignment | Apply supported shared fields to selected items; incompatible fields are not silently changed. | DATA-01 |
+| BATCH-03 | VALIDATING | Batch category/location assignment | Apply supported shared fields to selected items; incompatible fields are not silently changed. | DATA-01 |
 | BATCH-04 | VALIDATING | Safe multi-delete | Selection summary, typed confirmation for large deletions, online requirement and clear audit/export warning. | None |
 | QR-01 | VALIDATING | Selected-item QR printing | Select specific chemicals/apparatus and print only those labels; retain 40-per-A4 option. | None |
 
@@ -28,18 +28,18 @@ Ground rules for every item:
 
 | ID | Status | Improvement | Acceptance criteria | Dependencies |
 |---|---|---|---|---|
-| IMPORT-01 | TODO | Android CSV import | File selection, column mapping, preview, validation, duplicate warnings, partial-error report and confirmed import. | DUP-01 |
-| DUP-01 | TODO | Duplicate detection | Normalized name/formula/category checks; view existing or explicitly add anyway. | None |
-| FORM-01 | TODO | Remember form preferences | Persist recent unit, category, action amount and preferred threshold behavior per user/device. | None |
-| DATA-01 | TODO | Additive chemical metadata | Optional supplier, CAS, concentration, location, expiry and hazard fields; old web/app rows remain valid. | Additive SQL migration |
-| DATA-02 | TODO | Expiry and hazard presentation | Shelf/detail indicators, filters and report support without overwhelming normal cards. | DATA-01 |
+| IMPORT-01 | VALIDATING | Android CSV import | File selection, column mapping, preview, validation, duplicate warnings, partial-error report and confirmed import. | DUP-01 |
+| DUP-01 | VALIDATING | Duplicate detection | Normalized name/formula/category checks; view existing or explicitly add anyway. | None |
+| FORM-01 | VALIDATING | Remember form preferences | Persist recent unit, category, action amount and preferred threshold behavior per user/device. | None |
+| DATA-01 | VALIDATING | Additive chemical metadata | Optional supplier, CAS, concentration, location, expiry and hazard fields; old web/app rows remain valid. | Additive SQL migration |
+| DATA-02 | VALIDATING | Expiry and hazard presentation | Shelf/detail indicators, filters and report support without overwhelming normal cards. | DATA-01 |
 
 ## Milestone C — Apparatus operations
 
 | ID | Status | Improvement | Acceptance criteria | Dependencies |
 |---|---|---|---|---|
-| GEAR-01 | TODO | Serialized apparatus metadata | Serial number, condition, assigned person, purchase date and warranty expiry. | Additive SQL migration |
-| GEAR-02 | TODO | Checkout and return | Clear availability, borrower, due date, return condition and immutable history. | GEAR-01 |
+| GEAR-01 | VALIDATING | Serialized apparatus metadata | Serial number, condition, assigned person, purchase date and warranty expiry. | Additive SQL migration |
+| GEAR-02 | VALIDATING | Checkout and return | Clear availability, borrower, due date, return condition and immutable history. | GEAR-01 |
 | GEAR-03 | TODO | Maintenance and calibration | Due dates, completion records, notes and status warnings. | GEAR-01 |
 | GEAR-04 | TODO | Apparatus history | Unified checkout, return, damage, maintenance and calibration timeline/report. | GEAR-02, GEAR-03 |
 
@@ -136,3 +136,4 @@ This remains intentionally after the current single-lab quality program: organiz
 | 2026-09-21 | BATCH-03 | `TODO` → `VALIDATING` | Selection bar gains *location* (chemicals) / *category* (apparatus) with an old → new preview, one-tap suggestions from existing locations and unchanged rows skipped. The field is bound to the shelf so incompatible fields can never be written. Needs migration 003 for chemicals; a missing column is reported per row instead of failing silently. |
 | 2026-09-21 | IMPORT-01 | `TODO` → `VALIDATING` | `file_selector`-based CSV import from Settings: RFC 4180 parser (quotes, CRLF, BOM, `;`/tab sniffing), header auto-mapping with manual dropdowns, shelf selector or `type` column, per-row validation (errors vs warnings), duplicate detection against the shelf and within the file (skip by default, opt-in import), sequential import with progress, and a report of every skipped/failed line that can be shared. Unit + widget tests cover parser, mapping, validation and the screen flow. |
 | 2026-09-21 | GEAR-01 | `TODO` → `VALIDATING` | Additive `flutter_app/supabase/004_apparatus_metadata.sql` (nullable `serial_number`, `condition`, `assigned_to`, `location`, `purchase_date`, `warranty_until` + partial index). Model/cache/search/CSV export/import carry the fields; add/edit sheets get a collapsible *more details* section (condition dropdown, date entry/picker with strict YYYY-MM-DD validation); item sheet shows details with warranty copy; shelf rows mark needs-repair/fair/retired condition, assignee and warranty ending. Metadata only sent when changed; missing column → migration hint. |
+| 2026-09-21 | GEAR-02 | `TODO` → `VALIDATING` | Additive `flutter_app/supabase/005_apparatus_checkouts.sql` (`apparatus_checkouts` table, RLS own rows, cascade from `apparatus`, unique `(user_id, operation_id)`). One row per loan with `quantity`/`returned_quantity`; partial returns raise the returned count and the loan closes when everything is back. Item sheet: availability line, *Check out* (person with recent-name chips, whole pieces ≤ available, optional due date, note), open loans with due/overdue copy and per-loan *return*, recent returns. Shelf rows mark *N out* / *overdue*. Stock counts are never changed by a loan. Offline: `checkout_apparatus` / `return_apparatus` outbox entries, discard restores the previous state and drops dependent returns. SQLite + widget tests added. |

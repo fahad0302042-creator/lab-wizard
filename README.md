@@ -54,6 +54,8 @@ Chemical metadata on Android (DATA-01) uses [`flutter_app/supabase/003_chemical_
 
 Apparatus metadata (GEAR-01) follows the same pattern with [`flutter_app/supabase/004_apparatus_metadata.sql`](flutter_app/supabase/004_apparatus_metadata.sql): six nullable columns on `apparatus` (`serial_number`, `condition`, `assigned_to`, `location`, `purchase_date`, `warranty_until`).
 
+Apparatus checkouts (GEAR-02) add one new table with [`flutter_app/supabase/005_apparatus_checkouts.sql`](flutter_app/supabase/005_apparatus_checkouts.sql): `apparatus_checkouts` (own rows only via RLS, `on delete cascade` from `apparatus`, unique per queued operation so a retried mobile checkout is never lent twice). Loans do not modify `apparatus.quantity`, so the web app's numbers and queries are unaffected; the table is simply invisible to it.
+
 ## Improvement program
 
 The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.

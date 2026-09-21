@@ -12,9 +12,10 @@ import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../data/inventory_repository.dart';
 import '../domain/duplicates.dart';
-import 'apparatus_details.dart';
-import 'chemical_details.dart';
 import '../domain/models.dart';
+import 'apparatus_details.dart';
+import 'checkout_sheets.dart';
+import 'chemical_details.dart';
 
 Future<void> showAddItemSheet(
   BuildContext context,
@@ -1348,6 +1349,7 @@ class _ItemDetail extends ConsumerWidget {
             ],
             if (chemical != null) ChemicalDetailsSummary(chemical),
             if (apparatus != null) ApparatusDetailsSummary(apparatus),
+            if (apparatus != null) CheckoutSection(apparatus: apparatus),
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 24),
               const PageHeading('notes', trailing: SizedBox.shrink()),
