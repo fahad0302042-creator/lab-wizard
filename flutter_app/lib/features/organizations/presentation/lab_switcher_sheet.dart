@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/notebook_widgets.dart';
-import '../domain/models.dart';
 import 'organization_providers.dart';
 
 Future<void> showLabSwitcherSheet(BuildContext context) {
@@ -69,24 +67,22 @@ class _LabSwitcherContent extends ConsumerWidget {
                     ),
                     const Divider(height: 24),
                     labsAsync.when(
-                      loading:
-                          () => const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16),
-                              child: CircularProgressIndicator(),
-                            ),
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (err, _) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Cloud organization features require migration 010.',
+                          style: TextStyle(
+                            color: context.mutedInkColor,
+                            fontSize: 12,
                           ),
-                      error:
-                          (err, _) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'Cloud organization features require migration 010.',
-                              style: TextStyle(
-                                color: context.mutedInkColor,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
+                        ),
+                      ),
                       data: (labs) {
                         if (labs.isEmpty) {
                           return Padding(
@@ -147,85 +143,84 @@ class _LabSwitcherContent extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder:
-          (dialogCtx) => AlertDialog(
-            title: const Text('Create organization'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Organization name',
-                    hintText: 'e.g. Acme Research Labs',
-                  ),
-                  onChanged: (val) {
-                    if (slugController.text.isEmpty ||
-                        slugController.text ==
-                            _slugify(
-                              nameController.text.substring(
-                                0,
-                                nameController.text.length - 1,
-                              ),
-                            )) {
-                      slugController.text = _slugify(val);
-                    }
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: slugController,
-                  decoration: const InputDecoration(
-                    labelText: 'Organization slug',
-                    hintText: 'e.g. acme-research',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: labController,
-                  decoration: const InputDecoration(
-                    labelText: 'Initial lab name',
-                    hintText: 'e.g. Main Chemistry Lab',
-                  ),
-                ),
-              ],
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Create organization'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Organization name',
+                hintText: 'e.g. Acme Research Labs',
+              ),
+              onChanged: (val) {
+                if (slugController.text.isEmpty ||
+                    slugController.text ==
+                        _slugify(
+                          nameController.text.substring(
+                            0,
+                            nameController.text.length - 1,
+                          ),
+                        )) {
+                  slugController.text = _slugify(val);
+                }
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogCtx).pop(),
-                child: const Text('Cancel'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: slugController,
+              decoration: const InputDecoration(
+                labelText: 'Organization slug',
+                hintText: 'e.g. acme-research',
               ),
-              FilledButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  final slug = slugController.text.trim();
-                  final labName = labController.text.trim();
-                  if (name.isEmpty || slug.isEmpty) {
-                    return;
-                  }
-
-                  Navigator.of(dialogCtx).pop();
-                  final repo = ref.read(organizationRepositoryProvider);
-                  final orgId = await repo.createOrganization(
-                    name: name,
-                    slug: slug,
-                    defaultLabName: labName.isNotEmpty ? labName : 'Main Lab',
-                  );
-
-                  if (orgId != null) {
-                    ref.invalidate(userOrganizationsProvider);
-                    ref.invalidate(userLabsProvider);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Created organization "$name"')),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Create'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: labController,
+              decoration: const InputDecoration(
+                labelText: 'Initial lab name',
+                hintText: 'e.g. Main Chemistry Lab',
               ),
-            ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
           ),
+          FilledButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final slug = slugController.text.trim();
+              final labName = labController.text.trim();
+              if (name.isEmpty || slug.isEmpty) {
+                return;
+              }
+
+              Navigator.of(dialogCtx).pop();
+              final repo = ref.read(organizationRepositoryProvider);
+              final orgId = await repo.createOrganization(
+                name: name,
+                slug: slug,
+                defaultLabName: labName.isNotEmpty ? labName : 'Main Lab',
+              );
+
+              if (orgId != null) {
+                ref.invalidate(userOrganizationsProvider);
+                ref.invalidate(userLabsProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Created organization "$name"')),
+                  );
+                }
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -260,18 +255,15 @@ class _LabListTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color:
-            isSelected
-                ? Theme.of(
-                  context,
-                ).colorScheme.primaryContainer.withValues(alpha: 0.3)
-                : null,
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer
+                  .withValues(alpha: 0.3)
+            : null,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color:
-              isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
         ),
       ),
       child: ListTile(
@@ -287,10 +279,9 @@ class _LabListTile extends StatelessWidget {
           ),
         ),
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing:
-            isSelected
-                ? const Icon(Icons.check_circle, size: 20)
-                : const Icon(Icons.chevron_right, size: 18),
+        trailing: isSelected
+            ? const Icon(Icons.check_circle, size: 20)
+            : const Icon(Icons.chevron_right, size: 18),
         onTap: onTap,
       ),
     );

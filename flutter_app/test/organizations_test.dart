@@ -217,9 +217,7 @@ void main() {
     ) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            activeLabProvider.overrideWith(ActiveLabNotifier.new),
-          ],
+          overrides: [activeLabProvider.overrideWith(ActiveLabNotifier.new)],
           child: const MaterialApp(
             home: Scaffold(
               body: SingleChildScrollView(child: OrganizationCard()),
