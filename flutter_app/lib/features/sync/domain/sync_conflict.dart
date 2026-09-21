@@ -108,8 +108,10 @@ class SyncConflict {
         detectedAt: at ?? DateTime.now(),
       );
 
-  factory SyncConflict.deleted({DateTime? at}) =>
-      SyncConflict(kind: ConflictKind.deleted, detectedAt: at ?? DateTime.now());
+  factory SyncConflict.deleted({DateTime? at}) => SyncConflict(
+    kind: ConflictKind.deleted,
+    detectedAt: at ?? DateTime.now(),
+  );
 
   factory SyncConflict.stock({
     required double available,
@@ -162,8 +164,7 @@ class SyncConflict {
       'Changed on the server since you loaded it: '
           '${fields.map((field) => field.label).join(', ')}.',
     ConflictKind.deleted => 'Deleted on the server.',
-    ConflictKind.stock =>
-      'Only ${_amount(available)} available on the server.',
+    ConflictKind.stock => 'Only ${_amount(available)} available on the server.',
   };
 
   Map<String, dynamic> toJson() => {

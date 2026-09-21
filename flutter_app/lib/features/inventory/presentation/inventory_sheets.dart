@@ -755,9 +755,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   Future<void> _resolveConflict(SyncConflict conflict) async {
     if (conflict.kind == ConflictKind.deleted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This item was deleted on the server.'),
-        ),
+        const SnackBar(content: Text('This item was deleted on the server.')),
       );
       unawaited(ref.read(inventoryProvider.notifier).refresh());
       return;
@@ -783,7 +781,8 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
           ),
           FilledButton(
             key: const Key('conflict-keep-mine'),
-            onPressed: () => Navigator.pop(context, ConflictResolution.keepMine),
+            onPressed: () =>
+                Navigator.pop(context, ConflictResolution.keepMine),
             child: const Text('Overwrite with mine'),
           ),
         ],

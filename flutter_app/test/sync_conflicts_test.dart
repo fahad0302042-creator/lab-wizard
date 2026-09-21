@@ -254,8 +254,11 @@ void main() {
       expect(restored.detectedAt, DateTime(2026, 9, 21, 10));
       expect(restored.fields, hasLength(2));
       expect(restored.fields.first.server, 20);
-      expect(restored.summary, 'Changed on the server since you loaded it: '
-          'low-stock level, notes.');
+      expect(
+        restored.summary,
+        'Changed on the server since you loaded it: '
+        'low-stock level, notes.',
+      );
       expect(
         restored.explanation,
         contains('low-stock level is now 20 on the server (yours: 5)'),
@@ -304,15 +307,17 @@ void main() {
       return client;
     }
 
-    test('outbox keeps conflicts until a decision and migrates old files', () async {
-      final path = p.join(directory.path, 'v3.db');
-      // A pre-SYNC-04 file: schema version 3 without the conflict column.
-      final legacy = await databaseFactoryFfi.openDatabase(
-        path,
-        options: OpenDatabaseOptions(
-          version: 3,
-          onCreate: (db, _) async {
-            await db.execute('''
+    test(
+      'outbox keeps conflicts until a decision and migrates old files',
+      () async {
+        final path = p.join(directory.path, 'v3.db');
+        // A pre-SYNC-04 file: schema version 3 without the conflict column.
+        final legacy = await databaseFactoryFfi.openDatabase(
+          path,
+          options: OpenDatabaseOptions(
+            version: 3,
+            onCreate: (db, _) async {
+              await db.execute('''
               CREATE TABLE cache_records (
                 user_id TEXT NOT NULL, kind TEXT NOT NULL,
                 record_id TEXT NOT NULL, body TEXT NOT NULL,
@@ -320,7 +325,7 @@ void main() {
                 PRIMARY KEY (user_id, kind, record_id)
               )
             ''');
-            await db.execute('''
+              await db.execute('''
               CREATE TABLE outbox (
                 id TEXT PRIMARY KEY, user_id TEXT NOT NULL,
                 type TEXT NOT NULL, payload TEXT NOT NULL,
@@ -330,54 +335,55 @@ void main() {
                 last_attempt_at TEXT
               )
             ''');
-            await db.execute('''
+              await db.execute('''
               CREATE TABLE sync_meta (
                 user_id TEXT NOT NULL, key TEXT NOT NULL,
                 value TEXT NOT NULL, PRIMARY KEY (user_id, key)
               )
             ''');
-          },
-        ),
-      );
-      await legacy.insert('outbox', {
-        'id': 'op-1',
-        'user_id': 'u1',
-        'type': 'update_item',
-        'payload': '{"id":"c1","item_type":"chemical","changes":{}}',
-        'created_at': DateTime(2026, 9, 20).toIso8601String(),
-      });
-      await legacy.close();
+            },
+          ),
+        );
+        await legacy.insert('outbox', {
+          'id': 'op-1',
+          'user_id': 'u1',
+          'type': 'update_item',
+          'payload': '{"id":"c1","item_type":"chemical","changes":{}}',
+          'created_at': DateTime(2026, 9, 20).toIso8601String(),
+        });
+        await legacy.close();
 
-      final local = LocalDatabase(factory: databaseFactoryFfi, path: path);
-      addTearDown(local.close);
-      var operation = (await local.pendingOperations('u1')).single;
-      expect(operation.isConflict, isFalse);
+        final local = LocalDatabase(factory: databaseFactoryFfi, path: path);
+        addTearDown(local.close);
+        var operation = (await local.pendingOperations('u1')).single;
+        expect(operation.isConflict, isFalse);
 
-      await local.markConflict(
-        'op-1',
-        SyncConflict.deleted(at: DateTime(2026, 9, 21)),
-      );
-      operation = (await local.pendingOperations('u1')).single;
-      expect(operation.isFailed, isTrue);
-      expect(operation.isConflict, isTrue);
-      expect(operation.canRetry, isFalse);
-      expect(operation.attempts, 1);
-      expect(operation.lastError, 'Deleted on the server.');
-      expect(operation.conflict!.kind, ConflictKind.deleted);
+        await local.markConflict(
+          'op-1',
+          SyncConflict.deleted(at: DateTime(2026, 9, 21)),
+        );
+        operation = (await local.pendingOperations('u1')).single;
+        expect(operation.isFailed, isTrue);
+        expect(operation.isConflict, isTrue);
+        expect(operation.canRetry, isFalse);
+        expect(operation.attempts, 1);
+        expect(operation.lastError, 'Deleted on the server.');
+        expect(operation.conflict!.kind, ConflictKind.deleted);
 
-      await local.updatePayload('op-1', {'id': 'c1', 'force': true});
-      await local.resetOperation('op-1');
-      operation = (await local.pendingOperations('u1')).single;
-      expect(operation.isFailed, isFalse);
-      expect(operation.isConflict, isFalse);
-      expect(operation.payload['force'], isTrue);
+        await local.updatePayload('op-1', {'id': 'c1', 'force': true});
+        await local.resetOperation('op-1');
+        operation = (await local.pendingOperations('u1')).single;
+        expect(operation.isFailed, isFalse);
+        expect(operation.isConflict, isFalse);
+        expect(operation.payload['force'], isTrue);
 
-      await local.markConflict('op-1', SyncConflict.deleted());
-      await local.markAttempt('op-1', 'boom', failed: true);
-      operation = (await local.pendingOperations('u1')).single;
-      expect(operation.isFailed, isTrue);
-      expect(operation.isConflict, isFalse);
-    });
+        await local.markConflict('op-1', SyncConflict.deleted());
+        await local.markAttempt('op-1', 'boom', failed: true);
+        operation = (await local.pendingOperations('u1')).single;
+        expect(operation.isFailed, isTrue);
+        expect(operation.isConflict, isFalse);
+      },
+    );
 
     test('an edit only sends changed fields and guards them', () async {
       final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
@@ -420,118 +426,121 @@ void main() {
       expect(server.patches, hasLength(1));
     });
 
-    test('a field changed on both sides is a conflict, not an overwrite', () async {
-      final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
-      final local = openLocal('clash.db');
-      addTearDown(local.close);
-      await local.upsertRecord('u1', 'chemical', _acetone());
-      final repository = InventoryRepository(
-        local: local,
-        remote: clientFor(server),
-      );
-      // Someone else raised the threshold and renamed the item.
-      server.row('chemicals', 'c1')
-        ..['low_stock_threshold'] = 20
-        ..['name'] = 'Acetone (HPLC)';
+    test(
+      'a field changed on both sides is a conflict, not an overwrite',
+      () async {
+        final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+        final local = openLocal('clash.db');
+        addTearDown(local.close);
+        await local.upsertRecord('u1', 'chemical', _acetone());
+        final repository = InventoryRepository(
+          local: local,
+          remote: clientFor(server),
+        );
+        // Someone else raised the threshold and renamed the item.
+        server.row('chemicals', 'c1')
+          ..['low_stock_threshold'] = 20
+          ..['name'] = 'Acetone (HPLC)';
 
-      // Only the notes changed here: no clash with the server's edits.
-      final saved = await repository.updateItem(
-        userId: 'u1',
-        type: ItemKind.chemical,
-        id: 'c1',
-        changes: {'notes': 'Shelf B', 'low_stock_threshold': 10},
-      );
-      expect(saved['notes'], 'Shelf B');
-      expect(saved['name'], 'Acetone (HPLC)');
-      expect(saved['low_stock_threshold'], 20);
+        // Only the notes changed here: no clash with the server's edits.
+        final saved = await repository.updateItem(
+          userId: 'u1',
+          type: ItemKind.chemical,
+          id: 'c1',
+          changes: {'notes': 'Shelf B', 'low_stock_threshold': 10},
+        );
+        expect(saved['notes'], 'Shelf B');
+        expect(saved['name'], 'Acetone (HPLC)');
+        expect(saved['low_stock_threshold'], 20);
 
-      // A stale copy on this device edits the threshold the server moved:
-      // conflict, reported with both values, and nothing overwritten.
-      await local.upsertRecord('u1', 'chemical', _acetone());
-      await expectLater(
-        repository.updateItem(
+        // A stale copy on this device edits the threshold the server moved:
+        // conflict, reported with both values, and nothing overwritten.
+        await local.upsertRecord('u1', 'chemical', _acetone());
+        await expectLater(
+          repository.updateItem(
+            userId: 'u1',
+            type: ItemKind.chemical,
+            id: 'c1',
+            changes: {'low_stock_threshold': 5},
+          ),
+          throwsA(
+            isA<ItemConflictException>().having(
+              (error) => error.conflict.fields.single,
+              'field',
+              isA<FieldConflict>()
+                  .having((f) => f.field, 'field', 'low_stock_threshold')
+                  .having((f) => f.server, 'server', 20)
+                  .having((f) => f.local, 'local', 5),
+            ),
+          ),
+        );
+        expect(server.row('chemicals', 'c1')['low_stock_threshold'], 20);
+
+        // The server already has what this device wants: not a conflict.
+        await local.upsertRecord('u1', 'chemical', _acetone());
+        final agreed = await repository.updateItem(
+          userId: 'u1',
+          type: ItemKind.chemical,
+          id: 'c1',
+          changes: {'low_stock_threshold': 20},
+        );
+        expect(agreed['low_stock_threshold'], 20);
+
+        // Overwriting is an explicit choice.
+        await local.upsertRecord('u1', 'chemical', _acetone());
+        final forced = await repository.updateItem(
           userId: 'u1',
           type: ItemKind.chemical,
           id: 'c1',
           changes: {'low_stock_threshold': 5},
-        ),
-        throwsA(
-          isA<ItemConflictException>().having(
-            (error) => error.conflict.fields.single,
-            'field',
-            isA<FieldConflict>()
-                .having((f) => f.field, 'field', 'low_stock_threshold')
-                .having((f) => f.server, 'server', 20)
-                .having((f) => f.local, 'local', 5),
+          force: true,
+        );
+        expect(forced['low_stock_threshold'], 5);
+        expect(server.row('chemicals', 'c1')['low_stock_threshold'], 5);
+
+        // Array columns are compared before writing.
+        server.row('chemicals', 'c1')['hazard_classes'] = ['GHS02', 'GHS07'];
+        await local.upsertRecord('u1', 'chemical', {
+          ...server.row('chemicals', 'c1'),
+          'hazard_classes': ['GHS02'],
+        });
+        await expectLater(
+          repository.updateItem(
+            userId: 'u1',
+            type: ItemKind.chemical,
+            id: 'c1',
+            changes: {
+              'hazard_classes': ['GHS02', 'GHS05'],
+            },
           ),
-        ),
-      );
-      expect(server.row('chemicals', 'c1')['low_stock_threshold'], 20);
-
-      // The server already has what this device wants: not a conflict.
-      await local.upsertRecord('u1', 'chemical', _acetone());
-      final agreed = await repository.updateItem(
-        userId: 'u1',
-        type: ItemKind.chemical,
-        id: 'c1',
-        changes: {'low_stock_threshold': 20},
-      );
-      expect(agreed['low_stock_threshold'], 20);
-
-      // Overwriting is an explicit choice.
-      await local.upsertRecord('u1', 'chemical', _acetone());
-      final forced = await repository.updateItem(
-        userId: 'u1',
-        type: ItemKind.chemical,
-        id: 'c1',
-        changes: {'low_stock_threshold': 5},
-        force: true,
-      );
-      expect(forced['low_stock_threshold'], 5);
-      expect(server.row('chemicals', 'c1')['low_stock_threshold'], 5);
-
-      // Array columns are compared before writing.
-      server.row('chemicals', 'c1')['hazard_classes'] = ['GHS02', 'GHS07'];
-      await local.upsertRecord('u1', 'chemical', {
-        ...server.row('chemicals', 'c1'),
-        'hazard_classes': ['GHS02'],
-      });
-      await expectLater(
-        repository.updateItem(
-          userId: 'u1',
-          type: ItemKind.chemical,
-          id: 'c1',
-          changes: {
-            'hazard_classes': ['GHS02', 'GHS05'],
-          },
-        ),
-        throwsA(
-          isA<ItemConflictException>().having(
-            (error) => error.conflict.fields.single.field,
-            'field',
-            'hazard_classes',
+          throwsA(
+            isA<ItemConflictException>().having(
+              (error) => error.conflict.fields.single.field,
+              'field',
+              'hazard_classes',
+            ),
           ),
-        ),
-      );
+        );
 
-      // A deleted item cannot take edits.
-      server.tables['chemicals']!.clear();
-      await expectLater(
-        repository.updateItem(
-          userId: 'u1',
-          type: ItemKind.chemical,
-          id: 'c1',
-          changes: {'notes': 'gone'},
-        ),
-        throwsA(
-          isA<ItemConflictException>().having(
-            (error) => error.conflict.kind,
-            'kind',
-            ConflictKind.deleted,
+        // A deleted item cannot take edits.
+        server.tables['chemicals']!.clear();
+        await expectLater(
+          repository.updateItem(
+            userId: 'u1',
+            type: ItemKind.chemical,
+            id: 'c1',
+            changes: {'notes': 'gone'},
           ),
-        ),
-      );
-    });
+          throwsA(
+            isA<ItemConflictException>().having(
+              (error) => error.conflict.kind,
+              'kind',
+              ConflictKind.deleted,
+            ),
+          ),
+        );
+      },
+    );
 
     test('a queued edit that lost the race waits for a decision', () async {
       final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
@@ -632,142 +641,148 @@ void main() {
       expect(operation.conflict!.resolutions, [ConflictResolution.discard]);
     });
 
-    test('stale stock becomes a conflict that can apply what is left', () async {
-      final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
-      final local = openLocal('stock.db');
-      addTearDown(local.close);
-      await local.upsertRecord('u1', 'chemical', _acetone());
-      final repository = InventoryRepository(
-        local: local,
-        remote: clientFor(server),
-      );
-      final rpcAmounts = <num>[];
-      server.rpc['apply_inventory_action'] = (params) {
-        final amount = params['p_amount'] as num;
-        rpcAmounts.add(amount);
-        final row = server.row('chemicals', 'c1');
-        final quantity = row['quantity'] as num;
-        if (quantity < amount) {
-          return _FakePostgrest._error(
-            400,
-            'Insufficient stock: only $quantity available',
-            '22003',
-          );
-        }
-        row['quantity'] = quantity - amount;
-        final log = {
-          'id': 'server-log',
-          'user_id': 'u1',
-          'item_id': 'c1',
-          'item_type': 'chemical',
-          'action': params['p_action'],
-          'amount': amount,
-          'note': params['p_note'],
-          'logged_at': params['p_logged_at'],
-          'created_at': '2026-09-21T10:00:00.000Z',
-          'operation_id': params['p_operation_id'],
-        };
-        return http.Response(
-          jsonEncode({'item': row, 'log': log, 'duplicate': false}),
-          200,
-          headers: _FakePostgrest._json,
+    test(
+      'stale stock becomes a conflict that can apply what is left',
+      () async {
+        final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+        final local = openLocal('stock.db');
+        addTearDown(local.close);
+        await local.upsertRecord('u1', 'chemical', _acetone());
+        final repository = InventoryRepository(
+          local: local,
+          remote: clientFor(server),
         );
-      };
+        final rpcAmounts = <num>[];
+        server.rpc['apply_inventory_action'] = (params) {
+          final amount = params['p_amount'] as num;
+          rpcAmounts.add(amount);
+          final row = server.row('chemicals', 'c1');
+          final quantity = row['quantity'] as num;
+          if (quantity < amount) {
+            return _FakePostgrest._error(
+              400,
+              'Insufficient stock: only $quantity available',
+              '22003',
+            );
+          }
+          row['quantity'] = quantity - amount;
+          final log = {
+            'id': 'server-log',
+            'user_id': 'u1',
+            'item_id': 'c1',
+            'item_type': 'chemical',
+            'action': params['p_action'],
+            'amount': amount,
+            'note': params['p_note'],
+            'logged_at': params['p_logged_at'],
+            'created_at': '2026-09-21T10:00:00.000Z',
+            'operation_id': params['p_operation_id'],
+          };
+          return http.Response(
+            jsonEncode({'item': row, 'log': log, 'duplicate': false}),
+            200,
+            headers: _FakePostgrest._json,
+          );
+        };
 
-      server.offline = true;
-      final log = await repository.applyAction(
-        userId: 'u1',
-        itemId: 'c1',
-        itemType: ItemKind.chemical,
-        action: InventoryAction.consume,
-        amount: 60,
-        previousQuantity: 100,
-        note: '',
-        loggedAt: DateTime(2026, 9, 21),
-        itemName: 'Acetone',
-        unit: 'mL',
-      );
-      // Someone else used most of it first.
-      server.row('chemicals', 'c1')['quantity'] = 25;
-      server.offline = false;
-      await repository.syncPending('u1');
-      var operation = (await local.pendingOperations('u1')).single;
-      expect(operation.isConflict, isTrue);
-      final conflict = operation.conflict!;
-      expect(conflict.kind, ConflictKind.stock);
-      expect(conflict.available, 25);
-      expect(conflict.requested, 60);
-      expect(conflict.unit, 'mL');
-      expect(conflict.resolutions.first, ConflictResolution.useAvailable);
-      expect(rpcAmounts, [60]);
+        server.offline = true;
+        final log = await repository.applyAction(
+          userId: 'u1',
+          itemId: 'c1',
+          itemType: ItemKind.chemical,
+          action: InventoryAction.consume,
+          amount: 60,
+          previousQuantity: 100,
+          note: '',
+          loggedAt: DateTime(2026, 9, 21),
+          itemName: 'Acetone',
+          unit: 'mL',
+        );
+        // Someone else used most of it first.
+        server.row('chemicals', 'c1')['quantity'] = 25;
+        server.offline = false;
+        await repository.syncPending('u1');
+        var operation = (await local.pendingOperations('u1')).single;
+        expect(operation.isConflict, isTrue);
+        final conflict = operation.conflict!;
+        expect(conflict.kind, ConflictKind.stock);
+        expect(conflict.available, 25);
+        expect(conflict.requested, 60);
+        expect(conflict.unit, 'mL');
+        expect(conflict.resolutions.first, ConflictResolution.useAvailable);
+        expect(rpcAmounts, [60]);
 
-      await repository.resolveConflict(
-        'u1',
-        operation,
-        ConflictResolution.useAvailable,
-      );
-      expect(rpcAmounts, [60, 25]);
-      expect(await local.pendingOperations('u1'), isEmpty);
-      expect(server.row('chemicals', 'c1')['quantity'], 0);
-      final cachedLog = (await local.loadRecords(
-        'u1',
-        'log',
-      )).firstWhere((row) => row['id'] == log.id);
-      expect(cachedLog['amount'], 25);
-      final cached = (await local.loadRecords('u1', 'chemical')).single;
-      // 100 cached − 60 optimistic + 35 given back = 75 until the next
-      // refresh downloads the server's 0.
-      expect(cached['quantity'], 75);
-    });
+        await repository.resolveConflict(
+          'u1',
+          operation,
+          ConflictResolution.useAvailable,
+        );
+        expect(rpcAmounts, [60, 25]);
+        expect(await local.pendingOperations('u1'), isEmpty);
+        expect(server.row('chemicals', 'c1')['quantity'], 0);
+        final cachedLog = (await local.loadRecords(
+          'u1',
+          'log',
+        )).firstWhere((row) => row['id'] == log.id);
+        expect(cachedLog['amount'], 25);
+        final cached = (await local.loadRecords('u1', 'chemical')).single;
+        // 100 cached − 60 optimistic + 35 given back = 75 until the next
+        // refresh downloads the server's 0.
+        expect(cached['quantity'], 75);
+      },
+    );
 
-    test('without the RPC, quantities are rebased instead of overwritten', () async {
-      final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
-      final local = openLocal('compat.db');
-      addTearDown(local.close);
-      await local.upsertRecord('u1', 'chemical', _acetone());
-      final repository = InventoryRepository(
-        local: local,
-        remote: clientFor(server),
-      );
-      // No RPC installed: the client falls back to plain table writes.
-      server.row('chemicals', 'c1')['quantity'] = 80;
-      await repository.applyAction(
-        userId: 'u1',
-        itemId: 'c1',
-        itemType: ItemKind.chemical,
-        action: InventoryAction.consume,
-        amount: 30,
-        previousQuantity: 100,
-        note: '',
-        loggedAt: DateTime(2026, 9, 21),
-      );
-      // 80 − 30, not the precomputed 70.
-      expect(server.row('chemicals', 'c1')['quantity'], 50);
-      expect(server.tables['consumption_logs'], hasLength(1));
-
-      server.row('chemicals', 'c1')['quantity'] = 10;
-      await expectLater(
-        repository.applyAction(
+    test(
+      'without the RPC, quantities are rebased instead of overwritten',
+      () async {
+        final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+        final local = openLocal('compat.db');
+        addTearDown(local.close);
+        await local.upsertRecord('u1', 'chemical', _acetone());
+        final repository = InventoryRepository(
+          local: local,
+          remote: clientFor(server),
+        );
+        // No RPC installed: the client falls back to plain table writes.
+        server.row('chemicals', 'c1')['quantity'] = 80;
+        await repository.applyAction(
           userId: 'u1',
           itemId: 'c1',
           itemType: ItemKind.chemical,
           action: InventoryAction.consume,
           amount: 30,
-          previousQuantity: 50,
+          previousQuantity: 100,
           note: '',
           loggedAt: DateTime(2026, 9, 21),
-          unit: 'mL',
-        ),
-        throwsA(
-          isA<ItemConflictException>().having(
-            (error) => error.conflict.available,
-            'available',
-            10,
+        );
+        // 80 − 30, not the precomputed 70.
+        expect(server.row('chemicals', 'c1')['quantity'], 50);
+        expect(server.tables['consumption_logs'], hasLength(1));
+
+        server.row('chemicals', 'c1')['quantity'] = 10;
+        await expectLater(
+          repository.applyAction(
+            userId: 'u1',
+            itemId: 'c1',
+            itemType: ItemKind.chemical,
+            action: InventoryAction.consume,
+            amount: 30,
+            previousQuantity: 50,
+            note: '',
+            loggedAt: DateTime(2026, 9, 21),
+            unit: 'mL',
           ),
-        ),
-      );
-      expect(server.row('chemicals', 'c1')['quantity'], 10);
-    });
+          throwsA(
+            isA<ItemConflictException>().having(
+              (error) => error.conflict.available,
+              'available',
+              10,
+            ),
+          ),
+        );
+        expect(server.row('chemicals', 'c1')['quantity'], 10);
+      },
+    );
   });
 
   group('SYNC-04 sync center', () {
@@ -802,11 +817,7 @@ void main() {
             id: 'op-consume',
             userId: 'u1',
             type: 'inventory_action',
-            payload: const {
-              'item_id': 'c2',
-              'action': 'consume',
-              'amount': 60,
-            },
+            payload: const {'item_id': 'c2', 'action': 'consume', 'amount': 60},
             createdAt: now.subtract(const Duration(minutes: 6)),
             attempts: 1,
             status: PendingStatus.failed,
