@@ -159,13 +159,21 @@ void main() {
         kind: ServiceKind.calibration,
         due: _today().subtract(const Duration(days: 3)),
       );
-      final soon = _task('soon', 'a1', due: _today().add(const Duration(days: 5)));
+      final soon = _task(
+        'soon',
+        'a1',
+        due: _today().add(const Duration(days: 5)),
+      );
       final sooner = _task(
         'sooner',
         'a1',
         due: _today().add(const Duration(days: 2)),
       );
-      final far = _task('far', 'a1', due: _today().add(const Duration(days: 90)));
+      final far = _task(
+        'far',
+        'a1',
+        due: _today().add(const Duration(days: 90)),
+      );
       final doneLate = _task(
         'done',
         'a1',
@@ -173,16 +181,21 @@ void main() {
         done: _today(),
       );
       expect(
-        InventoryState(services: [soon, far, sooner]).urgentServiceFor('a1')?.id,
+        InventoryState(services: [soon, far, sooner])
+            .urgentServiceFor('a1')
+            ?.id,
         'sooner',
       );
       expect(
-        InventoryState(
-          services: [soon, overdue, sooner],
-        ).urgentServiceFor('a1')?.id,
+        InventoryState(services: [soon, overdue, sooner])
+            .urgentServiceFor('a1')
+            ?.id,
         'late',
       );
-      expect(InventoryState(services: [far, doneLate]).urgentServiceFor('a1'), isNull);
+      expect(
+        InventoryState(services: [far, doneLate]).urgentServiceFor('a1'),
+        isNull,
+      );
       expect(
         InventoryState(services: [far]).serviceStateFor('a1'),
         ExpiryState.ok,
@@ -192,9 +205,9 @@ void main() {
         ExpiryState.expired,
       );
       expect(
-        InventoryState(services: [soon, far, doneLate]).serviceAlerts().map(
-          (t) => t.id,
-        ),
+        InventoryState(services: [soon, far, doneLate])
+            .serviceAlerts()
+            .map((t) => t.id),
         ['soon'],
       );
       expect(serviceDueCaption(_task('x', 'a1')), 'no due date');
@@ -220,11 +233,7 @@ void main() {
               title: 'Buffer check',
               due: _today().subtract(const Duration(days: 2)),
             ),
-            _task(
-              's2',
-              'a1',
-              due: _today().add(const Duration(days: 40)),
-            ),
+            _task('s2', 'a1', due: _today().add(const Duration(days: 40))),
             _task(
               's3',
               'a1',
@@ -252,9 +261,7 @@ void main() {
       expect(find.byKey(const Key('service-empty')), findsNothing);
     });
 
-    testWidgets('schedule form validates the date and submits', (
-      tester,
-    ) async {
+    testWidgets('schedule form validates the date and submits', (tester) async {
       final fake = await _pump(
         tester,
         seed: InventoryState(apparatus: [_gear('a1', 'pH meter')]),
@@ -264,7 +271,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Schedule Calibration'), findsOneWidget);
 
-      await tester.enterText(find.byKey(const Key('service-due')), '2026-13-40');
+      await tester.enterText(
+        find.byKey(const Key('service-due')),
+        '2026-13-40',
+      );
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
       expect(find.text('Use YYYY-MM-DD'), findsOneWidget);
@@ -276,7 +286,10 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('service-due-365')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('service-note')), 'ISO 17025');
+      await tester.enterText(
+        find.byKey(const Key('service-note')),
+        'ISO 17025',
+      );
       await tester.tap(find.byKey(const Key('service-submit')));
       await tester.pumpAndSettle();
 
@@ -285,9 +298,12 @@ void main() {
       expect(kind, ServiceKind.calibration);
       expect(title, 'Annual calibration');
       expect(note, 'ISO 17025');
-      expect(due, _today().add(const Duration(days: 365)).add(
-        const Duration(hours: 23, minutes: 59),
-      ));
+      expect(
+        due,
+        _today()
+            .add(const Duration(days: 365))
+            .add(const Duration(hours: 23, minutes: 59)),
+      );
       expect(find.textContaining('Calibration due'), findsOneWidget);
     });
 
@@ -357,9 +373,7 @@ void main() {
       expect(find.textContaining('Calibration done · next'), findsOneWidget);
     });
 
-    testWidgets('shelf rows mark overdue and due-soon service', (
-      tester,
-    ) async {
+    testWidgets('shelf rows mark overdue and due-soon service', (tester) async {
       tester.view.physicalSize = const Size(420, 840);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);

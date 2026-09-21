@@ -99,22 +99,23 @@ class InventoryRepository {
   /// newest first.
   static List<ApparatusService> sortedServices(
     Iterable<ApparatusService> services,
-  ) => services.toList()..sort((a, b) {
-    if (a.isOpen != b.isOpen) return a.isOpen ? -1 : 1;
-    if (a.isOpen) {
-      final dueA = a.dueAt;
-      final dueB = b.dueAt;
-      if (dueA == null && dueB == null) {
-        return b.createdAt.compareTo(a.createdAt);
+  ) => services.toList()
+    ..sort((a, b) {
+      if (a.isOpen != b.isOpen) return a.isOpen ? -1 : 1;
+      if (a.isOpen) {
+        final dueA = a.dueAt;
+        final dueB = b.dueAt;
+        if (dueA == null && dueB == null) {
+          return b.createdAt.compareTo(a.createdAt);
+        }
+        if (dueA == null) return 1;
+        if (dueB == null) return -1;
+        return dueA.compareTo(dueB);
       }
-      if (dueA == null) return 1;
-      if (dueB == null) return -1;
-      return dueA.compareTo(dueB);
-    }
-    return (b.completedAt ?? b.createdAt).compareTo(
-      a.completedAt ?? a.createdAt,
-    );
-  });
+      return (b.completedAt ?? b.createdAt).compareTo(
+        a.completedAt ?? a.createdAt,
+      );
+    });
 
   static List<InventoryReversal> _sortedReversals(
     Iterable<InventoryReversal> reversals,
@@ -1084,9 +1085,7 @@ class InventoryRepository {
               'apparatus_id': service.apparatusId,
               'changes': changes,
               'previous': {
-                'completed_at': service.completedAt
-                    ?.toUtc()
-                    .toIso8601String(),
+                'completed_at': service.completedAt?.toUtc().toIso8601String(),
                 'performed_by': service.performedBy,
                 'result': service.result,
                 'note': service.note,

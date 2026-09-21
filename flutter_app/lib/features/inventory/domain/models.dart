@@ -889,13 +889,16 @@ class ApparatusService {
     if (!isOpen || due == null) return ExpiryState.none;
     final reference = now ?? DateTime.now();
     final today = DateTime(reference.year, reference.month, reference.day);
-    final days = DateTime(due.year, due.month, due.day).difference(today).inDays;
+    final days = DateTime(
+      due.year,
+      due.month,
+      due.day,
+    ).difference(today).inDays;
     if (days < 0) return ExpiryState.expired;
     return days <= soonDays ? ExpiryState.expiringSoon : ExpiryState.ok;
   }
 
-  bool isOverdue({DateTime? now}) =>
-      dueState(now: now) == ExpiryState.expired;
+  bool isOverdue({DateTime? now}) => dueState(now: now) == ExpiryState.expired;
 
   ApparatusService copyWith({
     String? title,

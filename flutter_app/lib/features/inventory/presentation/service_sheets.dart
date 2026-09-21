@@ -229,7 +229,10 @@ class _ScheduleFormState extends ConsumerState<_ScheduleForm> {
               for (final kind in ServiceKind.values)
                 ButtonSegment(
                   value: kind,
-                  label: Text(kind.label, key: Key('service-kind-${kind.value}')),
+                  label: Text(
+                    kind.label,
+                    key: Key('service-kind-${kind.value}'),
+                  ),
                   icon: Icon(
                     kind == ServiceKind.calibration
                         ? Icons.straighten_outlined
@@ -363,9 +366,8 @@ class _ScheduleFormState extends ConsumerState<_ScheduleForm> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     }
   }
 }
@@ -640,9 +642,8 @@ class _CompleteFormState extends ConsumerState<_CompleteForm> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     }
   }
 }

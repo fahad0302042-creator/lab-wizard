@@ -578,7 +578,10 @@ void main() {
       );
       expect(task.title, 'Buffer check');
       expect(task.isOpen, isTrue);
-      expect(task.dueState(now: DateTime(2026, 9, 21)), ExpiryState.expiringSoon);
+      expect(
+        task.dueState(now: DateTime(2026, 9, 21)),
+        ExpiryState.expiringSoon,
+      );
       expect(task.dueState(now: DateTime(2026, 8, 1)), ExpiryState.ok);
       expect(task.dueState(now: DateTime(2026, 10, 2)), ExpiryState.expired);
       expect(task.isOverdue(now: DateTime(2026, 10, 2)), isTrue);
