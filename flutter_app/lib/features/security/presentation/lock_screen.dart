@@ -240,9 +240,13 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                   ),
                   const SizedBox(height: 20),
                   Semantics(
-                    label: '${_entry.length} of ${lock.pinLength} digits entered',
+                    label:
+                        '${_entry.length} of ${lock.pinLength} digits entered',
                     liveRegion: true,
-                    child: _PinDots(count: _entry.length, total: lock.pinLength),
+                    child: _PinDots(
+                      count: _entry.length,
+                      total: lock.pinLength,
+                    ),
                   ),
                   SizedBox(
                     height: 36,

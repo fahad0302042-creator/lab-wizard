@@ -76,7 +76,12 @@ MemorySecureStore _lockedStore({bool biometrics = true}) {
 }
 
 Future<
-  ({ProviderContainer container, _FakeAuth auth, _TestLock lock, _FakeGate gate})
+  ({
+    ProviderContainer container,
+    _FakeAuth auth,
+    _TestLock lock,
+    _FakeGate gate,
+  })
 >
 _pumpApp(
   WidgetTester tester, {
@@ -142,35 +147,36 @@ void main() {
     expect(find.text('shelf content'), findsOneWidget);
   });
 
-  testWidgets('starts locked, rejects a wrong PIN and opens with the right one', (
-    tester,
-  ) async {
-    final h = await _pumpApp(tester, store: _lockedStore(biometrics: false));
-    expect(find.byKey(const Key('lock-screen')), findsOneWidget);
-    expect(find.text('Enter your 4-digit PIN'), findsOneWidget);
-    expect(find.byKey(const Key('lock-biometric')), findsNothing);
-    // The shelf is still mounted (state preserved) but not reachable.
-    expect(find.text('shelf content'), findsOneWidget);
-    final blockers = tester.widgetList<IgnorePointer>(
-      find.ancestor(
-        of: find.text('shelf content'),
-        matching: find.byType(IgnorePointer),
-      ),
-    );
-    expect(blockers.any((blocker) => blocker.ignoring), isTrue);
+  testWidgets(
+    'starts locked, rejects a wrong PIN and opens with the right one',
+    (tester) async {
+      final h = await _pumpApp(tester, store: _lockedStore(biometrics: false));
+      expect(find.byKey(const Key('lock-screen')), findsOneWidget);
+      expect(find.text('Enter your 4-digit PIN'), findsOneWidget);
+      expect(find.byKey(const Key('lock-biometric')), findsNothing);
+      // The shelf is still mounted (state preserved) but not reachable.
+      expect(find.text('shelf content'), findsOneWidget);
+      final blockers = tester.widgetList<IgnorePointer>(
+        find.ancestor(
+          of: find.text('shelf content'),
+          matching: find.byType(IgnorePointer),
+        ),
+      );
+      expect(blockers.any((blocker) => blocker.ignoring), isTrue);
 
-    await _type(tester, '111');
-    await tester.tap(find.byKey(const Key('lock-backspace')));
-    await tester.pump();
-    await _type(tester, '19');
-    expect(find.byKey(const Key('lock-error')), findsOneWidget);
-    expect(find.textContaining('Wrong PIN'), findsOneWidget);
-    expect(h.container.read(appLockProvider).throttle.failures, 1);
+      await _type(tester, '111');
+      await tester.tap(find.byKey(const Key('lock-backspace')));
+      await tester.pump();
+      await _type(tester, '19');
+      expect(find.byKey(const Key('lock-error')), findsOneWidget);
+      expect(find.textContaining('Wrong PIN'), findsOneWidget);
+      expect(h.container.read(appLockProvider).throttle.failures, 1);
 
-    await _type(tester, '2468');
-    expect(find.byKey(const Key('lock-screen')), findsNothing);
-    expect(h.container.read(appLockProvider).locked, isFalse);
-  });
+      await _type(tester, '2468');
+      expect(find.byKey(const Key('lock-screen')), findsNothing);
+      expect(h.container.read(appLockProvider).locked, isFalse);
+    },
+  );
 
   testWidgets('locks again after a background trip and shows the cool-down', (
     tester,

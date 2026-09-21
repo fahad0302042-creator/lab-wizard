@@ -64,8 +64,10 @@ class AppLockCard extends ConsumerWidget {
             SwitchListTile(
               key: const Key('lock-biometrics'),
               contentPadding: EdgeInsets.zero,
-              title: const Text('Also unlock with fingerprint, face or the '
-                  'phone screen lock'),
+              title: const Text(
+                'Also unlock with fingerprint, face or the '
+                'phone screen lock',
+              ),
               subtitle: lock.biometricsAvailable
                   ? null
                   : const Text(

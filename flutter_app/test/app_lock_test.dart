@@ -72,8 +72,10 @@ Future<void> _settle() async {
   }
 }
 
-({ProviderContainer container, _FakeAuth auth, _TestLock lock})
-_harness(MemorySecureStore store, _FakeGate gate) {
+({ProviderContainer container, _FakeAuth auth, _TestLock lock}) _harness(
+  MemorySecureStore store,
+  _FakeGate gate,
+) {
   late _FakeAuth auth;
   late _TestLock lock;
   final container = ProviderContainer(
@@ -265,7 +267,10 @@ void main() {
       final h = _harness(MemorySecureStore(), _FakeGate());
       await _settle();
       await h.lock.enable('2468');
-      expect(h.container.read(appLockProvider).timeout, LockTimeout.immediately);
+      expect(
+        h.container.read(appLockProvider).timeout,
+        LockTimeout.immediately,
+      );
 
       h.lock.onBackground();
       h.lock.now = h.lock.now.add(const Duration(seconds: 2));
@@ -354,7 +359,10 @@ void main() {
       await h.lock.forgetPinAndSignOut();
       await _settle();
       expect(h.auth.signOuts, 1);
-      expect(store.values.keys.where((k) => k.startsWith('app_lock.u1')), isEmpty);
+      expect(
+        store.values.keys.where((k) => k.startsWith('app_lock.u1')),
+        isEmpty,
+      );
       final state = h.container.read(appLockProvider);
       expect(state.enabled, isFalse);
       expect(state.locked, isFalse);
