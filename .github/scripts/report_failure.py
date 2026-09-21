@@ -122,17 +122,32 @@ for level, (path, line_no, title, message) in zip(levels, findings):
     print(f"::{level}{where},title={title}::{text}" if where else f"::{level} title={title}::{text}")
 
 # --- commit comment ----------------------------------------------------------
-parts = [f"### {headline} — run {os.environ.get('GITHUB_RUN_ID', '?')}", ""]
-if findings:
+def render(findings, detail_limit):
+    """Comment body; details are cut to detail_limit characters each so the
+    list of failures always fits GitHub's comment size."""
+    parts = [f"### {headline} — run {os.environ.get('GITHUB_RUN_ID', '?')}", ""]
+    if not findings:
+        parts.append("No structured findings; log tail:")
+        parts.append("```")
+        parts.extend(lines[-200:])
+        parts.append("```")
+        return "\n".join(parts)
     for path, line_no, title, message in findings:
         where = f"`{path}:{line_no}` " if path else ""
+        if detail_limit == 0:
+            parts.append(f"- **{title}** {where}{message.splitlines()[0] if message else ''}")
+            continue
+        if len(message) > detail_limit:
+            message = message[:detail_limit] + "\n  … (cut)"
         parts.append(f"- **{title}** {where}\n  ```\n  " + message.replace("\n", "\n  ") + "\n  ```")
-else:
-    parts.append("No structured findings; log tail:")
-    parts.append("```")
-    parts.extend(lines[-200:])
-    parts.append("```")
-body = "\n".join(parts)
+    return "\n".join(parts)
+
+
+body = render(findings, 4000)
+for detail_limit in (2000, 1000, 500, 0):
+    if len(body) <= LIMIT:
+        break
+    body = render(findings, detail_limit)
 if len(body) > LIMIT:
     body = body[: LIMIT - 40] + "\n\n…truncated…"
 with open("failure-comment.json", "w", encoding="utf-8") as handle:

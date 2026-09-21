@@ -14,10 +14,13 @@ abstract final class LabColors {
   static const card = Color(0xFFFEFCF5);
   static const cardDark = Color(0xFF2B2621);
   static const marginRed = Color(0xFFB23A2E);
-  static const marginRedDark = Color(0xFFD86A5C);
-  static const amber = Color(0xFFD89A3E);
+  // Status colours double as text colours, so they meet WCAG AA (4.5:1)
+  // on paper and card in their own theme (A11Y-04): amber 5.2:1, green
+  // 5.5:1, red 5.6:1 light; red 5.1:1 on the dark card.
+  static const marginRedDark = Color(0xFFE07A6C);
+  static const amber = Color(0xFF8F5E0E);
   static const amberDark = Color(0xFFE8B558);
-  static const green = Color(0xFF5E8C5A);
+  static const green = Color(0xFF3F6F3B);
   static const greenDark = Color(0xFF7BAE74);
   static const blue = Color(0xFF4A5C8A);
   static const ruled = Color(0xFFD8D2C0);

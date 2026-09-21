@@ -83,10 +83,12 @@ void main() {
       testWidgets('${entry.key}: dashboard', (tester) async {
         await pumpScreen(
           tester,
-          DashboardScreen(
-            user: User.fromJson(userJson)!,
-            onNavigate: (_) {},
-            onSettings: () {},
+          Scaffold(
+            body: DashboardScreen(
+              user: User.fromJson(userJson)!,
+              onNavigate: (_) {},
+              onSettings: () {},
+            ),
           ),
           size: size,
         );
@@ -94,7 +96,7 @@ void main() {
       });
 
       testWidgets('${entry.key}: reports', (tester) async {
-        await pumpScreen(tester, const ReportsScreen(), size: size);
+        await pumpScreen(tester, const Scaffold(body: ReportsScreen()), size: size);
         expect(find.byKey(const Key('metric-consume')), findsOneWidget);
       });
 
@@ -169,10 +171,12 @@ void main() {
     ) async {
       await pumpScreen(
         tester,
-        DashboardScreen(
-          user: User.fromJson(userJson)!,
-          onNavigate: (_) {},
-          onSettings: () {},
+        Scaffold(
+          body: DashboardScreen(
+            user: User.fromJson(userJson)!,
+            onNavigate: (_) {},
+            onSettings: () {},
+          ),
         ),
         size: _sizes['small tablet']!,
       );

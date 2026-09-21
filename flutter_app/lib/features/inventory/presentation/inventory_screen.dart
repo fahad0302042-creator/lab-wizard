@@ -892,14 +892,18 @@ class _ShelfControls extends StatelessWidget {
                   children: [
                     Icon(Icons.sort, size: 17, color: context.mutedInkColor),
                     const SizedBox(width: 4),
-                    Text(
-                      'sort: ${sort.name}',
-                      style: TextStyle(
-                        color: context.mutedInkColor,
-                        fontFamily: 'Caveat',
-                        fontSize: 19,
-                        height: 1,
-                        fontWeight: FontWeight.w700,
+                    Flexible(
+                      child: Text(
+                        'sort: ${sort.name}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.mutedInkColor,
+                          fontFamily: 'Caveat',
+                          fontSize: 19,
+                          height: 1,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     Icon(
@@ -1458,8 +1462,10 @@ class _InventoryCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         // Large numbers with large text shrink to fit rather
-                        // than push past the card edge (A11Y-02).
-                        Flexible(
+                        // than push past the card edge (A11Y-02). Bounded,
+                        // not Flexible: the name column keeps the rest.
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 132),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.topRight,

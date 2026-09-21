@@ -454,6 +454,7 @@ class StockBar extends StatelessWidget {
               progress: value,
               color: color,
               ink: context.inkColor,
+              status: status,
             ),
           ),
         ),
@@ -462,16 +463,22 @@ class StockBar extends StatelessWidget {
   }
 }
 
+/// Stock bar fill. The hatch pattern changes with the status as well as the
+/// colour (A11Y-04): sparse diagonal stripes when healthy, dense stripes when
+/// low, and a cross-hatch when empty, so the state is readable without
+/// colour vision.
 class _HatchedBarPainter extends CustomPainter {
   const _HatchedBarPainter({
     required this.progress,
     required this.color,
     required this.ink,
+    required this.status,
   });
 
   final double progress;
   final Color color;
   final Color ink;
+  final StockState status;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -492,9 +499,27 @@ class _HatchedBarPainter extends CustomPainter {
     canvas.clipRect(fill);
     final stripe = Paint()
       ..color = Color.lerp(color, Colors.black, .18)!
-      ..strokeWidth = 3.2;
-    for (double x = -size.height; x < fillWidth + size.height; x += 8) {
+      ..strokeWidth = status == StockState.healthy ? 3.2 : 2.4;
+    final gap = status == StockState.healthy ? 12.0 : 6.0;
+    for (double x = -size.height; x < fillWidth + size.height; x += gap) {
       canvas.drawLine(Offset(x, size.height), Offset(x + 9, 0), stripe);
+      if (status == StockState.empty) {
+        canvas.drawLine(Offset(x, 0), Offset(x + 9, size.height), stripe);
+      }
+    }
+    // An empty bar still shows a faint cross-hatch across the whole track
+    // so "empty" is not just "nothing".
+    if (progress <= 0) {
+      canvas.restore();
+      canvas.save();
+      canvas.clipRRect(shape);
+      final ghost = Paint()
+        ..color = ink.withValues(alpha: .18)
+        ..strokeWidth = 1.2;
+      for (double x = -size.height; x < size.width + size.height; x += 7) {
+        canvas.drawLine(Offset(x, size.height), Offset(x + 9, 0), ghost);
+        canvas.drawLine(Offset(x, 0), Offset(x + 9, size.height), ghost);
+      }
     }
     canvas.restore();
     canvas.restore();
@@ -511,7 +536,8 @@ class _HatchedBarPainter extends CustomPainter {
   bool shouldRepaint(covariant _HatchedBarPainter oldDelegate) =>
       oldDelegate.progress != progress ||
       oldDelegate.color != color ||
-      oldDelegate.ink != ink;
+      oldDelegate.ink != ink ||
+      oldDelegate.status != status;
 }
 
 Color statusColor(StockState status) => switch (status) {

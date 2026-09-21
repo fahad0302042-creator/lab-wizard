@@ -329,12 +329,16 @@ class ExpiryBadge extends StatelessWidget {
                 color: color,
               ),
               const SizedBox(width: 3),
-              Text(
-                text,
-                style: TextStyle(
-                  color: color,
-                  fontSize: compact ? 10 : 11,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: compact ? 10 : 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],

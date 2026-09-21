@@ -206,6 +206,10 @@ The app follows the system font size up to Android's maximum (200 %); anything l
 
 Layouts are built from wrapping and flexible widgets, so a 320 px phone gets the same screens as a 6-inch one. From 720 px of width (tablets, large phones in landscape) the shelves show two items per row in both densities; the dashboard puts its four tiles in one row from 600 px; bottom sheets stay at most 640 px wide and scroll; the A–Z strip shows every second or third letter when the list area is short (phone landscape) and disappears when there is no room, with the collapsing heading (UX-03) giving the list back most of a landscape screen. `test/responsive_layout_test.dart` renders the shelves (both densities, selection, long lists with the strip), dashboard, reports, detail sheet and add form at 320 × 568, 740 × 360, 600 × 960 and 1024 × 720 and fails on any overflow, and checks the two-column shelf, the one-row dashboard and the thinned strip.
 
+## Contrast and colour vision (A11Y-04)
+
+No state is carried by colour alone: stock status is always written next to its colour (badge, compact-row word, margin note), the stock bar changes its hatch pattern with the state (sparse stripes in stock, dense stripes when low, cross-hatch when empty, a ghost cross-hatch on an empty track), expiry and hazards have icons and words, apparatus condition and loans are icon + text, and sync states are words. The status colours were darkened so that they pass WCAG AA (4.5:1) as text on paper and card: amber 5.2:1, green 5.5:1, red 5.6:1 in the light theme; the dark theme's red was lifted to 5.1:1 on the dark card. `test/a11y_semantics_test.dart` runs Flutter's `textContrastGuideline` over the shelf in both densities and both themes.
+
 ## Signing
 
 GitHub builds use `android/app/lab-wizard-github.jks`, a stable development-distribution key committed intentionally so phone-only testers can install future APKs as updates. Do not use this key for Play Store production. Configure private Play App Signing before publishing commercially.

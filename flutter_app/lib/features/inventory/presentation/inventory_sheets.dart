@@ -1349,17 +1349,19 @@ class _ItemDetail extends ConsumerWidget {
                 style: TextStyle(color: context.mutedInkColor, fontSize: 17),
               ),
             const SizedBox(height: 18),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            // Badge sits beside the amount, or under it with large text.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: 12,
+              runSpacing: 6,
               children: [
-                Expanded(
-                  child: AnimatedQuantity(
-                    quantity,
-                    suffix: ' $unit',
-                    style: const TextStyle(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w900,
-                    ),
+                AnimatedQuantity(
+                  quantity,
+                  suffix: ' $unit',
+                  style: const TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 StatusBadge(status),

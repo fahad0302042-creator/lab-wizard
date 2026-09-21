@@ -392,16 +392,20 @@ class _Mark extends StatelessWidget {
       children: [
         Icon(icon, size: fontSize + 3, color: color),
         const SizedBox(width: 3),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 140),
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontSize: fontSize,
-              fontWeight: FontWeight.w700,
+        // Flexible so a narrow column shortens the text instead of
+        // overflowing the row.
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: fontSize,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),

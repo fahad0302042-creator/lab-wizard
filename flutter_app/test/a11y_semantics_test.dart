@@ -222,6 +222,38 @@ void main() {
       handle.dispose();
     });
 
+    for (final dark in [false, true]) {
+      testWidgets(
+        'A11Y-04: text contrast on the shelf in ${dark ? 'dark' : 'light'}',
+        (tester) async {
+          final handle = tester.ensureSemantics();
+          tester.view.physicalSize = const Size(420, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                inventoryProvider.overrideWith(
+                  () => _SeededInventory(InventoryState(chemicals: chemicals)),
+                ),
+                isOnlineProvider.overrideWithValue(() async => true),
+              ],
+              child: MaterialApp(
+                theme: dark ? AppTheme.dark() : AppTheme.light(),
+                home: const InventoryScreen(kind: ItemKind.chemical),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await expectLater(tester, meetsGuideline(textContrastGuideline));
+          await tester.tap(find.byTooltip('Show compact rows'));
+          await tester.pumpAndSettle();
+          await expectLater(tester, meetsGuideline(textContrastGuideline));
+          handle.dispose();
+        },
+      );
+    }
+
     testWidgets('apparatus rows speak condition, assignee and damage action', (
       tester,
     ) async {
