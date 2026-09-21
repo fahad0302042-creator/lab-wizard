@@ -196,6 +196,9 @@ abstract final class AppTheme {
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
+        // Sheets stay a readable column on tablets and in landscape
+        // (A11Y-03); Material 3's default, made explicit.
+        constraints: const BoxConstraints(maxWidth: 640),
         showDragHandle: true,
         dragHandleColor: dark ? LabColors.mutedInkDark : LabColors.mutedInk,
         backgroundColor: Colors.transparent,

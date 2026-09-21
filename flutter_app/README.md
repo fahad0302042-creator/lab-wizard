@@ -202,6 +202,10 @@ Every shelf row or card is **one spoken item**: name, amount, stock status in wo
 
 The app follows the system font size up to Android's maximum (200 %); anything larger (developer settings, some launchers) is capped there so verified layouts stay valid. Everything is laid out with wrapping or flexible widgets: shelf quantities shrink to fit, dashboard tiles and the week chart grow with the font, report metric tiles stack under large text or on narrow screens, the "more details" headers wrap, and sheets scroll. Two pieces of chrome deliberately clamp their own text: the bottom navigation labels (130 %, the icons carry the meaning) and the A–Z strip letters (sized by their slot; TalkBack has the labels). `test/large_text_test.dart` pumps the shelves, item/edit/consume sheets, dashboard, reports, sync center, lock screen and navigation at 200 % on a 360 × 740 phone and fails on any overflow.
 
+## Small phones, landscape and tablets (A11Y-03)
+
+Layouts are built from wrapping and flexible widgets, so a 320 px phone gets the same screens as a 6-inch one. From 720 px of width (tablets, large phones in landscape) the shelves show two items per row in both densities; the dashboard puts its four tiles in one row from 600 px; bottom sheets stay at most 640 px wide and scroll; the A–Z strip shows every second or third letter when the list area is short (phone landscape) and disappears when there is no room, with the collapsing heading (UX-03) giving the list back most of a landscape screen. `test/responsive_layout_test.dart` renders the shelves (both densities, selection, long lists with the strip), dashboard, reports, detail sheet and add form at 320 × 568, 740 × 360, 600 × 960 and 1024 × 720 and fails on any overflow, and checks the two-column shelf, the one-row dashboard and the thinned strip.
+
 ## Signing
 
 GitHub builds use `android/app/lab-wizard-github.jks`, a stable development-distribution key committed intentionally so phone-only testers can install future APKs as updates. Do not use this key for Play Store production. Configure private Play App Signing before publishing commercially.

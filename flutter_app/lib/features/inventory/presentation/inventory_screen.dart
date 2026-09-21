@@ -28,6 +28,11 @@ enum SelectionAction { restock, threshold, field, labels, delete }
 
 /// Letters offered by the quick navigation strip. Names that do not start
 /// with a Latin letter are grouped under `#`.
+/// Items per shelf row for a screen [width]: one on phones, two once the
+/// screen is tablet-wide (A11Y-03). Cards stay readable instead of
+/// stretching across a tablet.
+int shelfColumns(double width) => width >= 720 ? 2 : 1;
+
 const alphabetIndexLetters = [
   'A',
   'B',
@@ -161,6 +166,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         items.isNotEmpty && visibleIds.every(_selected.contains);
     final showIndex = allItems.length >= _minimumItemsForIndex;
     final availableLetters = {for (final item in items) item.letter};
+    final columns = shelfColumns(MediaQuery.sizeOf(context).width);
     final motion = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
@@ -300,21 +306,29 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               ),
                               sliver: compact
                                   ? SliverList.separated(
-                                      itemCount: items.length,
+                                      itemCount: _rowCount(items, columns),
                                       separatorBuilder: (_, _) => Divider(
                                         height: 1,
                                         thickness: 1,
                                         color: context.ruledColor,
                                       ),
-                                      itemBuilder: (context, index) =>
-                                          _buildCompactRow(items, index),
+                                      itemBuilder: (context, row) => _buildRow(
+                                        items,
+                                        row,
+                                        columns,
+                                        _buildCompactRow,
+                                      ),
                                     )
                                   : SliverList.separated(
-                                      itemCount: items.length,
+                                      itemCount: _rowCount(items, columns),
                                       separatorBuilder: (_, _) =>
                                           const SizedBox(height: _detailedGap),
-                                      itemBuilder: (context, index) =>
-                                          _buildDetailedCard(items, index),
+                                      itemBuilder: (context, row) => _buildRow(
+                                        items,
+                                        row,
+                                        columns,
+                                        _buildDetailedCard,
+                                      ),
                                     ),
                             ),
                             SliverToBoxAdapter(
@@ -425,6 +439,34 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     // Items that were deleted disappear from the selection on rebuild; keep
     // the rest selected so a second action can follow.
     setState(() {});
+  }
+
+  static int _rowCount(List<_InventoryView> items, int columns) =>
+      (items.length + columns - 1) ~/ columns;
+
+  /// One list row: a single item on phones, [columns] items side by side on
+  /// wide screens (A11Y-03). Cards keep their own height; the row aligns
+  /// them at the top.
+  Widget _buildRow(
+    List<_InventoryView> items,
+    int row,
+    int columns,
+    Widget Function(List<_InventoryView> items, int index) build,
+  ) {
+    if (columns == 1) return build(items, row);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var column = 0; column < columns; column++) ...[
+          if (column > 0) const SizedBox(width: _detailedGap),
+          Expanded(
+            child: row * columns + column < items.length
+                ? build(items, row * columns + column)
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildDetailedCard(List<_InventoryView> items, int index) {
@@ -598,18 +640,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     if (first == null || last == null) return null;
     final viewport = RenderAbstractViewport.maybeOf(first);
     if (viewport == null) return null;
+    // Wide screens show several items per list row; the estimate works in
+    // rows, so the pitch is a row height.
+    final columns = shelfColumns(MediaQuery.sizeOf(context).width);
+    final firstRow = firstIndex ~/ columns;
+    final lastRow = lastIndex ~/ columns;
+    final targetRow = target ~/ columns;
     final firstOffset = viewport.getOffsetToReveal(first, 0).offset;
     final double pitch;
-    if (lastIndex != firstIndex) {
+    if (lastRow != firstRow) {
       final lastOffset = viewport.getOffsetToReveal(last, 0).offset;
-      pitch = (lastOffset - firstOffset) / (lastIndex - firstIndex);
+      pitch = (lastOffset - firstOffset) / (lastRow - firstRow);
     } else {
       final compact =
           ref.read(preferencesProvider).inventoryDensity ==
           InventoryDensity.compact;
       pitch = first.size.height + (compact ? 1 : _detailedGap);
     }
-    return firstOffset + (target - firstIndex) * pitch;
+    return firstOffset + (targetRow - firstRow) * pitch;
   }
 
   /// A4 sheet of QR labels for [labels] (QR-01 chemicals, QR-02 apparatus):
@@ -893,11 +941,27 @@ class AlphabetIndex extends StatefulWidget {
 class _AlphabetIndexState extends State<AlphabetIndex> {
   String? _active;
 
+  /// Letters that fit [height] at a readable size: all of them on a phone in
+  /// portrait, every second or third one in landscape, none when there is
+  /// no room at all (A11Y-03). Taps still land on the shown letters only.
+  static List<String> lettersFor(double height) {
+    const minimumSlot = 9.0;
+    final all = alphabetIndexLetters;
+    for (final step in [1, 2, 3]) {
+      final shown = [
+        for (var index = 0; index < all.length; index += step) all[index],
+      ];
+      if (shown.length * minimumSlot <= height) return shown;
+    }
+    return const [];
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final letters = alphabetIndexLetters;
+        final letters = lettersFor(constraints.maxHeight);
+        if (letters.isEmpty) return const SizedBox.shrink();
         final slot = math.min(
           18.0,
           math.max(9.0, constraints.maxHeight / letters.length),
@@ -919,13 +983,14 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   excludeFromSemantics: true,
-                  onTapDown: (details) => _select(details.localPosition, slot),
+                  onTapDown: (details) =>
+                      _select(details.localPosition, slot, letters),
                   onTapUp: (_) => _clear(),
                   onTapCancel: _clear,
                   onVerticalDragStart: (details) =>
-                      _select(details.localPosition, slot),
+                      _select(details.localPosition, slot, letters),
                   onVerticalDragUpdate: (details) =>
-                      _select(details.localPosition, slot),
+                      _select(details.localPosition, slot, letters),
                   onVerticalDragEnd: (_) => _clear(),
                   onVerticalDragCancel: _clear,
                   child: Container(
@@ -1020,10 +1085,10 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
     );
   }
 
-  void _select(Offset local, double slot) {
+  void _select(Offset local, double slot, List<String> letters) {
     final raw = (local.dy / slot).floor();
-    final index = math.max(0, math.min(alphabetIndexLetters.length - 1, raw));
-    final letter = alphabetIndexLetters[index];
+    final index = math.max(0, math.min(letters.length - 1, raw));
+    final letter = letters[index];
     if (letter == _active) return;
     setState(() => _active = letter);
     if (widget.available.contains(letter)) widget.onSelected(letter);

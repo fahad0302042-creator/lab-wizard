@@ -186,7 +186,8 @@ class DashboardScreen extends ConsumerWidget {
             // Tile height follows the font size so the number and caption
             // never clip at large text (A11Y-02).
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+              // Four tiles in one row on tablets and landscape (A11Y-03).
+              crossAxisCount: MediaQuery.sizeOf(context).width >= 600 ? 4 : 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               mainAxisExtent:
