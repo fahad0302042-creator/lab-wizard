@@ -17,133 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'support/mock_http.dart';
-
-/// Just enough of PostgREST to exercise conditional updates and RPC errors:
-/// `eq`/`is` filters, PATCH/POST/DELETE, single-object responses and
-/// scripted RPC functions.
-class _FakePostgrest {
-  final tables = <String, List<Map<String, dynamic>>>{
-    'chemicals': [],
-    'apparatus': [],
-    'consumption_logs': [],
-  };
-  final requests = <http.Request>[];
-  final rpc = <String, http.Response Function(Map<String, dynamic> params)>{};
-  bool offline = false;
-
-  http.Client get client => mockHttpClient(_handle);
-
-  Iterable<http.Request> get patches =>
-      requests.where((request) => request.method == 'PATCH');
-
-  Map<String, dynamic> row(String table, String id) =>
-      tables[table]!.firstWhere((row) => row['id'] == id);
-
-  Future<http.Response> _handle(http.Request request) async {
-    if (offline) throw const SocketException('offline');
-    requests.add(request);
-    final segments = request.url.pathSegments;
-    if (segments.length >= 4 && segments[2] == 'rpc') {
-      final handler = rpc[segments[3]];
-      if (handler == null) {
-        return _error(
-          404,
-          'Could not find the function public.${segments[3]}',
-          'PGRST202',
-        );
-      }
-      return handler(jsonDecode(request.body) as Map<String, dynamic>);
-    }
-    final rows = tables.putIfAbsent(segments[2], () => []);
-    final matched = rows
-        .where((row) => _matches(row, request.url.queryParameters))
-        .toList();
-    switch (request.method) {
-      case 'GET':
-        break;
-      case 'PATCH':
-        final changes = jsonDecode(request.body) as Map<String, dynamic>;
-        for (final row in matched) {
-          row.addAll(changes);
-        }
-      case 'POST':
-        final body = jsonDecode(request.body);
-        for (final item in body is List ? body : [body]) {
-          rows.add(Map<String, dynamic>.from(item as Map));
-          matched.add(rows.last);
-        }
-      case 'DELETE':
-        rows.removeWhere(matched.contains);
-      default:
-        return _error(405, 'Method not allowed', '405');
-    }
-    final accept = request.headers['Accept'] ?? '';
-    if (accept.contains('object+json')) {
-      if (matched.length != 1) {
-        return http.Response(
-          jsonEncode({
-            'message': 'JSON object requested, multiple (or no) rows returned',
-            'code': 'PGRST116',
-            'details': 'Results contain ${matched.length} rows',
-            'hint': null,
-          }),
-          406,
-          headers: _json,
-        );
-      }
-      return http.Response(jsonEncode(matched.single), 200, headers: _json);
-    }
-    return http.Response(jsonEncode(matched), 200, headers: _json);
-  }
-
-  static const _json = {'content-type': 'application/json; charset=utf-8'};
-
-  static http.Response _error(int status, String message, String code) =>
-      http.Response(
-        jsonEncode({
-          'message': message,
-          'code': code,
-          'details': null,
-          'hint': null,
-        }),
-        status,
-        headers: _json,
-      );
-
-  static bool _matches(Map<String, dynamic> row, Map<String, String> query) {
-    for (final entry in query.entries) {
-      if (entry.key == 'select' || entry.key == 'columns') continue;
-      final value = entry.value;
-      final dot = value.indexOf('.');
-      final operator = value.substring(0, dot);
-      final operand = value.substring(dot + 1);
-      final actual = row[entry.key];
-      switch (operator) {
-        case 'eq':
-          if (!_equal(actual, operand)) return false;
-        case 'is':
-          if (operand == 'null') {
-            if (actual != null) return false;
-          } else if (actual != (operand == 'true')) {
-            return false;
-          }
-        default:
-          throw UnsupportedError('operator $operator');
-      }
-    }
-    return true;
-  }
-
-  static bool _equal(Object? actual, String operand) {
-    if (actual == null) return false;
-    if (actual is num) {
-      final number = num.tryParse(operand);
-      return number != null && number == actual;
-    }
-    return actual.toString() == operand;
-  }
-}
+import 'support/fake_postgrest.dart';
 
 Map<String, dynamic> _acetone() => {
   'id': 'c1',
@@ -298,7 +172,7 @@ void main() {
       path: p.join(directory.path, name),
     );
 
-    SupabaseClient clientFor(_FakePostgrest server) {
+    SupabaseClient clientFor(FakePostgrest server) {
       final client = SupabaseClient(
         'http://fake.local',
         'test-key',
@@ -387,7 +261,7 @@ void main() {
     );
 
     test('an edit only sends changed fields and guards them', () async {
-      final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+      final server = FakePostgrest()..tables['chemicals']!.add(_acetone());
       final local = openLocal('guard.db');
       addTearDown(local.close);
       await local.upsertRecord('u1', 'chemical', _acetone());
@@ -430,7 +304,7 @@ void main() {
     test(
       'a field changed on both sides is a conflict, not an overwrite',
       () async {
-        final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+        final server = FakePostgrest()..tables['chemicals']!.add(_acetone());
         final local = openLocal('clash.db');
         addTearDown(local.close);
         await local.upsertRecord('u1', 'chemical', _acetone());
@@ -544,7 +418,7 @@ void main() {
     );
 
     test('a queued edit that lost the race waits for a decision', () async {
-      final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+      final server = FakePostgrest()..tables['chemicals']!.add(_acetone());
       final local = openLocal('queued.db');
       addTearDown(local.close);
       await local.upsertRecord('u1', 'chemical', _acetone());
@@ -619,7 +493,7 @@ void main() {
     });
 
     test('a queued edit whose item was deleted is reported as such', () async {
-      final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+      final server = FakePostgrest()..tables['chemicals']!.add(_acetone());
       final local = openLocal('deleted.db');
       addTearDown(local.close);
       await local.upsertRecord('u1', 'chemical', _acetone());
@@ -645,7 +519,7 @@ void main() {
     test(
       'stale stock becomes a conflict that can apply what is left',
       () async {
-        final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+        final server = FakePostgrest()..tables['chemicals']!.add(_acetone());
         final local = openLocal('stock.db');
         addTearDown(local.close);
         await local.upsertRecord('u1', 'chemical', _acetone());
@@ -660,7 +534,7 @@ void main() {
           final row = server.row('chemicals', 'c1');
           final quantity = row['quantity'] as num;
           if (quantity < amount) {
-            return _FakePostgrest._error(
+            return FakePostgrest.error(
               400,
               'Insufficient stock: only $quantity available',
               '22003',
@@ -682,7 +556,7 @@ void main() {
           return http.Response(
             jsonEncode({'item': row, 'log': log, 'duplicate': false}),
             200,
-            headers: _FakePostgrest._json,
+            headers: FakePostgrest.json,
           );
         };
 
@@ -736,7 +610,7 @@ void main() {
     test(
       'without the RPC, quantities are rebased instead of overwritten',
       () async {
-        final server = _FakePostgrest()..tables['chemicals']!.add(_acetone());
+        final server = FakePostgrest()..tables['chemicals']!.add(_acetone());
         final local = openLocal('compat.db');
         addTearDown(local.close);
         await local.upsertRecord('u1', 'chemical', _acetone());

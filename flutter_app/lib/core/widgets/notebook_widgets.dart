@@ -19,10 +19,12 @@ class NotebookPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The shadow stays on a DecoratedBox; the paper colour is a Material so
+    // list tiles and ink splashes on a page paint on the paper (Flutter
+    // asserts when a coloured box sits between a tile and its Material).
     final content = DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.paperColor,
-        boxShadow: const [
+      decoration: const BoxDecoration(
+        boxShadow: [
           BoxShadow(
             color: Color(0x35000000),
             blurRadius: 22,
@@ -30,13 +32,16 @@ class NotebookPage extends StatelessWidget {
           ),
         ],
       ),
-      child: CustomPaint(
-        painter: _PaperPainter(
-          ruled: context.ruledColor,
-          margin: context.marginLineColor,
-          desk: Theme.of(context).scaffoldBackgroundColor,
+      child: Material(
+        color: context.paperColor,
+        child: CustomPaint(
+          painter: _PaperPainter(
+            ruled: context.ruledColor,
+            margin: context.marginLineColor,
+            desk: Theme.of(context).scaffoldBackgroundColor,
+          ),
+          child: child,
         ),
-        child: child,
       ),
     );
     return includeSafeArea ? SafeArea(child: content) : content;
