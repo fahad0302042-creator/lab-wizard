@@ -317,7 +317,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       _handling = false;
       return;
     }
-    unawaited(history.record(RecentScan.found(match, raw.trim(), DateTime.now())));
+    unawaited(
+      history.record(RecentScan.found(match, raw.trim(), DateTime.now())),
+    );
     await _scanner.stop();
     HapticFeedback.mediumImpact();
     if (mounted) {

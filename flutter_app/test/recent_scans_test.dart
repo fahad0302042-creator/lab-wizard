@@ -67,15 +67,14 @@ Apparatus _apparatus(String id) => Apparatus(
   createdAt: DateTime(2026, 1, 1),
 );
 
-RecentScan _found(ItemKind kind, String id, {int minutesAgo = 0}) =>
-    RecentScan(
-      raw: 'labwizard:${kind.name}:$id',
-      scannedAt: _now.subtract(Duration(minutes: minutesAgo)),
-      kind: kind,
-      itemId: id,
-      name: kind == ItemKind.chemical ? 'Ethanol $id' : 'Burette $id',
-      subtitle: kind == ItemKind.chemical ? 'C2H6O' : 'volumetric glass',
-    );
+RecentScan _found(ItemKind kind, String id, {int minutesAgo = 0}) => RecentScan(
+  raw: 'labwizard:${kind.name}:$id',
+  scannedAt: _now.subtract(Duration(minutes: minutesAgo)),
+  kind: kind,
+  itemId: id,
+  name: kind == ItemKind.chemical ? 'Ethanol $id' : 'Burette $id',
+  subtitle: kind == ItemKind.chemical ? 'C2H6O' : 'volumetric glass',
+);
 
 ProviderContainer _container(String userId) {
   final container = ProviderContainer(
@@ -205,10 +204,7 @@ void main() {
         'raw:https://example.com',
       ]);
       for (var index = 0; index < 40; index++) {
-        history = pushRecentScan(
-          history,
-          _found(ItemKind.chemical, 'c$index'),
-        );
+        history = pushRecentScan(history, _found(ItemKind.chemical, 'c$index'));
       }
       expect(history, hasLength(recentScansLimit));
       expect(history.first.itemId, 'c39');

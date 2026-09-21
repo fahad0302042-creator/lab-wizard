@@ -20,8 +20,7 @@ class RecentScansSection extends ConsumerStatefulWidget {
   final int collapsedCount;
 
   @override
-  ConsumerState<RecentScansSection> createState() =>
-      _RecentScansSectionState();
+  ConsumerState<RecentScansSection> createState() => _RecentScansSectionState();
 }
 
 class _RecentScansSectionState extends ConsumerState<RecentScansSection> {
@@ -99,9 +98,7 @@ class _RecentScansSectionState extends ConsumerState<RecentScansSection> {
     }
     if (!_exists(inventory, scan)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${scan.name} is no longer in your notebook.'),
-        ),
+        SnackBar(content: Text('${scan.name} is no longer in your notebook.')),
       );
       return;
     }
@@ -192,10 +189,7 @@ class _RecentScanTile extends StatelessWidget {
     final when = relativeTime(scan.scannedAt);
     final title = scan.found ? scan.name : 'Unknown code';
     final detail = scan.found
-        ? [
-            if (scan.subtitle.isNotEmpty) scan.subtitle,
-            when,
-          ].join(' · ')
+        ? [if (scan.subtitle.isNotEmpty) scan.subtitle, when].join(' · ')
         : '${_shorten(scan.raw)} · $when';
     final icon = !scan.found
         ? Icons.help_outline
