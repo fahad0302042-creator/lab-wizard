@@ -12,7 +12,7 @@ import 'package:lab_wizard/core/theme/app_theme.dart';
 import 'package:lab_wizard/features/auth/presentation/auth_screen.dart';
 import 'package:lab_wizard/features/auth/presentation/new_password_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 final _user = User.fromJson({
   'id': 'u1',

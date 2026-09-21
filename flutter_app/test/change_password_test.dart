@@ -9,7 +9,7 @@ import 'package:lab_wizard/app/providers.dart';
 import 'package:lab_wizard/core/theme/app_theme.dart';
 import 'package:lab_wizard/features/auth/presentation/change_password_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 const _email = 'ali@example.org';
 

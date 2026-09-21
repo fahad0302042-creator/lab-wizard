@@ -12,7 +12,7 @@ import 'package:lab_wizard/core/theme/app_theme.dart';
 import 'package:lab_wizard/features/auth/presentation/delete_account_sheet.dart';
 import 'package:lab_wizard/features/inventory/domain/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 const _email = 'ali@example.org';
 

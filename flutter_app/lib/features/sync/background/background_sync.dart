@@ -134,10 +134,8 @@ class WorkmanagerScheduler implements BackgroundScheduler {
   final Workmanager _workmanager;
   Future<void>? _initializing;
 
-  Future<void> _initialize() => _initializing ??= _workmanager.initialize(
-    backgroundSyncDispatcher,
-    isInDebugMode: false,
-  );
+  Future<void> _initialize() =>
+      _initializing ??= _workmanager.initialize(backgroundSyncDispatcher);
 
   Constraints _constraints(BackgroundSyncPreferences preferences) =>
       Constraints(

@@ -214,8 +214,8 @@ class BackgroundSyncCoordinator extends Notifier<BackgroundSyncState>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
-    unawaited(handleLifecycle(lifecycle));
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    unawaited(handleLifecycle(state));
   }
 
   @visibleForTesting

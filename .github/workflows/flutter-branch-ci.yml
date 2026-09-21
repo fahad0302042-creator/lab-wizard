@@ -12,6 +12,7 @@ on:
     paths:
       - "flutter_app/**"
       - ".github/workflows/flutter-branch-ci.yml"
+      - ".github/scripts/report_failure.py"
   workflow_dispatch:
 
 permissions:
@@ -74,73 +75,41 @@ jobs:
             echo "::warning::Branch moved during the run; formatting fixes will be re-applied on the next run."
           fi
 
-      # Analyzer and test failures are re-emitted as check annotations so they
-      # can be read through the GitHub API without downloading the raw logs.
+      # Analyzer, test and build failures are re-emitted as check annotations
+      # and as a commit comment (.github/scripts/report_failure.py) so they can
+      # be read through the GitHub API without downloading the raw logs.
       # GitHub's default step shell is `bash -e` WITHOUT pipefail, so a
       # `cmd | tee` pipeline would report tee's exit code; pipefail keeps the
       # analyzer/test/build status honest.
       - name: Analyze source
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           if flutter analyze --fatal-infos 2>&1 | tee analyze.log; then exit 0; fi
-          python3 - <<'PY'
-          import re
-          # GitHub keeps at most 10 annotations per level and step, so the
-          # summary goes first and the details are capped.
-          pattern = re.compile(r'^\s*(error|warning|info) • (.*) • (.*?):(\d+):(\d+) • (\S+)\s*$')
-          issues = []
-          for line in open('analyze.log', encoding='utf-8', errors='replace'):
-              match = pattern.match(line)
-              if match:
-                  issues.append(match.groups())
-          print(f'::error title=Analyzer::{len(issues)} issue(s); first {min(9, len(issues))} annotated')
-          for level, message, path, line_no, _, rule in issues[:9]:
-              print(f'::error file=flutter_app/{path},line={line_no},title={level} {rule}::{message}')
-          PY
+          python3 ../.github/scripts/report_failure.py analyze analyze.log
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" --input failure-comment.json --silent || echo "::warning::Could not post the commit comment"
           exit 1
 
       - name: Install SQLite for database tests
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
 
       - name: Run tests
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           if flutter test --reporter expanded 2>&1 | tee test.log; then exit 0; fi
-          python3 - <<'PY'
-          import re
-          progress = re.compile(r'^\d\d:\d\d \+\d+(?: ~\d+)?(?: -\d+)?: (.*?)(?: \[E\])?$')
-          compile_error = re.compile(r'^\s*((?:test|lib)/\S+?\.dart):(\d+):(\d+): Error: (.*)$')
-          failures = []
-          current = None
-          emitted = 0
-          for raw in open('test.log', encoding='utf-8', errors='replace'):
-              line = raw.rstrip('\n')
-              compiled = compile_error.match(line)
-              if compiled and emitted < 10:
-                  path, line_no, _, message = compiled.groups()
-                  print(f'::error file=flutter_app/{path},line={line_no},title=Compile error::{message}')
-                  emitted += 1
-                  continue
-              match = progress.match(line)
-              if match:
-                  current = [line] if line.endswith('[E]') else None
-                  if current:
-                      failures.append(current)
-                  continue
-              if current is not None and len(current) < 14:
-                  current.append(line)
-          print(f'::error title=Tests::{len(failures)} failing test(s); first {min(9, len(failures))} annotated')
-          for block in failures[:9]:
-              title = block[0].split(': ', 1)[1].removesuffix(' [E]')
-              detail = '%0A'.join(entry.strip() for entry in block[1:] if entry.strip())
-              print(f'::error title=Test failed::{title}%0A{detail}')
-          PY
+          python3 ../.github/scripts/report_failure.py test test.log
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" --input failure-comment.json --silent || echo "::warning::Could not post the commit comment"
           exit 1
 
       # versionCode is minutes since the epoch so that branch builds and main
       # releases always increase together and can be installed as updates over
       # each other without uninstalling.
       - name: Build signed universal APK
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           if flutter build apk --release \
@@ -149,24 +118,8 @@ jobs:
               --build-number=$(( $(date +%s) / 60 )) 2>&1 | tee build.log; then
             exit 0
           fi
-          python3 - <<'PY'
-          import re
-          dart_error = re.compile(r'^\s*((?:lib|test)/\S+?\.dart):(\d+):(\d+): Error: (.*)$')
-          other = re.compile(r'(FAILURE:|What went wrong|error:|Error:|Exception)')
-          emitted = 0
-          for raw in open('build.log', encoding='utf-8', errors='replace'):
-              line = raw.rstrip('\n')
-              if emitted >= 10:
-                  break
-              match = dart_error.match(line)
-              if match:
-                  path, line_no, _, message = match.groups()
-                  print(f'::error file=flutter_app/{path},line={line_no},title=Compile error::{message}')
-                  emitted += 1
-              elif other.search(line):
-                  print('::error title=Build::' + line.strip()[:900])
-                  emitted += 1
-          PY
+          python3 ../.github/scripts/report_failure.py build build.log
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" --input failure-comment.json --silent || echo "::warning::Could not post the commit comment"
           exit 1
 
       - name: Name APK for download
