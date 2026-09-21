@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:lab_wizard/app/providers.dart';
 import 'package:lab_wizard/core/database/local_database.dart';
 import 'package:lab_wizard/core/theme/app_theme.dart';
@@ -13,6 +12,7 @@ import 'package:lab_wizard/features/auth/presentation/delete_account_sheet.dart'
 import 'package:lab_wizard/features/inventory/domain/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'support/mock_http.dart';
 
 const _email = 'ali@example.org';
 
@@ -42,7 +42,7 @@ class _FakeServer {
   bool functionInstalled = true;
   bool offline = false;
 
-  http.Client get client => MockClient((request) async {
+  http.Client get client => mockHttpClient((request) async {
     if (offline && request.url.path.contains('/rest/')) {
       throw const SocketException('offline');
     }

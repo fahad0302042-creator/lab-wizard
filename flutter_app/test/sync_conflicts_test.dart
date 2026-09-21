@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:lab_wizard/app/providers.dart';
 import 'package:lab_wizard/core/database/local_database.dart';
 import 'package:lab_wizard/core/theme/app_theme.dart';
@@ -17,6 +16,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'support/mock_http.dart';
 
 /// Just enough of PostgREST to exercise conditional updates and RPC errors:
 /// `eq`/`is` filters, PATCH/POST/DELETE, single-object responses and
@@ -31,7 +31,7 @@ class _FakePostgrest {
   final rpc = <String, http.Response Function(Map<String, dynamic> params)>{};
   bool offline = false;
 
-  http.Client get client => MockClient(_handle);
+  http.Client get client => mockHttpClient(_handle);
 
   Iterable<http.Request> get patches =>
       requests.where((request) => request.method == 'PATCH');

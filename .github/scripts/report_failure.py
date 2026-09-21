@@ -38,33 +38,69 @@ if KIND == "analyze":
             findings.append((path, line_no, f"{level} {rule}", message))
     headline = f"flutter analyze: {len(findings)} issue(s)"
 elif KIND == "test":
-    progress = re.compile(r"^\d\d:\d\d \+\d+(?: ~\d+)?(?: -\d+)?: (.*?)(?: \[E\])?$")
+    # The compact reporter prints a progress line before every chunk of test
+    # output.  A failing widget test therefore appears twice: first as
+    # "<title>" followed by the framework's exception dump, then as
+    # "<title> [E]" followed by the (terse) failure summary.  Both parts are
+    # kept and merged so the comment shows the real assertion.
+    progress = re.compile(r"^\d\d:\d\d \+\d+(?: ~\d+)?(?: -\d+)?: (.*?)( \[E\])?$")
     compile_error = re.compile(r"^\s*((?:test|lib)/\S+?\.dart):(\d+):(\d+): Error: (.*)$")
-    blocks = []
-    current = None
+    frame = re.compile(r"^\s*#\d+\s")
+    noise = re.compile(r"^[═╞╡\s]*$")
+    seen_compile = set()
+    printed = {}  # title -> lines printed by the test before it failed
+    failures = []  # (title, summary lines)
+    current_title, current_failed = None, False
     for line in lines:
         compiled = compile_error.match(line)
         if compiled:
             path, line_no, _, message = compiled.groups()
-            findings.append((path, line_no, "Compile error", message))
+            key = (path, line_no, message)
+            if key not in seen_compile:
+                seen_compile.add(key)
+                findings.append((path, line_no, "Compile error", message))
             continue
         match = progress.match(line)
         if match:
-            current = [line] if line.endswith("[E]") else None
-            if current:
-                blocks.append(current)
+            current_title, current_failed = match.group(1), bool(match.group(2))
+            if current_failed:
+                failures.append((current_title, []))
             continue
-        if current is not None and len(current) < 60:
-            current.append(line)
-    for block in blocks:
-        title = block[0].split(": ", 1)[1].removesuffix(" [E]")
-        detail = "\n".join(entry.rstrip() for entry in block[1:] if entry.strip())
+        if current_title is None:
+            continue
+        if current_failed:
+            if len(failures[-1][1]) < 40:
+                failures[-1][1].append(line)
+        else:
+            printed.setdefault(current_title, []).append(line)
+
+    def useful(block):
+        """Keeps messages and the stack frames that point at our own code."""
+        kept = []
+        for entry in block:
+            text = entry.rstrip()
+            if not text.strip() or noise.match(text):
+                continue
+            if frame.match(text) and not re.search(r"(package:lab_wizard/|[\s(/]test/\S+_test\.dart)", text):
+                continue
+            if text.startswith("(elided ") or "asynchronous suspension" in text:
+                continue
+            kept.append(text)
+            if len(kept) >= 45:
+                kept.append("…")
+                break
+        return kept
+
+    for title, summary in failures:
+        detail_lines = useful(printed.get(title, [])) + useful(summary)
+        detail = "\n".join(detail_lines)
         # Point the annotation at the test file when the trace names one.
-        location = re.search(r"(test/[^\s:]+?\.dart)[ :](\d+):\d+", detail)
+        location = re.search(r"(?:^|[\s(/])(test/[^\s:]+?_test\.dart)[ :](\d+):\d+", detail, re.M)
         path = location.group(1) if location else None
         line_no = location.group(2) if location else None
-        findings.append((path, line_no, "Test failed", f"{title}\n{detail}"))
-    headline = f"flutter test: {len(blocks)} failing test(s)"
+        short_title = title.split("/flutter_app/")[-1]
+        findings.append((path, line_no, "Test failed", f"{short_title}\n{detail}"))
+    headline = f"flutter test: {len(failures)} failing test(s)"
 else:
     dart_error = re.compile(r"^\s*((?:lib|test)/\S+?\.dart):(\d+):(\d+): Error: (.*)$")
     other = re.compile(r"(FAILURE:|What went wrong|error:|Error:|Exception)")

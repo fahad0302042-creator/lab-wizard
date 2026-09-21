@@ -69,7 +69,7 @@ class _FakeSource implements SyncSource {
   }) async {
     requests++;
     if (missing.contains(table)) throw SyncTableMissing(table);
-    final rows = [...tables[table] ?? const []]
+    final rows = [...?tables[table]]
       ..sort((a, b) => _compare(a, b, 'updated_at'));
     return _after(rows, 'updated_at', after, afterId).take(limit).toList();
   }
@@ -102,7 +102,7 @@ class _FakeSource implements SyncSource {
   }) async {
     requests++;
     if (missing.contains(table)) throw SyncTableMissing(table);
-    final rows = [...tables[table] ?? const []]
+    final rows = [...?tables[table]]
       ..sort((a, b) => -_compare(a, b, orderBy));
     if (offset >= rows.length) return const [];
     return rows.sublist(

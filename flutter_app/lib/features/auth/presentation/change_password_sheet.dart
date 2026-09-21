@@ -118,10 +118,10 @@ class _ChangePasswordFormState extends ConsumerState<ChangePasswordForm> {
             ),
             validator: (value) {
               final text = value ?? '';
-              if (text.length < 6) return 'Use at least 6 characters';
-              if (text == _current.text) {
+              if (text.isNotEmpty && text == _current.text) {
                 return 'Choose a password different from the current one.';
               }
+              if (text.length < 6) return 'Use at least 6 characters';
               return null;
             },
           ),

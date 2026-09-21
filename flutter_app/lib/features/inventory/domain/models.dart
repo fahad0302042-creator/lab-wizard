@@ -396,16 +396,22 @@ enum ApparatusCondition {
 
   final String label;
 
+  /// Accepts the label, the enum name and common spellings such as
+  /// `needs_repair` or `NeedsRepair`; anything else is free text.
   static ApparatusCondition? fromLabel(String? value) {
-    final normalized = (value ?? '').trim().toLowerCase();
+    final normalized = _squash(value ?? '');
     if (normalized.isEmpty) return null;
     for (final condition in values) {
-      if (condition.label == normalized || condition.name == normalized) {
+      if (_squash(condition.label) == normalized ||
+          _squash(condition.name) == normalized) {
         return condition;
       }
     }
     return null;
   }
+
+  static String _squash(String value) =>
+      value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 }
 
 class Apparatus {

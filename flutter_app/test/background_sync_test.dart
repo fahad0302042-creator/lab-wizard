@@ -79,6 +79,8 @@ class _FakeInventory extends InventoryController {
     refreshes++;
     state = state.copyWith(refreshing: true);
     await Future<void>.delayed(Duration.zero);
+    // A test may finish (and dispose the container) during the delay.
+    if (!ref.mounted) return;
     final change = afterRefresh;
     state = change != null
         ? change(state)

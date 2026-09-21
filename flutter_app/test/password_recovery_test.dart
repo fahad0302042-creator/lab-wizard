@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:lab_wizard/app/providers.dart';
 import 'package:lab_wizard/core/config/app_config.dart';
 import 'package:lab_wizard/core/theme/app_theme.dart';
@@ -13,6 +12,7 @@ import 'package:lab_wizard/features/auth/presentation/auth_screen.dart';
 import 'package:lab_wizard/features/auth/presentation/new_password_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'support/mock_http.dart';
 
 final _user = User.fromJson({
   'id': 'u1',
@@ -56,7 +56,7 @@ class _FakeGoTrue {
   final requests = <http.Request>[];
   int recoverStatus = 200;
 
-  http.Client get client => MockClient((request) async {
+  http.Client get client => mockHttpClient((request) async {
     requests.add(request);
     final path = request.url.path;
     if (path.endsWith('/auth/v1/recover')) {

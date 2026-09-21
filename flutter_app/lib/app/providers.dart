@@ -228,10 +228,10 @@ class AuthController extends Notifier<AuthState> {
       return 'Sign in again to change your password.';
     }
     if (current.isEmpty) return 'Enter your current password.';
-    if (next.length < 6) return 'Use at least 6 characters';
     if (next == current) {
       return 'Choose a password different from the current one.';
     }
+    if (next.length < 6) return 'Use at least 6 characters';
     try {
       await client.auth.signInWithPassword(email: email, password: current);
     } on AuthException catch (error) {
