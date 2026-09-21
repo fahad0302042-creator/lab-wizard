@@ -1,5 +1,6 @@
 package com.labwizard.lab_wizard
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity: local_auth (SECURITY-01) needs a FragmentActivity.
+class MainActivity : FlutterFragmentActivity()

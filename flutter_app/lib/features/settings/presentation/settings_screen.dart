@@ -17,6 +17,7 @@ import '../../inventory/domain/models.dart';
 import '../../notifications/presentation/notification_settings_card.dart';
 import '../../sync/presentation/background_sync_card.dart';
 import '../../sync/presentation/sync_center_screen.dart';
+import 'app_lock_card.dart';
 import 'lab_profile_card.dart';
 import 'sessions_card.dart';
 
@@ -317,6 +318,8 @@ class SettingsScreen extends ConsumerWidget {
             const LabProfileCard(),
             const SizedBox(height: 13),
             const SessionsCard(),
+            const SizedBox(height: 13),
+            const AppLockCard(),
             const SizedBox(height: 13),
             NotebookCard(
               child: Column(

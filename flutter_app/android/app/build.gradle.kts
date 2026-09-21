@@ -58,6 +58,9 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Explicit so the Theme.AppCompat parents in res/values/styles.xml always
+    // resolve (local_auth's biometric dialog needs them, SECURITY-01).
+    implementation("androidx.appcompat:appcompat:1.7.1")
 }
 
 flutter {

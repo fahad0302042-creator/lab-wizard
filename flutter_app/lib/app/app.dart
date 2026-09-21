@@ -6,6 +6,7 @@ import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/auth/presentation/new_password_screen.dart';
 import '../features/home/presentation/home_shell.dart';
+import '../features/security/presentation/lock_screen.dart';
 import 'providers.dart';
 
 class LabWizardApp extends ConsumerWidget {
@@ -28,7 +29,9 @@ class LabWizardApp extends ConsumerWidget {
                 media.disableAnimations || preferences.reduceMotion,
             textScaler: media.textScaler.clamp(maxScaleFactor: 1.5),
           ),
-          child: child!,
+          // Above the navigator so the lock also covers open sheets and
+          // dialogs (SECURITY-01).
+          child: LockGate(child: child!),
         );
       },
       home: const _AuthGate(),
