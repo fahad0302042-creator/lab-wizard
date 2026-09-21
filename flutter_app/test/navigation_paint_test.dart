@@ -110,10 +110,10 @@ void main() {
 
     // Their tickers are muted.
     expect(
-      TickerMode.of(tester.element(find.byType(InventoryScreen).first)),
+      TickerMode.valuesOf(tester.element(find.byType(InventoryScreen).first)).enabled,
       isFalse,
     );
-    expect(TickerMode.of(tester.element(find.byType(DashboardScreen))), isTrue);
+    expect(TickerMode.valuesOf(tester.element(find.byType(DashboardScreen))).enabled, isTrue);
 
     // Switching tabs flips all of the above.
     await tester.tap(find.text('chems'));
@@ -124,11 +124,11 @@ void main() {
     expect(find.byType(InventoryScreen).hitTestable(), findsOneWidget);
     expect(find.bySemanticsLabel('chemicals shelf'), findsOneWidget);
     expect(
-      TickerMode.of(tester.element(find.byType(DashboardScreen))),
+      TickerMode.valuesOf(tester.element(find.byType(DashboardScreen))).enabled,
       isFalse,
     );
     expect(
-      TickerMode.of(tester.element(find.byType(InventoryScreen).first)),
+      TickerMode.valuesOf(tester.element(find.byType(InventoryScreen).first)).enabled,
       isTrue,
     );
     handle.dispose();
