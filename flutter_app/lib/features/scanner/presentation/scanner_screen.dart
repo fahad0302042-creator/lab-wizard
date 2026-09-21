@@ -11,8 +11,10 @@ import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
 import '../domain/recent_scan.dart';
+import '../domain/scan_batch.dart';
 import '../domain/scan_resolver.dart';
 import '../scanner_providers.dart';
+import 'batch_summary_sheet.dart';
 import 'recent_scans_section.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
@@ -31,6 +33,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   final _search = TextEditingController();
   bool _handling = false;
   String? _message;
+  Timer? _messageTimer;
+  bool _batchMode = false;
+  ScanBatch _batch = const ScanBatch();
+  String? _lastRaw;
+  DateTime? _lastRawAt;
 
   @override
   void initState() {
@@ -71,6 +78,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
   @override
   void dispose() {
+    _messageTimer?.cancel();
     _line.dispose();
     _search.dispose();
     _scanner.dispose();
@@ -216,7 +224,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        _message ?? 'Hold steady inside the frame',
+                        _message ?? _idleMessage,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
@@ -230,6 +238,52 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: SegmentedButton<bool>(
+                key: const Key('scan-mode'),
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.qr_code_scanner),
+                    label: Text('Single'),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.playlist_add_check_outlined),
+                    label: Text('Batch'),
+                  ),
+                ],
+                selected: {_batchMode},
+                onSelectionChanged: (selection) =>
+                    setState(() => _batchMode = selection.first),
+              ),
+            ),
+            if (_batch.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              FilledButton.tonalIcon(
+                key: const Key('batch-finish'),
+                onPressed: _finishBatch,
+                icon: const Icon(Icons.checklist_outlined),
+                label: Text('Finish (${_batch.itemCount})'),
+              ),
+            ],
+          ],
+        ),
+        if (_batchMode) ...[
+          const SizedBox(height: 6),
+          Text(
+            _batch.isEmpty
+                ? 'Every recognised label is added to a list without '
+                      'leaving the camera; repeated labels are counted, '
+                      'not listed twice.'
+                : _batch.summaryLine,
+            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+          ),
+        ],
         const SizedBox(height: 24),
         const RecentScansSection(),
         const PageHeading('or search manually', trailing: SizedBox.shrink()),
@@ -295,10 +349,44 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     );
   }
 
+  String get _idleMessage {
+    if (!_batchMode) return 'Hold steady inside the frame';
+    if (_batch.isEmpty) return 'Batch mode · scan the first label';
+    return '${_batch.summaryLine} · next label';
+  }
+
+  void _flash(String text) {
+    setState(() => _message = text);
+    _messageTimer?.cancel();
+    _messageTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _message = null);
+    });
+  }
+
+  Future<void> _finishBatch() async {
+    if (_batch.isEmpty) return;
+    await _scanner.stop();
+    if (!mounted) return;
+    final done = await showBatchSummarySheet(context, _batch);
+    if (!mounted) return;
+    if (done) setState(() => _batch = const ScanBatch());
+    if (widget.active) await _scanner.start();
+  }
+
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_handling) return;
     final raw = capture.barcodes.firstOrNull?.rawValue;
     if (raw == null || raw.isEmpty) return;
+    final now = DateTime.now();
+    // The camera can re-read a label that stays in view; treat repeats within
+    // a couple of seconds as the same read.
+    if (raw == _lastRaw &&
+        _lastRawAt != null &&
+        now.difference(_lastRawAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastRaw = raw;
+    _lastRawAt = now;
     _handling = true;
     final inventory = ref.read(inventoryProvider);
     final match = resolveScan(
@@ -307,6 +395,37 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       apparatus: inventory.apparatus,
     );
     final history = ref.read(recentScansProvider.notifier);
+
+    if (_batchMode) {
+      final (batch, outcome) = _batch.add(raw, match, at: now);
+      unawaited(
+        history.record(
+          match == null
+              ? RecentScan.unknown(raw.trim(), now)
+              : RecentScan.found(match, raw.trim(), now),
+        ),
+      );
+      _batch = batch;
+      switch (outcome) {
+        case ScanBatchOutcome.added:
+          HapticFeedback.mediumImpact();
+          _flash('Added ${match!.name}');
+        case ScanBatchOutcome.duplicate:
+          HapticFeedback.lightImpact();
+          final item = match!;
+          final count = batch.entries
+              .firstWhere(
+                (entry) => entry.key == '${item.kind.name}:${item.id}',
+              )
+              .count;
+          _flash('${item.name} already in batch (×$count)');
+        case ScanBatchOutcome.unknown:
+          HapticFeedback.heavyImpact();
+          _flash('Not in your notebook · kept in the summary');
+      }
+      _handling = false;
+      return;
+    }
 
     if (match == null) {
       unawaited(history.record(RecentScan.unknown(raw.trim(), DateTime.now())));
