@@ -29,17 +29,17 @@ final userLabsProvider = FutureProvider<List<Lab>>((ref) async {
   return repo.loadUserLabs();
 });
 
-class ActiveLabNotifier extends StateNotifier<Lab?> {
-  ActiveLabNotifier(this._ref) : super(null) {
+class ActiveLabNotifier extends Notifier<Lab?> {
+  @override
+  Lab? build() {
     _restore();
+    return null;
   }
-
-  final Ref _ref;
 
   static String _key(String userId) => 'active_lab_$userId';
 
   Future<void> _restore() async {
-    final auth = _ref.read(authControllerProvider);
+    final auth = ref.read(authProvider);
     final userId = auth.user?.id;
     if (userId == null) return;
 
@@ -51,9 +51,9 @@ class ActiveLabNotifier extends StateNotifier<Lab?> {
         return;
       }
 
-      final labs = await _ref.read(userLabsProvider.future);
+      final labs = await ref.read(userLabsProvider.future);
       final match = labs.where((l) => l.id == savedId).firstOrNull;
-      if (match != null && mounted) {
+      if (match != null && ref.mounted) {
         state = match;
       }
     } catch (_) {
@@ -63,7 +63,7 @@ class ActiveLabNotifier extends StateNotifier<Lab?> {
 
   Future<void> selectLab(Lab? lab) async {
     state = lab;
-    final auth = _ref.read(authControllerProvider);
+    final auth = ref.read(authProvider);
     final userId = auth.user?.id;
     if (userId == null) return;
 
@@ -78,6 +78,6 @@ class ActiveLabNotifier extends StateNotifier<Lab?> {
   }
 }
 
-final activeLabProvider = StateNotifierProvider<ActiveLabNotifier, Lab?>((ref) {
-  return ActiveLabNotifier(ref);
-});
+final activeLabProvider = NotifierProvider<ActiveLabNotifier, Lab?>(
+  ActiveLabNotifier.new,
+);

@@ -11,6 +11,14 @@ import 'package:lab_wizard/features/organizations/presentation/lab_switcher_shee
 import 'package:lab_wizard/features/organizations/presentation/organization_card.dart';
 import 'package:lab_wizard/features/organizations/presentation/organization_providers.dart';
 
+class _MockActiveLab extends ActiveLabNotifier {
+  _MockActiveLab(this._initial);
+  final Lab? _initial;
+
+  @override
+  Lab? build() => _initial;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
@@ -210,7 +218,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            activeLabProvider.overrideWith((ref) => ActiveLabNotifier(ref)),
+            activeLabProvider.overrideWith(ActiveLabNotifier.new),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -242,11 +250,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            activeLabProvider.overrideWith((ref) {
-              final notifier = ActiveLabNotifier(ref);
-              notifier.state = testLab;
-              return notifier;
-            }),
+            activeLabProvider.overrideWith(() => _MockActiveLab(testLab)),
           ],
           child: const MaterialApp(
             home: Scaffold(
