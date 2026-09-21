@@ -4,13 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../labels/domain/label_spec.dart';
+import '../../labels/presentation/label_actions.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../domain/models.dart';
 import 'batch_sheets.dart';
@@ -408,12 +407,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       case SelectionAction.field:
         await showBatchFieldSheet(context, kind: widget.kind, itemIds: ids);
       case SelectionAction.labels:
-        final chemicals = ref
-            .read(inventoryProvider)
-            .chemicals
-            .where((item) => ids.contains(item.id))
-            .toList();
-        await _printQrLabels(chemicals);
+        final inventory = ref.read(inventoryProvider);
+        await _printQrLabels(
+          widget.kind == ItemKind.chemical
+              ? chemicalLabels(
+                  inventory.chemicals.where((item) => ids.contains(item.id)),
+                )
+              : apparatusLabels(
+                  inventory.apparatus.where((item) => ids.contains(item.id)),
+                ),
+        );
         return;
       case SelectionAction.delete:
         await showBatchDeleteSheet(context, kind: widget.kind, itemIds: ids);
@@ -493,7 +496,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       case _ShelfMenu.batchConsume:
         showBatchConsumeSheet(context, ref);
       case _ShelfMenu.printLabels:
-        _printQrLabels(state.chemicals);
+        _printQrLabels(
+          widget.kind == ItemKind.chemical
+              ? chemicalLabels(state.chemicals)
+              : apparatusLabels(state.apparatus),
+        );
       case _ShelfMenu.settings:
         Navigator.of(
           context,
@@ -605,76 +612,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     return firstOffset + (target - firstIndex) * pitch;
   }
 
-  Future<void> _printQrLabels(List<Chemical> chemicals) async {
-    if (chemicals.isEmpty || _printingLabels) return;
+  /// A4 sheet of QR labels for [labels] (QR-01 chemicals, QR-02 apparatus):
+  /// the user picks the grid and prints or shares the PDF.
+  Future<void> _printQrLabels(List<LabelSpec> labels) async {
+    if (_printingLabels) return;
     setState(() => _printingLabels = true);
     try {
-      final document = pw.Document(title: 'Lab Wizard QR labels');
-      for (var offset = 0; offset < chemicals.length; offset += 40) {
-        final pageItems = chemicals.skip(offset).take(40).toList();
-        document.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.all(10 * PdfPageFormat.mm),
-            build: (_) => pw.Column(
-              children: List.generate(8, (row) {
-                return pw.Expanded(
-                  child: pw.Row(
-                    children: List.generate(5, (column) {
-                      final index = row * 5 + column;
-                      return pw.Expanded(
-                        child: index >= pageItems.length
-                            ? pw.SizedBox()
-                            : _qrLabel(pageItems[index]),
-                      );
-                    }),
-                  ),
-                );
-              }),
-            ),
-          ),
-        );
-      }
-      await Printing.layoutPdf(
-        name: 'Lab-Wizard-QR-Labels.pdf',
-        onLayout: (_) => document.save(),
-      );
+      await printLabelSheet(context, labels);
     } finally {
       if (mounted) setState(() => _printingLabels = false);
     }
-  }
-
-  pw.Widget _qrLabel(Chemical chemical) {
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey400, width: .45),
-      ),
-      padding: const pw.EdgeInsets.all(4),
-      child: pw.Column(
-        mainAxisAlignment: pw.MainAxisAlignment.center,
-        children: [
-          pw.BarcodeWidget(
-            barcode: pw.Barcode.qrCode(),
-            data: 'labwizard:chemical:${chemical.qrCode}',
-            width: 17 * PdfPageFormat.mm,
-            height: 17 * PdfPageFormat.mm,
-          ),
-          pw.SizedBox(height: 2),
-          pw.Text(
-            chemical.name,
-            maxLines: 2,
-            textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
-          ),
-          if (chemical.formula.isNotEmpty)
-            pw.Text(
-              chemical.formula,
-              maxLines: 1,
-              style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey700),
-            ),
-        ],
-      ),
-    );
   }
 }
 
@@ -811,7 +758,7 @@ class _ShelfControls extends StatelessWidget {
                       title: Text('select items…'),
                     ),
                   ),
-                  if (chemical) ...[
+                  if (chemical)
                     const PopupMenuItem(
                       value: _ShelfMenu.batchConsume,
                       child: ListTile(
@@ -820,20 +767,20 @@ class _ShelfControls extends StatelessWidget {
                         title: Text('batch consume (multiple)'),
                       ),
                     ),
-                    PopupMenuItem(
-                      value: _ShelfMenu.printLabels,
-                      enabled: !printingLabels && total > 0,
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.qr_code_2),
-                        title: Text(
-                          printingLabels
-                              ? 'preparing labels…'
-                              : 'print QR labels (40 per A4)',
-                        ),
+                  PopupMenuItem(
+                    key: const Key('menu-print-labels'),
+                    value: _ShelfMenu.printLabels,
+                    enabled: !printingLabels && total > 0,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.qr_code_2),
+                      title: Text(
+                        printingLabels
+                            ? 'preparing labels…'
+                            : 'QR labels for all (A4 sheet)…',
                       ),
                     ),
-                  ],
+                  ),
                   const PopupMenuItem(
                     value: _ShelfMenu.settings,
                     child: ListTile(
@@ -1684,17 +1631,16 @@ class _SelectionActionBar extends StatelessWidget {
                       : null,
                 ),
               ),
-              if (kind == ItemKind.chemical)
-                Expanded(
-                  child: _SelectionButton(
-                    key: const Key('selection-labels'),
-                    icon: Icons.qr_code_2,
-                    label: busy ? 'preparing…' : 'labels',
-                    onPressed: enabled
-                        ? () => onAction(SelectionAction.labels)
-                        : null,
-                  ),
+              Expanded(
+                child: _SelectionButton(
+                  key: const Key('selection-labels'),
+                  icon: Icons.qr_code_2,
+                  label: busy ? 'preparing…' : 'labels',
+                  onPressed: enabled
+                      ? () => onAction(SelectionAction.labels)
+                      : null,
                 ),
+              ),
               Expanded(
                 child: _SelectionButton(
                   key: const Key('selection-delete'),

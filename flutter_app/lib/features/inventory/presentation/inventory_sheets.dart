@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../labels/domain/label_spec.dart';
+import '../../labels/presentation/label_actions.dart';
 import '../../sync/domain/sync_conflict.dart';
 import '../data/inventory_repository.dart';
 import '../domain/apparatus_history.dart';
@@ -1411,28 +1412,15 @@ class _ItemDetail extends ConsumerWidget {
               const SizedBox(height: 24),
               const PageHeading('QR label', trailing: SizedBox.shrink()),
               Text(
-                'Print or screenshot this label for instant scanning.',
+                'Scan it with the app, or share and print it as an image or '
+                'PDF.',
                 style: TextStyle(color: context.mutedInkColor, fontSize: 12),
               ),
               const SizedBox(height: 8),
-              Center(
-                child: NotebookCard(
-                  tape: NotebookTape.yellow,
-                  padding: const EdgeInsets.all(12),
-                  child: ColoredBox(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: QrImageView(
-                        data: chemical != null
-                            ? 'labwizard:chemical:${chemical.qrCode}'
-                            : 'labwizard:apparatus:$itemId',
-                        size: 152,
-                        backgroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
+              LabelCard(
+                label: chemical != null
+                    ? LabelSpec.chemical(chemical)
+                    : LabelSpec.apparatus(apparatus!),
               ),
             ],
             if (chemical != null) ChemicalDetailsSummary(chemical),
