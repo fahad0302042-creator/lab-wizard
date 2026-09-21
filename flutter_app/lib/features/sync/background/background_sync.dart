@@ -251,9 +251,8 @@ class BackgroundSyncBridge {
 
   /// Main isolate: starts answering requests. Returns a handle that stops
   /// answering and removes the registration.
-  BackgroundSyncListener listen(
-    Future<String> Function(String task) handler,
-  ) => BackgroundSyncListener._(handler);
+  BackgroundSyncListener listen(Future<String> Function(String task) handler) =>
+      BackgroundSyncListener._(handler);
 
   /// Background isolate: asks the main isolate to run [task]. Returns null
   /// when no live main isolate answered.

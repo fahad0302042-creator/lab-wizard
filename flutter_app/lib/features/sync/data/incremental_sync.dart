@@ -347,8 +347,9 @@ class IncrementalSync {
         }
       } on SyncTableMissing {
         missing.add(table);
-        if (!legacy)
+        if (!legacy) {
           await local.setMeta(userId, cursorKey(kind), missingMarker);
+        }
         continue;
       }
       final serverIds = {for (final row in downloaded) row['id'] as String};

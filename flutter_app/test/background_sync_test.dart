@@ -292,49 +292,52 @@ void main() {
         await local.close();
       });
       container.read(inventoryProvider);
-      container.read(backgroundSyncCoordinatorProvider.notifier).now =
-          () => _now;
+      container.read(backgroundSyncCoordinatorProvider.notifier).now = () =>
+          _now;
       return container;
     }
 
-    test('registers the periodic job on start and follows the settings', () async {
-      final container = makeContainer();
-      final coordinator = container.read(
-        backgroundSyncCoordinatorProvider.notifier,
-      );
-      await coordinator.start();
-      expect(scheduler.periodic, hasLength(1));
-      expect(scheduler.periodic.single.everyHours, 1);
-      expect(scheduler.cancels, 0);
+    test(
+      'registers the periodic job on start and follows the settings',
+      () async {
+        final container = makeContainer();
+        final coordinator = container.read(
+          backgroundSyncCoordinatorProvider.notifier,
+        );
+        await coordinator.start();
+        expect(scheduler.periodic, hasLength(1));
+        expect(scheduler.periodic.single.everyHours, 1);
+        expect(scheduler.cancels, 0);
 
-      final preferences = container.read(
-        backgroundSyncPreferencesProvider.notifier,
-      );
-      await preferences.update((current) => current.copyWith(enabled: false));
-      await Future<void>.delayed(Duration.zero);
-      expect(scheduler.cancels, 1);
+        final preferences = container.read(
+          backgroundSyncPreferencesProvider.notifier,
+        );
+        await preferences.update((current) => current.copyWith(enabled: false));
+        await Future<void>.delayed(Duration.zero);
+        expect(scheduler.cancels, 1);
 
-      await preferences.update(
-        (current) => current.copyWith(
-          enabled: true,
-          everyHours: 6,
-          unmeteredOnly: true,
-        ),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(scheduler.periodic, hasLength(2));
-      expect(scheduler.periodic.last.everyHours, 6);
-      expect(scheduler.periodic.last.unmeteredOnly, isTrue);
+        await preferences.update(
+          (current) => current.copyWith(
+            enabled: true,
+            everyHours: 6,
+            unmeteredOnly: true,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(scheduler.periodic, hasLength(2));
+        expect(scheduler.periodic.last.everyHours, 6);
+        expect(scheduler.periodic.last.unmeteredOnly, isTrue);
 
-      // The saved settings survive a restart.
-      final store = await SharedPreferences.getInstance();
-      expect(
-        BackgroundSyncPreferences.decode(
-          store.getString(BackgroundSyncPreferencesController.storageKey),
-        ).everyHours,
-        6,
-      );
-    });
+        // The saved settings survive a restart.
+        final store = await SharedPreferences.getInstance();
+        expect(
+          BackgroundSyncPreferences.decode(
+            store.getString(BackgroundSyncPreferencesController.storageKey),
+          ).everyHours,
+          6,
+        );
+      },
+    );
 
     test('cancels the jobs when the user signs out', () async {
       final container = makeContainer();
@@ -356,14 +359,19 @@ void main() {
       await coordinator.start();
       await coordinator.handleLifecycle(AppLifecycleState.resumed);
       expect(inventory.refreshes, 1);
-      expect(container.read(backgroundSyncCoordinatorProvider).lastTrigger, 'resume');
+      expect(
+        container.read(backgroundSyncCoordinatorProvider).lastTrigger,
+        'resume',
+      );
 
       // The fake refresh set lastSyncedAt to now: the next resume is quiet.
       await coordinator.handleLifecycle(AppLifecycleState.resumed);
       expect(inventory.refreshes, 1);
 
       // ...unless something is queued.
-      inventory.replaceState((current) => current.copyWith(outbox: [_operation('a')]));
+      inventory.replaceState(
+        (current) => current.copyWith(outbox: [_operation('a')]),
+      );
       await coordinator.handleLifecycle(AppLifecycleState.resumed);
       expect(inventory.refreshes, 2);
     });
@@ -398,38 +406,44 @@ void main() {
       );
     });
 
-    test('schedules a flush when the app is left with queued changes', () async {
-      final container = makeContainer();
-      final coordinator = container.read(
-        backgroundSyncCoordinatorProvider.notifier,
-      );
-      await coordinator.start();
-      await coordinator.handleLifecycle(AppLifecycleState.paused);
-      expect(scheduler.flushes, isEmpty, reason: 'nothing queued');
+    test(
+      'schedules a flush when the app is left with queued changes',
+      () async {
+        final container = makeContainer();
+        final coordinator = container.read(
+          backgroundSyncCoordinatorProvider.notifier,
+        );
+        await coordinator.start();
+        await coordinator.handleLifecycle(AppLifecycleState.paused);
+        expect(scheduler.flushes, isEmpty, reason: 'nothing queued');
 
-      inventory.replaceState(
-        (current) => current.copyWith(
-          outbox: [_operation('a'), _operation('b', failed: true)],
-        ),
-      );
-      await coordinator.handleLifecycle(AppLifecycleState.paused);
-      expect(scheduler.flushes, hasLength(1));
+        inventory.replaceState(
+          (current) => current.copyWith(
+            outbox: [_operation('a'), _operation('b', failed: true)],
+          ),
+        );
+        await coordinator.handleLifecycle(AppLifecycleState.paused);
+        expect(scheduler.flushes, hasLength(1));
 
-      // Only failed changes left: those wait for the user, not for a job.
-      inventory.replaceState(
-        (current) => current.copyWith(outbox: [_operation('b', failed: true)]),
-      );
-      await coordinator.handleLifecycle(AppLifecycleState.paused);
-      expect(scheduler.flushes, hasLength(1));
+        // Only failed changes left: those wait for the user, not for a job.
+        inventory.replaceState(
+          (current) =>
+              current.copyWith(outbox: [_operation('b', failed: true)]),
+        );
+        await coordinator.handleLifecycle(AppLifecycleState.paused);
+        expect(scheduler.flushes, hasLength(1));
 
-      // Background sync off: no jobs at all.
-      await container
-          .read(backgroundSyncPreferencesProvider.notifier)
-          .update((current) => current.copyWith(enabled: false));
-      inventory.replaceState((current) => current.copyWith(outbox: [_operation('a')]));
-      await coordinator.handleLifecycle(AppLifecycleState.paused);
-      expect(scheduler.flushes, hasLength(1));
-    });
+        // Background sync off: no jobs at all.
+        await container
+            .read(backgroundSyncPreferencesProvider.notifier)
+            .update((current) => current.copyWith(enabled: false));
+        inventory.replaceState(
+          (current) => current.copyWith(outbox: [_operation('a')]),
+        );
+        await coordinator.handleLifecycle(AppLifecycleState.paused);
+        expect(scheduler.flushes, hasLength(1));
+      },
+    );
 
     test('answers a background isolate over the bridge', () async {
       final container = makeContainer(

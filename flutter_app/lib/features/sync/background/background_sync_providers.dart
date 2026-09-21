@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -202,9 +201,7 @@ class BackgroundSyncCoordinator extends Notifier<BackgroundSyncState>
 
   void _listenToConnectivity() {
     try {
-      _connectivity = ref.read(connectivityChangesProvider)().listen((
-        results,
-      ) {
+      _connectivity = ref.read(connectivityChangesProvider)().listen((results) {
         final offline =
             results.isEmpty ||
             results.every((result) => result == ConnectivityResult.none);
@@ -289,7 +286,10 @@ class BackgroundSyncCoordinator extends Notifier<BackgroundSyncState>
       return 'skipped · a sync was already running';
     }
     final before = inventory.pendingCount;
-    state = state.copyWith(lastTrigger: 'background job', lastTriggeredAt: now());
+    state = state.copyWith(
+      lastTrigger: 'background job',
+      lastTriggeredAt: now(),
+    );
     if (inventory.lastUpdated == null) {
       final userId = _signedInUserId;
       if (userId == null) return 'nobody signed in';
