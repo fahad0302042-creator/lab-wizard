@@ -96,7 +96,11 @@ void main() {
       });
 
       testWidgets('${entry.key}: reports', (tester) async {
-        await pumpScreen(tester, const Scaffold(body: ReportsScreen()), size: size);
+        await pumpScreen(
+          tester,
+          const Scaffold(body: ReportsScreen()),
+          size: size,
+        );
         expect(find.byKey(const Key('metric-consume')), findsOneWidget);
       });
 

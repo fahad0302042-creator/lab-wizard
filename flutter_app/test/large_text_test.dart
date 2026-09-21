@@ -142,7 +142,11 @@ void main() {
     });
 
     testWidgets('reports', (tester) async {
-      await pumpScreen(tester, const Scaffold(body: ReportsScreen()), scale: maxTextScale);
+      await pumpScreen(
+        tester,
+        const Scaffold(body: ReportsScreen()),
+        scale: maxTextScale,
+      );
       expect(find.byKey(const Key('metric-consume')), findsOneWidget);
       await tester.tap(find.byKey(const Key('report-range-month')));
       await tester.pumpAndSettle();
