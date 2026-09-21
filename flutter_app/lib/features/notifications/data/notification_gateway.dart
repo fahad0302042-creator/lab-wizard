@@ -178,10 +178,7 @@ class LocalNotificationGateway implements NotificationGateway {
 
 /// In-memory gateway for tests and for platforms without notifications.
 class RecordingNotificationGateway implements NotificationGateway {
-  RecordingNotificationGateway({
-    this.permission = true,
-    this.failWith,
-  });
+  RecordingNotificationGateway({this.permission = true, this.failWith});
 
   bool permission;
   Object? failWith;

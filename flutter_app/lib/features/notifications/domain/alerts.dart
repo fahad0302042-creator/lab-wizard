@@ -344,8 +344,7 @@ List<PlannedReminder> planReminders({
   if (!preferences.enabled) return const [];
   final reference = now ?? DateTime.now();
   final hour = preferences.reminderHour;
-  DateTime atHour(DateTime day) =>
-      DateTime(day.year, day.month, day.day, hour);
+  DateTime atHour(DateTime day) => DateTime(day.year, day.month, day.day, hour);
   final planned = <PlannedReminder>[];
   final apparatusNames = {for (final item in apparatus) item.id: item.name};
 
@@ -431,9 +430,9 @@ List<PlannedReminder> planReminders({
     }
   }
 
-  final future = planned.where((reminder) => reminder.at.isAfter(reference))
-    .toList()
-    ..sort((a, b) => a.at.compareTo(b.at));
+  final future =
+      planned.where((reminder) => reminder.at.isAfter(reference)).toList()
+        ..sort((a, b) => a.at.compareTo(b.at));
   final result = future.take(limit).toList();
 
   if (preferences.weeklySummary) {

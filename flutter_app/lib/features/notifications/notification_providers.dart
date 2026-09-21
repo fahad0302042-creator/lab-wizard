@@ -23,9 +23,10 @@ final notificationGatewayProvider = Provider<NotificationGateway>(
 
 /// Persisted notification preferences (NOTIFY-01).
 final notificationPreferencesProvider =
-    NotifierProvider<NotificationPreferencesController, NotificationPreferences>(
-      NotificationPreferencesController.new,
-    );
+    NotifierProvider<
+      NotificationPreferencesController,
+      NotificationPreferences
+    >(NotificationPreferencesController.new);
 
 class NotificationPreferencesController
     extends Notifier<NotificationPreferences> {
@@ -201,10 +202,7 @@ class NotificationCoordinator extends Notifier<NotificationStatus> {
       if (granted) await dispatch(force: true);
       return granted;
     } catch (error) {
-      state = state.copyWith(
-        busy: false,
-        lastError: _describe(error),
-      );
+      state = state.copyWith(busy: false, lastError: _describe(error));
       return false;
     }
   }
@@ -282,10 +280,7 @@ class NotificationCoordinator extends Notifier<NotificationStatus> {
         clearError: true,
       );
     } catch (error) {
-      state = state.copyWith(
-        busy: false,
-        lastError: _describe(error),
-      );
+      state = state.copyWith(busy: false, lastError: _describe(error));
     }
   }
 

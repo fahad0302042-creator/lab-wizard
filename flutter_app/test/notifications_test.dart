@@ -527,7 +527,10 @@ void main() {
           body: SingleChildScrollView(child: NotificationSettingsCard()),
         ),
       );
-      expect(find.text('Off · the alerts list in the app still works'), findsOneWidget);
+      expect(
+        find.text('Off · the alerts list in the app still works'),
+        findsOneWidget,
+      );
       expect(
         tester.widget<TextButton>(find.byKey(const Key('notify-test'))).enabled,
         isFalse,
@@ -583,24 +586,28 @@ void main() {
       expect(gateway.shown, isEmpty);
     });
 
-    testWidgets('alerts screen lists everything and the reminders card opens it', (
-      tester,
-    ) async {
-      await pump(tester, const Scaffold(body: RemindersCard()));
-      expect(find.text('6 reminders'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('reminders-card')));
-      await tester.pumpAndSettle();
-      expect(find.text('needs attention'), findsOneWidget);
-      expect(find.text('now · 5'), findsOneWidget);
-      expect(find.text('coming up · 3'), findsOneWidget);
-      expect(find.byKey(const Key('alert-empty:salt')), findsOneWidget);
-      expect(find.text('Beaker not back from Aisha'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('weekly-summary-card')),
-        200,
-      );
-      expect(find.textContaining('5 chemicals and 2 apparatus'), findsOneWidget);
-    });
+    testWidgets(
+      'alerts screen lists everything and the reminders card opens it',
+      (tester) async {
+        await pump(tester, const Scaffold(body: RemindersCard()));
+        expect(find.text('6 reminders'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('reminders-card')));
+        await tester.pumpAndSettle();
+        expect(find.text('needs attention'), findsOneWidget);
+        expect(find.text('now · 5'), findsOneWidget);
+        expect(find.text('coming up · 3'), findsOneWidget);
+        expect(find.byKey(const Key('alert-empty:salt')), findsOneWidget);
+        expect(find.text('Beaker not back from Aisha'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('weekly-summary-card')),
+          200,
+        );
+        expect(
+          find.textContaining('5 chemicals and 2 apparatus'),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('reminders card hides when only stock needs attention', (
       tester,

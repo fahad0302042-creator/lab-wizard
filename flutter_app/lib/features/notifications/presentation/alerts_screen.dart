@@ -217,9 +217,9 @@ class RemindersCard extends ConsumerWidget {
       child: NotebookCard(
         key: const Key('reminders-card'),
         accent: urgent > 0 ? LabColors.marginRed : LabColors.amber,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const AlertsScreen()),
-        ),
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const AlertsScreen())),
         child: Row(
           children: [
             Icon(
