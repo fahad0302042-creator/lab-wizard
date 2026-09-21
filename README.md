@@ -50,6 +50,8 @@ The migration adds columns, constraints, an idempotency index, and an RPC functi
 
 Undo support on Android (UX-04) has its own optional additive migration, [`flutter_app/supabase/002_undo_inventory_action.sql`](flutter_app/supabase/002_undo_inventory_action.sql). It adds an `inventory_reversals` table (RLS: own rows only) and an idempotent `undo_inventory_action` RPC. Undo behaves exactly like the web app's undo — the quantity is restored and the log entry removed — and additionally records the reversal so the mobile history can show it. Without the migration the app falls back to the web-parity flow and keeps the reversal note on the device only.
 
+Chemical metadata on Android (DATA-01) uses [`flutter_app/supabase/003_chemical_metadata.sql`](flutter_app/supabase/003_chemical_metadata.sql): six nullable columns on `chemicals` (`supplier`, `cas_number`, `concentration`, `location`, `expiry_date`, `hazard_classes`) and one partial index. Existing rows and the web app's inserts stay valid because every column is optional; the web app simply ignores the extra columns. Until the script is run, the app hides nothing but tells you the database needs the update if you try to save those details.
+
 ## Improvement program
 
 The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.

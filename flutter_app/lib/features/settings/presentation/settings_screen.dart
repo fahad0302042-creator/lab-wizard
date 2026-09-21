@@ -20,6 +20,7 @@ class SettingsScreen extends ConsumerWidget {
     final preferences = ref.watch(preferencesProvider);
     final auth = ref.watch(authProvider);
     final inventory = ref.watch(inventoryProvider);
+    final formMemory = ref.watch(formMemoryProvider);
     return Scaffold(
       body: NotebookPage(
         child: ListView(
@@ -117,6 +118,54 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: ref
                         .read(preferencesProvider.notifier)
                         .setReduceMotion,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 13),
+            NotebookCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _CardTitle(
+                    icon: Icons.history_edu_outlined,
+                    title: 'form memory',
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'The add and record sheets start from the unit, category, '
+                    'low-stock level and amounts you used last. Kept on this '
+                    'device for your account only.',
+                    style: TextStyle(color: context.mutedInkColor, fontSize: 13),
+                  ),
+                  SwitchListTile(
+                    key: const Key('prefill-threshold'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Prefill low-stock level'),
+                    value: formMemory.prefillThreshold,
+                    onChanged: ref
+                        .read(formMemoryProvider.notifier)
+                        .setPrefillThreshold,
+                  ),
+                  SwitchListTile(
+                    key: const Key('prefill-amount'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Prefill last amount'),
+                    subtitle: const Text(
+                      'Per action: use, restock and damage each remember their own.',
+                    ),
+                    value: formMemory.prefillActionAmount,
+                    onChanged: ref
+                        .read(formMemoryProvider.notifier)
+                        .setPrefillActionAmount,
+                  ),
+                  TextButton.icon(
+                    key: const Key('forget-form-memory'),
+                    onPressed: formMemory.isEmpty
+                        ? null
+                        : ref.read(formMemoryProvider.notifier).forget,
+                    icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+                    label: const Text('Forget remembered values'),
                   ),
                 ],
               ),
@@ -230,6 +279,12 @@ class SettingsScreen extends ConsumerWidget {
           'unit',
           'low stock level',
           'notes',
+          'supplier',
+          'cas number',
+          'concentration',
+          'location',
+          'expiry date',
+          'hazards',
         ],
         ...state.chemicals.map(
           (item) => [
@@ -240,6 +295,12 @@ class SettingsScreen extends ConsumerWidget {
             item.unit,
             formatQuantity(item.lowStockThreshold),
             item.notes,
+            item.supplier ?? '',
+            item.casNumber ?? '',
+            item.concentration ?? '',
+            item.location ?? '',
+            item.expiryDate == null ? '' : formatDateOnly(item.expiryDate!),
+            item.hazardClasses.join(';'),
           ],
         ),
         ...state.apparatus.map(
@@ -251,6 +312,12 @@ class SettingsScreen extends ConsumerWidget {
             'pcs',
             formatQuantity(item.lowStockThreshold),
             item.notes,
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
           ],
         ),
       ];

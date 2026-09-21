@@ -22,6 +22,51 @@ String formatQuantity(double value) {
       .replaceFirst(RegExp(r'\.$'), '');
 }
 
+/// Optional chemical metadata columns added by
+/// `supabase/003_chemical_metadata.sql` (DATA-01). Everything is nullable so
+/// rows created by the web app or before the migration stay valid.
+const chemicalMetadataColumns = {
+  'supplier',
+  'cas_number',
+  'concentration',
+  'location',
+  'expiry_date',
+  'hazard_classes',
+};
+
+/// Days before the expiry date at which a chemical counts as "expiring".
+const expiryWarningWindow = Duration(days: 30);
+
+enum ExpiryState { none, ok, expiringSoon, expired }
+
+/// GHS hazard pictograms, used as chips on forms and in the item detail.
+enum HazardClass {
+  explosive('GHS01', 'explosive'),
+  flammable('GHS02', 'flammable'),
+  oxidizing('GHS03', 'oxidizing'),
+  compressedGas('GHS04', 'gas under pressure'),
+  corrosive('GHS05', 'corrosive'),
+  toxic('GHS06', 'acutely toxic'),
+  irritant('GHS07', 'harmful / irritant'),
+  healthHazard('GHS08', 'health hazard'),
+  environmental('GHS09', 'environmental hazard');
+
+  const HazardClass(this.code, this.label);
+
+  final String code;
+  final String label;
+
+  static HazardClass? fromCode(String value) {
+    final normalized = value.trim().toUpperCase();
+    for (final hazard in values) {
+      if (hazard.code == normalized || hazard.name.toUpperCase() == normalized) {
+        return hazard;
+      }
+    }
+    return null;
+  }
+}
+
 class Chemical {
   const Chemical({
     required this.id,
@@ -34,6 +79,12 @@ class Chemical {
     required this.notes,
     required this.qrCode,
     required this.createdAt,
+    this.supplier,
+    this.casNumber,
+    this.concentration,
+    this.location,
+    this.expiryDate,
+    this.hazardClasses = const [],
   });
 
   final String id;
@@ -46,6 +97,30 @@ class Chemical {
   final String notes;
   final String qrCode;
   final DateTime createdAt;
+  final String? supplier;
+  final String? casNumber;
+  final String? concentration;
+  final String? location;
+
+  /// Calendar date (local); the time component is ignored.
+  final DateTime? expiryDate;
+  final List<String> hazardClasses;
+
+  bool get hasMetadata =>
+      (supplier ?? '').isNotEmpty ||
+      (casNumber ?? '').isNotEmpty ||
+      (concentration ?? '').isNotEmpty ||
+      (location ?? '').isNotEmpty ||
+      expiryDate != null ||
+      hazardClasses.isNotEmpty;
+
+  List<HazardClass> get hazards => [
+    for (final code in hazardClasses)
+      if (HazardClass.fromCode(code) case final hazard?) hazard,
+  ];
+
+  ExpiryState expiryState({DateTime? now}) =>
+      expiryStateFor(expiryDate, now: now);
 
   StockState get stockState {
     if (quantity <= 0) return StockState.empty;
@@ -73,6 +148,12 @@ class Chemical {
     double? lowStockThreshold,
     String? notes,
     String? qrCode,
+    String? supplier,
+    String? casNumber,
+    String? concentration,
+    String? location,
+    DateTime? expiryDate,
+    List<String>? hazardClasses,
   }) => Chemical(
     id: id,
     name: name ?? this.name,
@@ -84,6 +165,12 @@ class Chemical {
     notes: notes ?? this.notes,
     qrCode: qrCode ?? this.qrCode,
     createdAt: createdAt,
+    supplier: supplier ?? this.supplier,
+    casNumber: casNumber ?? this.casNumber,
+    concentration: concentration ?? this.concentration,
+    location: location ?? this.location,
+    expiryDate: expiryDate ?? this.expiryDate,
+    hazardClasses: hazardClasses ?? this.hazardClasses,
   );
 
   factory Chemical.fromMap(Map<String, dynamic> map) => Chemical(
@@ -99,8 +186,16 @@ class Chemical {
     createdAt:
         DateTime.tryParse((map['created_at'] as String?) ?? '') ??
         DateTime.now(),
+    supplier: _emptyToNull(map['supplier']),
+    casNumber: _emptyToNull(map['cas_number']),
+    concentration: _emptyToNull(map['concentration']),
+    location: _emptyToNull(map['location']),
+    expiryDate: parseDateOnly(map['expiry_date']),
+    hazardClasses: parseHazardList(map['hazard_classes']),
   );
 
+  /// Row shape shared with the server. Metadata keys are only present when
+  /// set, so devices talking to a pre-migration schema keep working.
   Map<String, dynamic> toMap() => {
     'id': id,
     'name': name,
@@ -112,7 +207,148 @@ class Chemical {
     'notes': notes,
     'qr_code': qrCode,
     'created_at': createdAt.toIso8601String(),
+    ...metadataMap(),
   };
+
+  /// Only the DATA-01 columns, null-free, for inserts and updates.
+  Map<String, dynamic> metadataMap() => {
+    if ((supplier ?? '').isNotEmpty) 'supplier': supplier,
+    if ((casNumber ?? '').isNotEmpty) 'cas_number': casNumber,
+    if ((concentration ?? '').isNotEmpty) 'concentration': concentration,
+    if ((location ?? '').isNotEmpty) 'location': location,
+    if (expiryDate != null) 'expiry_date': formatDateOnly(expiryDate!),
+    if (hazardClasses.isNotEmpty) 'hazard_classes': hazardClasses,
+  };
+}
+
+/// Optional DATA-01 metadata captured by the chemical forms and CSV import.
+class ChemicalDetails {
+  const ChemicalDetails({
+    this.supplier,
+    this.casNumber,
+    this.concentration,
+    this.location,
+    this.expiryDate,
+    this.hazardClasses = const [],
+  });
+
+  factory ChemicalDetails.of(Chemical chemical) => ChemicalDetails(
+    supplier: chemical.supplier,
+    casNumber: chemical.casNumber,
+    concentration: chemical.concentration,
+    location: chemical.location,
+    expiryDate: chemical.expiryDate,
+    hazardClasses: chemical.hazardClasses,
+  );
+
+  final String? supplier;
+  final String? casNumber;
+  final String? concentration;
+  final String? location;
+  final DateTime? expiryDate;
+  final List<String> hazardClasses;
+
+  bool get isEmpty =>
+      _emptyToNull(supplier) == null &&
+      _emptyToNull(casNumber) == null &&
+      _emptyToNull(concentration) == null &&
+      _emptyToNull(location) == null &&
+      expiryDate == null &&
+      hazardClasses.isEmpty;
+
+  /// Full column map for updates; nulls clear a column on the server.
+  Map<String, dynamic> toChanges() => {
+    'supplier': _emptyToNull(supplier),
+    'cas_number': _emptyToNull(casNumber),
+    'concentration': _emptyToNull(concentration),
+    'location': _emptyToNull(location),
+    'expiry_date': expiryDate == null ? null : formatDateOnly(expiryDate!),
+    'hazard_classes': parseHazardList(hazardClasses),
+  };
+
+  bool sameAs(ChemicalDetails other) {
+    final mine = toChanges();
+    final theirs = other.toChanges();
+    for (final key in mine.keys) {
+      if (key == 'hazard_classes') {
+        final a = mine[key] as List<String>;
+        final b = theirs[key] as List<String>;
+        if (a.length != b.length) return false;
+        for (var index = 0; index < a.length; index++) {
+          if (a[index] != b[index]) return false;
+        }
+      } else if (mine[key] != theirs[key]) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
+String? _emptyToNull(Object? value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
+}
+
+/// Parses `YYYY-MM-DD` (or a full timestamp) into a local calendar date.
+DateTime? parseDateOnly(Object? value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  if (text.isEmpty) return null;
+  final parsed = DateTime.tryParse(text);
+  if (parsed == null) return null;
+  return DateTime(parsed.year, parsed.month, parsed.day);
+}
+
+String formatDateOnly(DateTime value) =>
+    '${value.year.toString().padLeft(4, '0')}-'
+    '${value.month.toString().padLeft(2, '0')}-'
+    '${value.day.toString().padLeft(2, '0')}';
+
+/// Accepts a JSON array, a Postgres array literal (`{GHS02,GHS07}`) or a
+/// separated string ("GHS02; GHS07") and returns clean upper-case codes.
+List<String> parseHazardList(Object? value) {
+  if (value == null) return const [];
+  final Iterable<String> parts;
+  if (value is Iterable) {
+    parts = value.map((entry) => entry.toString());
+  } else {
+    parts = value
+        .toString()
+        .replaceAll(RegExp(r'[{}"\[\]]'), '')
+        .split(RegExp(r'[;,|/]+'));
+  }
+  final codes = <String>[];
+  for (final part in parts) {
+    final code = HazardClass.fromCode(part)?.code;
+    if (code != null && !codes.contains(code)) codes.add(code);
+  }
+  return codes;
+}
+
+ExpiryState expiryStateFor(DateTime? expiryDate, {DateTime? now}) {
+  if (expiryDate == null) return ExpiryState.none;
+  final reference = now ?? DateTime.now();
+  final today = DateTime(reference.year, reference.month, reference.day);
+  final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+  if (expiry.isBefore(today)) return ExpiryState.expired;
+  if (!expiry.isAfter(today.add(expiryWarningWindow))) {
+    return ExpiryState.expiringSoon;
+  }
+  return ExpiryState.ok;
+}
+
+/// Checks the CAS Registry Number format and its check digit.
+bool isValidCasNumber(String value) {
+  final match = RegExp(r'^(\d{2,7})-(\d{2})-(\d)$').firstMatch(value.trim());
+  if (match == null) return false;
+  final digits = '${match.group(1)}${match.group(2)}';
+  var sum = 0;
+  for (var index = 0; index < digits.length; index++) {
+    final digit = int.parse(digits[digits.length - 1 - index]);
+    sum += digit * (index + 1);
+  }
+  return sum % 10 == int.parse(match.group(3)!);
 }
 
 class Apparatus {

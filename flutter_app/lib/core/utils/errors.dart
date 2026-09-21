@@ -1,10 +1,14 @@
 /// Turns repository and network exceptions into short notebook-style copy.
 String friendlyErrorMessage(Object error) {
-  final message = error.toString().replaceFirst(
-    RegExp(r'^[A-Za-z]+Exception:\s*'),
-    '',
-  );
+  final message = error
+      .toString()
+      .replaceFirst(RegExp(r'^[A-Za-z]+Exception:\s*'), '')
+      .replaceFirst(RegExp(r'^Bad state:\s*'), '');
   final lower = message.toLowerCase();
+  if (lower.contains('could not find the') && lower.contains('column')) {
+    return 'The database is missing the newest columns. Run the latest '
+        'script in flutter_app/supabase, then try again.';
+  }
   if (lower.contains('socket') ||
       lower.contains('network') ||
       lower.contains('connection') ||

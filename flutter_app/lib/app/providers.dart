@@ -221,6 +221,166 @@ class PreferencesController extends Notifier<AppPreferences> {
   }
 }
 
+/// Values the add/action forms remember for the signed-in user on this
+/// device (FORM-01). Nothing here leaves the phone.
+class FormMemory {
+  const FormMemory({
+    this.lastUnit,
+    this.lastCategory,
+    this.lastThresholds = const {},
+    this.lastActionAmounts = const {},
+    this.prefillThreshold = true,
+    this.prefillActionAmount = true,
+  });
+
+  final String? lastUnit;
+  final String? lastCategory;
+
+  /// Last low-stock level typed per item kind (key: `ItemKind.name`).
+  final Map<String, double> lastThresholds;
+
+  /// Last amount per kind and action (key: `chemical.consume`).
+  final Map<String, double> lastActionAmounts;
+  final bool prefillThreshold;
+  final bool prefillActionAmount;
+
+  static String amountKey(ItemKind kind, InventoryAction action) =>
+      '${kind.name}.${action.name}';
+
+  double? thresholdFor(ItemKind kind) =>
+      prefillThreshold ? lastThresholds[kind.name] : null;
+
+  double? amountFor(ItemKind kind, InventoryAction action) =>
+      prefillActionAmount ? lastActionAmounts[amountKey(kind, action)] : null;
+
+  bool get isEmpty =>
+      lastUnit == null &&
+      lastCategory == null &&
+      lastThresholds.isEmpty &&
+      lastActionAmounts.isEmpty;
+
+  FormMemory copyWith({
+    String? lastUnit,
+    String? lastCategory,
+    Map<String, double>? lastThresholds,
+    Map<String, double>? lastActionAmounts,
+    bool? prefillThreshold,
+    bool? prefillActionAmount,
+  }) => FormMemory(
+    lastUnit: lastUnit ?? this.lastUnit,
+    lastCategory: lastCategory ?? this.lastCategory,
+    lastThresholds: lastThresholds ?? this.lastThresholds,
+    lastActionAmounts: lastActionAmounts ?? this.lastActionAmounts,
+    prefillThreshold: prefillThreshold ?? this.prefillThreshold,
+    prefillActionAmount: prefillActionAmount ?? this.prefillActionAmount,
+  );
+}
+
+final formMemoryProvider = NotifierProvider<FormMemoryController, FormMemory>(
+  FormMemoryController.new,
+);
+
+class FormMemoryController extends Notifier<FormMemory> {
+  String _prefix = 'form.anonymous.';
+
+  @override
+  FormMemory build() {
+    final userId = ref.watch(
+      authProvider.select((value) => value.user?.id),
+    );
+    _prefix = 'form.${userId ?? 'anonymous'}.';
+    unawaited(_restore(_prefix));
+    return const FormMemory();
+  }
+
+  Future<void> _restore(String prefix) async {
+    final preferences = await SharedPreferences.getInstance();
+    if (prefix != _prefix) return;
+    state = FormMemory(
+      lastUnit: preferences.getString('${prefix}unit'),
+      lastCategory: preferences.getString('${prefix}category'),
+      lastThresholds: _readDoubles(preferences, '${prefix}threshold.'),
+      lastActionAmounts: _readDoubles(preferences, '${prefix}amount.'),
+      prefillThreshold: preferences.getBool('${prefix}prefill_threshold') ?? true,
+      prefillActionAmount:
+          preferences.getBool('${prefix}prefill_amount') ?? true,
+    );
+  }
+
+  static Map<String, double> _readDoubles(
+    SharedPreferences preferences,
+    String prefix,
+  ) => {
+    for (final key in preferences.getKeys())
+      if (key.startsWith(prefix) && preferences.getDouble(key) != null)
+        key.substring(prefix.length): preferences.getDouble(key)!,
+  };
+
+  /// Remembers the choices made while adding an item.
+  Future<void> rememberAdd({
+    required ItemKind kind,
+    String? unit,
+    String? category,
+    double? threshold,
+  }) async {
+    final thresholds = {...state.lastThresholds};
+    if (threshold != null) thresholds[kind.name] = threshold;
+    state = state.copyWith(
+      lastUnit: unit,
+      lastCategory: category,
+      lastThresholds: thresholds,
+    );
+    final preferences = await SharedPreferences.getInstance();
+    if (unit != null) await preferences.setString('${_prefix}unit', unit);
+    if (category != null) {
+      await preferences.setString('${_prefix}category', category);
+    }
+    if (threshold != null) {
+      await preferences.setDouble('${_prefix}threshold.${kind.name}', threshold);
+    }
+  }
+
+  /// Remembers the amount just recorded for [kind]/[action].
+  Future<void> rememberAmount(
+    ItemKind kind,
+    InventoryAction action,
+    double amount,
+  ) async {
+    final key = FormMemory.amountKey(kind, action);
+    state = state.copyWith(
+      lastActionAmounts: {...state.lastActionAmounts, key: amount},
+    );
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setDouble('${_prefix}amount.$key', amount);
+  }
+
+  Future<void> setPrefillThreshold(bool value) async {
+    state = state.copyWith(prefillThreshold: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('${_prefix}prefill_threshold', value);
+  }
+
+  Future<void> setPrefillActionAmount(bool value) async {
+    state = state.copyWith(prefillActionAmount: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('${_prefix}prefill_amount', value);
+  }
+
+  /// Forgets remembered values but keeps the prefill switches.
+  Future<void> forget() async {
+    state = FormMemory(
+      prefillThreshold: state.prefillThreshold,
+      prefillActionAmount: state.prefillActionAmount,
+    );
+    final preferences = await SharedPreferences.getInstance();
+    for (final key in preferences.getKeys().toList()) {
+      if (key.startsWith(_prefix) && !key.contains('prefill_')) {
+        await preferences.remove(key);
+      }
+    }
+  }
+}
+
 class InventoryState {
   const InventoryState({
     this.chemicals = const [],
@@ -440,6 +600,7 @@ class InventoryController extends Notifier<InventoryState> {
     required double quantity,
     required double threshold,
     required String notes,
+    ChemicalDetails details = const ChemicalDetails(),
   }) async {
     final userId = _requireUser();
     final item = await _repository.addChemical(
@@ -450,6 +611,7 @@ class InventoryController extends Notifier<InventoryState> {
       quantity: quantity,
       threshold: threshold,
       notes: notes,
+      details: details,
     );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(

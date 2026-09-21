@@ -68,6 +68,14 @@ Without this migration, the mobile app automatically falls back to the existing 
 
 Run `supabase/002_undo_inventory_action.sql` to add the `inventory_reversals` table and the idempotent `undo_inventory_action` RPC. Undoing a consume/restock/damage restores the quantity and deletes the log entry (the same thing the web app's undo does) and stores a reversal record that the item history shows as an "undone" entry. Changes that are still queued on the device are simply cancelled. Only entries recorded in the last 7 days can be undone, and a restock cannot be undone once that stock has been used. Without the migration the app performs the web-parity undo and keeps the reversal note locally.
 
+## Duplicate warnings and remembered form choices (DUP-01, FORM-01)
+
+While you type a new item, the add sheet compares the normalized name (case, spacing and punctuation ignored), formula and category with what is already on the shelf and shows the matches inline with *view* and *add anyway* links. Saving is blocked until a match is either opened or waved through. The add and action sheets also start from the unit, category, low-stock level and action amount you used last time on this device (per signed-in user); both prefills can be switched off or forgotten in Settings → *form memory*.
+
+## Chemical details, expiry and hazards (DATA-01, DATA-02)
+
+Run `supabase/003_chemical_metadata.sql` to add optional `supplier`, `cas_number`, `concentration`, `location`, `expiry_date` and `hazard_classes` columns to `chemicals`. All columns are nullable, so rows created by the web app or before the migration stay valid and the web app is unaffected. The add/edit sheets gain a collapsible *more details* section (CAS numbers are check-digit validated, hazards are GHS01–GHS09 chips, expiry is a calendar date). Chemicals that are expired or expire within 30 days get a badge on the shelf and an *expiring* filter; the item sheet shows the metadata, a plain-language expiry line and hazard chips. The CSV export includes the new columns. Metadata columns are only sent to the server when they are filled in or changed, and the app explains that the database needs the script if it is missing.
+
 ## Selecting several items (BATCH-01/02/04, QR-01)
 
 Long-press any card or row (or use the shelf menu → *select items…*) to enter selection mode. The bar at the bottom offers a batch restock with a separate amount and history entry per item, a batch low-stock threshold with an old → new preview, QR labels for just the selected chemicals, and a guarded delete: unsynced items and offline devices are blocked, deleting five or more items requires typing `DELETE`, and every batch reports the rows that failed so they can be retried on their own.

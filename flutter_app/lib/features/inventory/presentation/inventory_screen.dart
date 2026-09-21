@@ -14,9 +14,10 @@ import '../../../core/widgets/notebook_widgets.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../domain/models.dart';
 import 'batch_sheets.dart';
+import 'chemical_details.dart';
 import 'inventory_sheets.dart';
 
-enum _StockFilter { all, low, critical }
+enum _StockFilter { all, low, critical, expiring }
 
 enum _InventorySort { name, quantity, status }
 
@@ -97,6 +98,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     NotebookTape.none,
     NotebookTape.none,
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load remembered form defaults early so the add/action sheets can use
+    // them synchronously (FORM-01).
+    ref.read(formMemoryProvider);
+  }
 
   @override
   void dispose() {
@@ -497,6 +506,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     if (_filter == _StockFilter.critical && item.status != StockState.empty) {
       return false;
     }
+    if (_filter == _StockFilter.expiring && !item.expiring) return false;
     return query.isEmpty || item.searchText.toLowerCase().contains(query);
   }
 
@@ -846,6 +856,14 @@ class _ShelfControls extends StatelessWidget {
               onTap: () => onFilter(_StockFilter.critical),
               fontSize: 20,
             ),
+            if (kind == ItemKind.chemical)
+              NotebookFilterWord(
+                key: const Key('filter-expiring'),
+                label: 'expiring',
+                selected: filter == _StockFilter.expiring,
+                onTap: () => onFilter(_StockFilter.expiring),
+                fontSize: 20,
+              ),
             PopupMenuButton<_InventorySort>(
               tooltip: 'Sort shelf',
               initialValue: sort,
@@ -1063,18 +1081,23 @@ class _InventoryView {
     required this.threshold,
     required this.progress,
     required this.status,
+    this.chemical,
   });
 
   factory _InventoryView.chemical(Chemical item) => _InventoryView(
     id: item.id,
     name: item.name,
     subtitle: item.formula.isEmpty ? 'no formula noted' : item.formula,
-    searchText: '${item.name} ${item.formula} ${item.notes}',
+    searchText:
+        '${item.name} ${item.formula} ${item.notes} '
+        '${item.supplier ?? ''} ${item.casNumber ?? ''} '
+        '${item.location ?? ''}',
     quantity: item.quantity,
     unit: item.unit,
     threshold: item.lowStockThreshold,
     progress: item.stockProgress,
     status: item.stockState,
+    chemical: item,
   );
 
   factory _InventoryView.apparatus(Apparatus item) => _InventoryView(
@@ -1099,7 +1122,43 @@ class _InventoryView {
   final double progress;
   final StockState status;
 
+  /// Source row for chemical shelves; carries the DATA-01 metadata.
+  final Chemical? chemical;
+
   String get letter => indexLetterFor(name);
+
+  bool get expiring => switch (chemical?.expiryState()) {
+    ExpiryState.expired || ExpiryState.expiringSoon => true,
+    _ => false,
+  };
+}
+
+/// Expiry badge and hazard icons shown next to a chemical's formula
+/// (DATA-02). Empty for apparatus and for chemicals without metadata.
+class _MetadataMarks extends StatelessWidget {
+  const _MetadataMarks(this.item, {this.compact = false});
+
+  final _InventoryView item;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final chemical = item.chemical;
+    if (chemical == null) return const SizedBox.shrink();
+    final hasExpiry = item.expiring;
+    final hasHazards = chemical.hazards.isNotEmpty;
+    if (!hasExpiry && !hasHazards) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: compact ? 2 : 4),
+      child: Row(
+        children: [
+          if (hasExpiry) ExpiryBadge(chemical, compact: compact),
+          if (hasExpiry && hasHazards) const SizedBox(width: 6),
+          if (hasHazards) HazardStrip(chemical, size: compact ? 13 : 15),
+        ],
+      ),
+    );
+  }
 }
 
 class _InventoryCard extends StatelessWidget {
@@ -1221,6 +1280,7 @@ class _InventoryCard extends StatelessWidget {
                                 fontSize: 15,
                               ),
                             ),
+                            _MetadataMarks(item),
                           ],
                         ),
                       ),
@@ -1422,6 +1482,7 @@ class _CompactRow extends StatelessWidget {
                           height: 1.2,
                         ),
                       ),
+                      _MetadataMarks(item, compact: true),
                     ],
                   ),
                 ),

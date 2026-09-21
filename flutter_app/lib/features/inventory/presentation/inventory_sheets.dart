@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,8 @@ import '../../../core/utils/errors.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../data/inventory_repository.dart';
+import '../domain/duplicates.dart';
+import 'chemical_details.dart';
 import '../domain/models.dart';
 
 Future<void> showAddItemSheet(
@@ -137,10 +141,14 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   final _quantity = TextEditingController();
   final _threshold = TextEditingController();
   final _notes = TextEditingController();
+  final _details = ChemicalDetailsController();
   String _unit = 'mL';
   String _category = 'glassware';
   bool _saving = false;
   bool _dirty = false;
+
+  /// Duplicate set the user explicitly chose to add anyway (DUP-01).
+  String _acknowledgedDuplicates = '';
 
   static const _units = ['mL', 'g', 'mg', 'L', 'kg', 'drops', 'pcs'];
   static const _categories = [
@@ -154,6 +162,14 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   @override
   void initState() {
     super.initState();
+    // FORM-01: start from what this user chose last time on this device.
+    final memory = ref.read(formMemoryProvider);
+    if (_units.contains(memory.lastUnit)) _unit = memory.lastUnit!;
+    if (_categories.contains(memory.lastCategory)) {
+      _category = memory.lastCategory!;
+    }
+    final threshold = memory.thresholdFor(widget.kind);
+    if (threshold != null) _threshold.text = formatQuantity(threshold);
     for (final controller in [
       _name,
       _subtitle,
@@ -163,10 +179,15 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     ]) {
       controller.addListener(_markDirty);
     }
+    _details.addListener(_detailsChanged);
   }
 
   void _markDirty() {
     if (!_dirty && mounted) setState(() => _dirty = true);
+  }
+
+  void _detailsChanged() {
+    if (!_details.value.isEmpty) _markDirty();
   }
 
   @override
@@ -176,6 +197,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     _quantity.dispose();
     _threshold.dispose();
     _notes.dispose();
+    _details.dispose();
     super.dispose();
   }
 
@@ -197,6 +219,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               controller: _name,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: chemical ? 'Chemical name' : 'Apparatus name',
               ),
@@ -206,6 +229,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
             if (chemical)
               TextFormField(
                 controller: _subtitle,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: 'Formula',
                   hintText: 'e.g. HCl',
@@ -226,6 +250,24 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                   _dirty = true;
                 }),
               ),
+            if (_pendingDuplicates().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _DuplicateWarning(
+                matches: _pendingDuplicates(),
+                onView: (match) =>
+                    showItemDetailSheet(context, ref, match.kind, match.id),
+                onAddAnyway: _saving
+                    ? null
+                    : () {
+                        setState(
+                          () => _acknowledgedDuplicates = _duplicateKey(
+                            _pendingDuplicates(),
+                          ),
+                        );
+                        _save();
+                      },
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,6 +331,10 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                 hintText: 'Cabinet, supplier, safety note…',
               ),
             ),
+            if (chemical) ...[
+              const SizedBox(height: 8),
+              ChemicalDetailsFields(controller: _details),
+            ],
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -322,8 +368,46 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     return _nonNegativeNumber(value);
   }
 
+  /// Existing items that look like this one and have not been waved through.
+  List<DuplicateMatch> _pendingDuplicates() {
+    final state = ref.read(inventoryProvider);
+    final matches = widget.kind == ItemKind.chemical
+        ? findChemicalDuplicates(
+            existing: state.chemicals,
+            name: _name.text,
+            formula: _subtitle.text,
+          )
+        : findApparatusDuplicates(
+            existing: state.apparatus,
+            name: _name.text,
+            category: _category,
+          );
+    if (matches.isEmpty || _duplicateKey(matches) == _acknowledgedDuplicates) {
+      return const [];
+    }
+    return matches;
+  }
+
+  static String _duplicateKey(List<DuplicateMatch> matches) =>
+      (matches.map((match) => match.id).toList()..sort()).join(',');
+
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      // Surface problems hidden inside the collapsed details section.
+      if (_details.validate() != null) _details.expanded = true;
+      return;
+    }
+    if (_pendingDuplicates().isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This looks like a duplicate. View the existing item or choose '
+            '"add anyway".',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       final quantity = double.parse(_quantity.text);
@@ -338,6 +422,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               quantity: quantity,
               threshold: threshold,
               notes: _notes.text,
+              details: _details.value,
             );
       } else {
         await ref
@@ -352,6 +437,16 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
       }
       HapticFeedback.mediumImpact();
       if (!mounted) return;
+      unawaited(
+        ref
+            .read(formMemoryProvider.notifier)
+            .rememberAdd(
+              kind: widget.kind,
+              unit: widget.kind == ItemKind.chemical ? _unit : null,
+              category: widget.kind == ItemKind.apparatus ? _category : null,
+              threshold: threshold,
+            ),
+      );
       _dirty = false;
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
@@ -383,6 +478,8 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   late final TextEditingController _subtitle;
   late final TextEditingController _threshold;
   late final TextEditingController _notes;
+  late final ChemicalDetailsController _details;
+  late final ChemicalDetails _originalDetails;
   late String _unit;
   late String _category;
   bool _saving = false;
@@ -419,6 +516,10 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     _notes = TextEditingController(
       text: chemical?.notes ?? apparatus?.notes ?? '',
     );
+    _originalDetails = chemical == null
+        ? const ChemicalDetails()
+        : ChemicalDetails.of(chemical);
+    _details = ChemicalDetailsController(_originalDetails);
     _unit = chemical?.unit ?? 'mL';
     _category = apparatus?.category ?? 'other';
     if (!_units.contains(_unit)) _unit = 'pcs';
@@ -426,10 +527,15 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     for (final controller in [_name, _subtitle, _threshold, _notes]) {
       controller.addListener(_markDirty);
     }
+    _details.addListener(_detailsChanged);
   }
 
   void _markDirty() {
     if (!_dirty && mounted) setState(() => _dirty = true);
+  }
+
+  void _detailsChanged() {
+    if (!_details.value.sameAs(_originalDetails)) _markDirty();
   }
 
   @override
@@ -438,6 +544,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     _subtitle.dispose();
     _threshold.dispose();
     _notes.dispose();
+    _details.dispose();
     super.dispose();
   }
 
@@ -538,6 +645,10 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
                 hintText: 'Cabinet, supplier, safety note…',
               ),
             ),
+            if (chemical) ...[
+              const SizedBox(height: 8),
+              ChemicalDetailsFields(controller: _details),
+            ],
             const SizedBox(height: 22),
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -559,9 +670,13 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      if (_details.validate() != null) _details.expanded = true;
+      return;
+    }
     setState(() => _saving = true);
     try {
+      final details = _details.value;
       await ref
           .read(inventoryProvider.notifier)
           .updateItem(
@@ -574,6 +689,10 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
                     'unit': _unit,
                     'low_stock_threshold': double.parse(_threshold.text.trim()),
                     'notes': _notes.text.trim(),
+                    // Metadata columns are only sent when they changed, so
+                    // databases without migration 003 keep working.
+                    if (!details.sameAs(_originalDetails))
+                      ...details.toChanges(),
                   }
                 : {
                     'name': _name.text.trim(),
@@ -819,6 +938,16 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    // FORM-01: the last amount recorded for this kind of action.
+    final remembered = ref
+        .read(formMemoryProvider)
+        .amountFor(widget.kind, widget.action);
+    if (remembered != null) _amount.text = formatQuantity(remembered);
+  }
+
+  @override
   void dispose() {
     _amount.dispose();
     _note.dispose();
@@ -1019,6 +1148,11 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
           );
       HapticFeedback.mediumImpact();
       if (!mounted) return;
+      unawaited(
+        ref
+            .read(formMemoryProvider.notifier)
+            .rememberAmount(widget.kind, widget.action, log.amount),
+      );
       final messenger = ScaffoldMessenger.of(context);
       final container = ProviderScope.containerOf(context, listen: false);
       Navigator.pop(context);
@@ -1190,6 +1324,7 @@ class _ItemDetail extends ConsumerWidget {
                 ),
               ),
             ],
+            if (chemical != null) ChemicalDetailsSummary(chemical),
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 24),
               const PageHeading('notes', trailing: SizedBox.shrink()),
@@ -1478,6 +1613,80 @@ class _QuantityPreview extends StatelessWidget {
 }
 
 String _friendlyError(Object error) => friendlyErrorMessage(error);
+
+/// Inline note shown while adding an item that matches something on the
+/// shelf (DUP-01). The user can inspect the existing item or add anyway.
+class _DuplicateWarning extends StatelessWidget {
+  const _DuplicateWarning({
+    required this.matches,
+    required this.onView,
+    required this.onAddAnyway,
+  });
+
+  final List<DuplicateMatch> matches;
+  final ValueChanged<DuplicateMatch> onView;
+  final VoidCallback? onAddAnyway;
+
+  @override
+  Widget build(BuildContext context) {
+    return NotebookCard(
+      key: const Key('duplicate-warning'),
+      accent: context.lowColor,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.content_copy_outlined, size: 18, color: context.lowColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  matches.length == 1
+                      ? 'already on the shelf?'
+                      : '${matches.length} similar items on the shelf',
+                  style: const TextStyle(
+                    fontFamily: 'ArchitectsDaughter',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          for (final match in matches.take(3))
+            ListTile(
+              key: Key('duplicate-${match.id}'),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              title: Text(match.name),
+              subtitle: Text('${match.detail} · ${match.reason}'),
+              trailing: TextButton(
+                onPressed: () => onView(match),
+                child: const Text('view'),
+              ),
+            ),
+          if (matches.length > 3)
+            Text(
+              'and ${matches.length - 3} more',
+              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('duplicate-add-anyway'),
+              onPressed: onAddAnyway,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('add anyway'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Undoes [logId] from a snackbar after the recording sheet has closed.
 Future<void> undoRecordedAction(

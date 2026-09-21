@@ -156,6 +156,7 @@ class InventoryRepository {
     required double quantity,
     required double threshold,
     required String notes,
+    ChemicalDetails details = const ChemicalDetails(),
   }) async {
     final now = DateTime.now();
     final chemical = Chemical(
@@ -169,6 +170,12 @@ class InventoryRepository {
       notes: notes.trim(),
       qrCode: _uuid.v4(),
       createdAt: now,
+      supplier: details.supplier?.trim(),
+      casNumber: details.casNumber?.trim(),
+      concentration: details.concentration?.trim(),
+      location: details.location?.trim(),
+      expiryDate: details.expiryDate,
+      hazardClasses: parseHazardList(details.hazardClasses),
     );
     final payload = {...chemical.toMap(), 'user_id': userId};
     try {
