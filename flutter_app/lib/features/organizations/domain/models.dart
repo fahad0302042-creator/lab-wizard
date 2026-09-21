@@ -6,12 +6,13 @@ enum OrganizationRole {
   member,
   viewer;
 
-  static OrganizationRole fromString(String? role) => switch (role?.toLowerCase()) {
-    'owner' => OrganizationRole.owner,
-    'admin' => OrganizationRole.admin,
-    'viewer' => OrganizationRole.viewer,
-    _ => OrganizationRole.member,
-  };
+  static OrganizationRole fromString(String? role) =>
+      switch (role?.toLowerCase()) {
+        'owner' => OrganizationRole.owner,
+        'admin' => OrganizationRole.admin,
+        'viewer' => OrganizationRole.viewer,
+        _ => OrganizationRole.member,
+      };
 
   bool get canManageMembers => this == owner || this == admin;
   bool get canManageLabs => this == owner || this == admin;
@@ -86,14 +87,20 @@ class Organization {
   final DateTime createdAt;
   final OrganizationRole userRole;
 
-  factory Organization.fromMap(Map<String, dynamic> map, {OrganizationRole? userRole}) {
+  factory Organization.fromMap(
+    Map<String, dynamic> map, {
+    OrganizationRole? userRole,
+  }) {
     return Organization(
       id: map['id']?.toString() ?? '',
       name: map['name']?.toString() ?? '',
       slug: map['slug']?.toString() ?? '',
       createdBy: map['created_by']?.toString() ?? '',
-      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
-      userRole: userRole ?? OrganizationRole.fromString(map['role']?.toString()),
+      createdAt:
+          DateTime.tryParse(map['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      userRole:
+          userRole ?? OrganizationRole.fromString(map['role']?.toString()),
     );
   }
 
@@ -128,14 +135,20 @@ class Lab {
   final LabRole userRole;
   final String organizationName;
 
-  factory Lab.fromMap(Map<String, dynamic> map, {LabRole? userRole, String? orgName}) {
+  factory Lab.fromMap(
+    Map<String, dynamic> map, {
+    LabRole? userRole,
+    String? orgName,
+  }) {
     return Lab(
       id: map['id']?.toString() ?? '',
       organizationId: map['organization_id']?.toString() ?? '',
       name: map['name']?.toString() ?? '',
       labType: LabType.fromCode(map['lab_type']?.toString()),
       roomNumber: map['room_number']?.toString() ?? '',
-      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(map['created_at']?.toString() ?? '') ??
+          DateTime.now(),
       userRole: userRole ?? LabRole.fromString(map['role']?.toString()),
       organizationName: orgName ?? map['organization_name']?.toString() ?? '',
     );
@@ -177,7 +190,9 @@ class OrganizationMember {
       userId: map['user_id']?.toString() ?? '',
       role: OrganizationRole.fromString(map['role']?.toString()),
       email: map['email']?.toString() ?? '',
-      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(map['created_at']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 

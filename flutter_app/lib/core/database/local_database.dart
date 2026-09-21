@@ -109,7 +109,9 @@ class LocalDatabase {
   }
 
   static Future<void> _upgradeToVersion5(DatabaseExecutor db) async {
-    await db.execute('ALTER TABLE cache_records ADD COLUMN organization_id TEXT');
+    await db.execute(
+      'ALTER TABLE cache_records ADD COLUMN organization_id TEXT',
+    );
     await db.execute('ALTER TABLE cache_records ADD COLUMN lab_id TEXT');
     await db.execute('ALTER TABLE outbox ADD COLUMN organization_id TEXT');
     await db.execute('ALTER TABLE outbox ADD COLUMN lab_id TEXT');
@@ -194,7 +196,8 @@ class LocalDatabase {
       'record_id': record['id'] as String,
       'body': jsonEncode(record),
       'updated_at': DateTime.now().toIso8601String(),
-      'organization_id': organizationId ?? record['organization_id']?.toString(),
+      'organization_id':
+          organizationId ?? record['organization_id']?.toString(),
       'lab_id': labId ?? record['lab_id']?.toString(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -316,13 +319,10 @@ class LocalDatabase {
   }) async {
     final db = await database;
     final map = operation.toDatabase();
-    map['organization_id'] = organizationId ?? operation.payload['organization_id']?.toString();
+    map['organization_id'] =
+        organizationId ?? operation.payload['organization_id']?.toString();
     map['lab_id'] = labId ?? operation.payload['lab_id']?.toString();
-    await db.insert(
-      'outbox',
-      map,
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    await db.insert('outbox', map, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   /// Queued changes in the order they must be replayed.

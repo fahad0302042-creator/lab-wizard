@@ -158,33 +158,42 @@ void main() {
       expect(await db.getVersion(), 5);
 
       // Insert item into Lab 1
-      await localDb.upsertRecord(
-        'user-1',
-        'chemical',
-        {'id': 'c-1', 'name': 'Ethanol', 'lab_id': 'lab-1', 'organization_id': 'org-1'},
-      );
+      await localDb.upsertRecord('user-1', 'chemical', {
+        'id': 'c-1',
+        'name': 'Ethanol',
+        'lab_id': 'lab-1',
+        'organization_id': 'org-1',
+      });
 
       // Insert item into Lab 2
-      await localDb.upsertRecord(
-        'user-1',
-        'chemical',
-        {'id': 'c-2', 'name': 'Methanol', 'lab_id': 'lab-2', 'organization_id': 'org-1'},
-      );
+      await localDb.upsertRecord('user-1', 'chemical', {
+        'id': 'c-2',
+        'name': 'Methanol',
+        'lab_id': 'lab-2',
+        'organization_id': 'org-1',
+      });
 
       // Insert item into Personal Lab (no lab_id)
-      await localDb.upsertRecord(
-        'user-1',
-        'chemical',
-        {'id': 'c-3', 'name': 'Acetone'},
-      );
+      await localDb.upsertRecord('user-1', 'chemical', {
+        'id': 'c-3',
+        'name': 'Acetone',
+      });
 
       // Query Lab 1 specifically
-      final lab1Items = await localDb.loadRecords('user-1', 'chemical', labId: 'lab-1');
+      final lab1Items = await localDb.loadRecords(
+        'user-1',
+        'chemical',
+        labId: 'lab-1',
+      );
       expect(lab1Items.length, 1);
       expect(lab1Items.first['name'], 'Ethanol');
 
       // Query Lab 2 specifically
-      final lab2Items = await localDb.loadRecords('user-1', 'chemical', labId: 'lab-2');
+      final lab2Items = await localDb.loadRecords(
+        'user-1',
+        'chemical',
+        labId: 'lab-2',
+      );
       expect(lab2Items.length, 1);
       expect(lab2Items.first['name'], 'Methanol');
 
@@ -195,7 +204,9 @@ void main() {
   });
 
   group('Organization UI widgets', () {
-    testWidgets('OrganizationCard shows Personal Mode when activeLab is null', (tester) async {
+    testWidgets('OrganizationCard shows Personal Mode when activeLab is null', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -215,7 +226,9 @@ void main() {
       expect(find.text('Switch active lab…'), findsOneWidget);
     });
 
-    testWidgets('OrganizationCard shows active team lab details', (tester) async {
+    testWidgets('OrganizationCard shows active team lab details', (
+      tester,
+    ) async {
       final testLab = Lab(
         id: 'lab-101',
         organizationId: 'org-1',
@@ -249,21 +262,25 @@ void main() {
       expect(find.textContaining('Department of Chemistry'), findsOneWidget);
     });
 
-    testWidgets('showLabSwitcherSheet allows selecting Personal Lab', (tester) async {
+    testWidgets('showLabSwitcherSheet allows selecting Personal Lab', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            userLabsProvider.overrideWith((ref) async => [
-              Lab(
-                id: 'lab-1',
-                organizationId: 'org-1',
-                name: 'Biotech Lab',
-                labType: LabType.biology,
-                createdAt: DateTime(2026, 9, 21),
-                userRole: LabRole.member,
-                organizationName: 'Alpha Bio',
-              ),
-            ]),
+            userLabsProvider.overrideWith(
+              (ref) async => [
+                Lab(
+                  id: 'lab-1',
+                  organizationId: 'org-1',
+                  name: 'Biotech Lab',
+                  labType: LabType.biology,
+                  createdAt: DateTime(2026, 9, 21),
+                  userRole: LabRole.member,
+                  organizationName: 'Alpha Bio',
+                ),
+              ],
+            ),
           ],
           child: MaterialApp(
             home: Scaffold(

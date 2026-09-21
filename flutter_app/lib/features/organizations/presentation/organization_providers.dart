@@ -13,7 +13,9 @@ final organizationRepositoryProvider = Provider<OrganizationRepository>((ref) {
   return OrganizationRepository(client: client);
 });
 
-final userOrganizationsProvider = FutureProvider<List<Organization>>((ref) async {
+final userOrganizationsProvider = FutureProvider<List<Organization>>((
+  ref,
+) async {
   final client = ref.watch(supabaseClientProvider);
   if (client == null) return const [];
   final repo = ref.watch(organizationRepositoryProvider);

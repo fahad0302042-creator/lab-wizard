@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/notebook_widgets.dart';
-import '../domain/models.dart';
 import 'organization_providers.dart';
 
 Future<void> showLabSwitcherSheet(BuildContext context) {
@@ -60,7 +58,9 @@ class _LabSwitcherContent extends ConsumerWidget {
                       icon: Icons.person_pin_outlined,
                       isSelected: activeLab == null,
                       onTap: () async {
-                        await ref.read(activeLabProvider.notifier).selectLab(null);
+                        await ref
+                            .read(activeLabProvider.notifier)
+                            .selectLab(null);
                         if (context.mounted) Navigator.of(context).pop();
                       },
                     ),
@@ -76,7 +76,10 @@ class _LabSwitcherContent extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Text(
                           'Cloud organization features require migration 010.',
-                          style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+                          style: TextStyle(
+                            color: context.mutedInkColor,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       data: (labs) {
@@ -85,7 +88,10 @@ class _LabSwitcherContent extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               'No team organizations found. You are working in your private lab.',
-                              style: TextStyle(color: context.mutedInkColor, fontSize: 13),
+                              style: TextStyle(
+                                color: context.mutedInkColor,
+                                fontSize: 13,
+                              ),
                             ),
                           );
                         }
@@ -95,13 +101,17 @@ class _LabSwitcherContent extends ConsumerWidget {
                             for (final lab in labs)
                               _LabListTile(
                                 title: lab.name,
-                                subtitle: '${lab.organizationName.isNotEmpty ? '${lab.organizationName} · ' : ''}${lab.userRole.label}${lab.roomNumber.isNotEmpty ? ' · Room ${lab.roomNumber}' : ''}',
+                                subtitle:
+                                    '${lab.organizationName.isNotEmpty ? '${lab.organizationName} · ' : ''}${lab.userRole.label}${lab.roomNumber.isNotEmpty ? ' · Room ${lab.roomNumber}' : ''}',
                                 icon: lab.labType.icon,
                                 isSelected: activeLab?.id == lab.id,
                                 badgeText: lab.userRole.label,
                                 onTap: () async {
-                                  await ref.read(activeLabProvider.notifier).selectLab(lab);
-                                  if (context.mounted) Navigator.of(context).pop();
+                                  await ref
+                                      .read(activeLabProvider.notifier)
+                                      .selectLab(lab);
+                                  if (context.mounted)
+                                    Navigator.of(context).pop();
                                 },
                               ),
                           ],
@@ -143,7 +153,14 @@ class _LabSwitcherContent extends ConsumerWidget {
                 hintText: 'e.g. Acme Research Labs',
               ),
               onChanged: (val) {
-                if (slugController.text.isEmpty || slugController.text == _slugify(nameController.text.substring(0, nameController.text.length - 1))) {
+                if (slugController.text.isEmpty ||
+                    slugController.text ==
+                        _slugify(
+                          nameController.text.substring(
+                            0,
+                            nameController.text.length - 1,
+                          ),
+                        )) {
                   slugController.text = _slugify(val);
                 }
               },
@@ -235,7 +252,8 @@ class _LabListTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: isSelected
-            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+            ? Theme.of(context).colorScheme.primaryContainer
+                  .withValues(alpha: 0.3)
             : null,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
@@ -256,10 +274,7 @@ class _LabListTile extends StatelessWidget {
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(fontSize: 12),
-        ),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
         trailing: isSelected
             ? const Icon(Icons.check_circle, size: 20)
             : const Icon(Icons.chevron_right, size: 18),

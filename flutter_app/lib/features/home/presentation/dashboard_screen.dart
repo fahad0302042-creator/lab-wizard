@@ -967,7 +967,6 @@ extension<T> on Iterable<T> {
   }
 }
 
-
 class _LabChip extends StatelessWidget {
   const _LabChip({required this.activeLab, required this.onTap});
 
@@ -983,17 +982,21 @@ class _LabChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest
+              .withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+            color: Theme.of(context).colorScheme.outlineVariant
+                .withValues(alpha: 0.5),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isPersonal ? Icons.person_pin_outlined : (activeLab?.labType.icon ?? Icons.science_outlined),
+              isPersonal
+                  ? Icons.person_pin_outlined
+                  : (activeLab?.labType.icon ?? Icons.science_outlined),
               size: 14,
               color: Theme.of(context).colorScheme.primary,
             ),
@@ -1007,11 +1010,7 @@ class _LabChip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Icons.arrow_drop_down,
-              size: 16,
-              color: context.mutedInkColor,
-            ),
+            Icon(Icons.arrow_drop_down, size: 16, color: context.mutedInkColor),
           ],
         ),
       ),
