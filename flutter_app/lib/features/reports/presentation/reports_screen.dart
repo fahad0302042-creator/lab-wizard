@@ -12,9 +12,11 @@ import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
+import '../domain/asset_reports.dart';
 import '../domain/report_range.dart';
 import '../domain/report_stats.dart';
 import '../domain/runout.dart';
+import 'asset_report_sections.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -96,6 +98,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final runOut = _kind == ItemKind.chemical
         ? runOutReportForChemicals(state.chemicals, state.logs)
         : runOutReportForApparatus(state.apparatus, state.logs);
+    // REPORT-04: expiry, damage, overdue loans, maintenance and calibration.
+    final assets = AssetReports.compute(state, range: _range, kind: _kind);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
@@ -290,6 +294,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         const SizedBox(height: 24),
         const PageHeading('run-out estimates'),
         _RunOutSection(report: runOut),
+        ...assetReportSections(context, assets),
         const SizedBox(height: 24),
         PageHeading(
           _range.dayCount > 62 ? 'activity by week' : 'activity by day',
@@ -322,7 +327,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         OutlinedButton.icon(
           onPressed: logs.isEmpty || _exporting
               ? null
-              : () => _export(state, logs),
+              : () => _export(state, logs, assets),
           icon: _exporting
               ? const SizedBox.square(
                   dimension: 17,
@@ -353,10 +358,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
-  Future<void> _export(InventoryState state, List<ConsumptionLog> logs) async {
+  Future<void> _export(
+    InventoryState state,
+    List<ConsumptionLog> logs,
+    AssetReports assets,
+  ) async {
     setState(() => _exporting = true);
     try {
-      final bytes = await _buildPdf(state, logs);
+      final bytes = await _buildPdf(state, logs, assets);
       await Printing.sharePdf(
         bytes: bytes,
         filename: 'lab-wizard-${_kind.name}-${_range.fileStem}.pdf',
@@ -369,7 +378,34 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<Uint8List> _buildPdf(
     InventoryState state,
     List<ConsumptionLog> logs,
+    AssetReports assets,
   ) async {
+    final day = DateFormat('d MMM yyyy');
+    pw.Widget table(String title, List<String> headers, List<List<String>> rows) {
+      if (rows.isEmpty) return pw.SizedBox();
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(height: 16),
+          pw.Text(
+            title,
+            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            headers: headers,
+            data: rows,
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            cellStyle: const pw.TextStyle(fontSize: 9),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          ),
+        ],
+      );
+    }
+
+    final expiry = assets.expiry;
+    final loans = assets.loans;
+    final services = assets.services;
     final document = pw.Document(
       title: 'Lab Wizard report ${_range.dates}',
       author: 'Lab Wizard',
@@ -405,6 +441,64 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             cellStyle: const pw.TextStyle(fontSize: 9),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
           ),
+          if (expiry != null)
+            table(
+              'Expired and expiring chemicals',
+              const ['Chemical', 'Expiry date', 'Status'],
+              [
+                for (final row in [...expiry.expired, ...expiry.expiringSoon])
+                  [
+                    row.chemical.name,
+                    day.format(row.chemical.expiryDate!),
+                    row.state == ExpiryState.expired
+                        ? 'expired ${relativeDays(row.days)}'
+                        : relativeDays(row.days),
+                  ],
+              ],
+            ),
+          table(
+            'Damage in this range',
+            const ['Item', 'Incidents', 'Amount', 'Last'],
+            [
+              for (final row in assets.damage.rows)
+                [
+                  row.name,
+                  '${row.incidents}',
+                  '${formatQuantity(row.amount)} ${row.unit}'.trim(),
+                  day.format(row.lastAt.toLocal()),
+                ],
+            ],
+          ),
+          if (loans != null)
+            table(
+              'Overdue loans',
+              const ['Apparatus', 'Person', 'Out', 'Due', 'Overdue'],
+              [
+                for (final loan in loans.overdue)
+                  [
+                    loan.apparatusName,
+                    loan.checkout.person,
+                    formatQuantity(loan.checkout.outstanding),
+                    day.format(loan.checkout.dueAt!.toLocal()),
+                    loan.when,
+                  ],
+              ],
+            ),
+          if (services != null)
+            table(
+              'Maintenance and calibration due',
+              const ['Task', 'Apparatus', 'Kind', 'Due', 'Status'],
+              [
+                for (final row in services.due)
+                  [
+                    row.service.displayTitle,
+                    row.apparatusName,
+                    row.service.kind.label,
+                    day.format(row.service.dueAt!.toLocal()),
+                    row.when,
+                  ],
+              ],
+            ),
         ],
       ),
     );

@@ -159,7 +159,7 @@ void main() {
 
   group('reports screen', () {
     testWidgets('filters the activity by the chosen range', (tester) async {
-      tester.view.physicalSize = const Size(420, 2200);
+      tester.view.physicalSize = const Size(420, 3000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -191,7 +191,54 @@ void main() {
                       createdAt: DateTime(2026, 1, 1),
                     ),
                   ],
-                  logs: logs,
+                  apparatus: [
+                    Apparatus(
+                      id: 'a1',
+                      name: 'Beaker',
+                      category: 'glassware',
+                      quantity: 4,
+                      initialQuantity: 6,
+                      lowStockThreshold: 1,
+                      notes: '',
+                      createdAt: DateTime(2026, 1, 1),
+                    ),
+                  ],
+                  checkouts: [
+                    ApparatusCheckout(
+                      id: 'l1',
+                      apparatusId: 'a1',
+                      quantity: 2,
+                      person: 'Ali',
+                      checkedOutAt: DateTime(
+                        today.year,
+                        today.month,
+                        today.day - 10,
+                      ),
+                      dueAt: DateTime(today.year, today.month, today.day - 3),
+                    ),
+                  ],
+                  services: [
+                    ApparatusService(
+                      id: 's1',
+                      apparatusId: 'a1',
+                      kind: ServiceKind.calibration,
+                      createdAt: DateTime(2026, 1, 1),
+                      dueAt: DateTime(today.year, today.month, today.day - 5),
+                    ),
+                  ],
+                  logs: [
+                    ...logs,
+                    ConsumptionLog(
+                      id: 'b1',
+                      itemId: 'a1',
+                      itemType: ItemKind.apparatus,
+                      action: InventoryAction.breakage,
+                      amount: 2,
+                      note: '',
+                      loggedAt: today,
+                      createdAt: today,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -249,6 +296,23 @@ void main() {
         find.widgetWithIcon(IconButton, Icons.chevron_right),
       );
       expect(next.onPressed, isNull);
+
+      // REPORT-04: chemical shelf shows expiry + damage; apparatus shelf shows
+      // damage, overdue loans and due services.
+      expect(find.byKey(const Key('report-expiry')), findsOneWidget);
+      expect(find.byKey(const Key('report-damage')), findsOneWidget);
+      expect(find.byKey(const Key('report-loans')), findsNothing);
+      expect(find.text('No damage recorded in this range.'), findsOneWidget);
+      await tester.tap(find.text('apparatus'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('report-expiry')), findsNothing);
+      expect(find.byKey(const Key('damage-a1')), findsOneWidget);
+      expect(find.byKey(const Key('loan-l1')), findsOneWidget);
+      expect(find.text('3 days overdue'), findsOneWidget);
+      expect(find.byKey(const Key('service-s1')), findsOneWidget);
+      expect(find.text('overdue by 5 days'), findsOneWidget);
+      await tester.tap(find.text('chemicals'));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('report-range-custom')));
       await tester.pumpAndSettle();
