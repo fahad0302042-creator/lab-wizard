@@ -194,8 +194,9 @@ class InventoryRepository {
       keepLocal: (kind, record) =>
           record['local_only'] == true || queuedIds.contains(record['id']),
     );
-    bool? availability(String table, bool? previous) =>
-        tables.contains(table) ? !report.missingTables.contains(table) : previous;
+    bool? availability(String table, bool? previous) => tables.contains(table)
+        ? !report.missingTables.contains(table)
+        : previous;
     _reversalsTableAvailable = availability(
       'inventory_reversals',
       _reversalsTableAvailable,

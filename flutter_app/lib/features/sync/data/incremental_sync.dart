@@ -55,8 +55,8 @@ class SyncReport {
       SyncMode.incremental =>
         '$fetched changed, $removed removed · $pages page'
             '${pages == 1 ? '' : 's'} · ${seconds}s',
-      SyncMode.full ||
-      SyncMode.legacy => '$fetched rows · $pages page${pages == 1 ? '' : 's'} · ${seconds}s',
+      SyncMode.full || SyncMode.legacy =>
+        '$fetched rows · $pages page${pages == 1 ? '' : 's'} · ${seconds}s',
     };
   }
 }
@@ -347,7 +347,8 @@ class IncrementalSync {
         }
       } on SyncTableMissing {
         missing.add(table);
-        if (!legacy) await local.setMeta(userId, cursorKey(kind), missingMarker);
+        if (!legacy)
+          await local.setMeta(userId, cursorKey(kind), missingMarker);
         continue;
       }
       final serverIds = {for (final row in downloaded) row['id'] as String};
@@ -355,8 +356,7 @@ class IncrementalSync {
           ? const <Map<String, dynamic>>[]
           : (await local.loadRecords(userId, kind)).where(
               (record) =>
-                  !serverIds.contains(record['id']) &&
-                  keepLocal(kind, record),
+                  !serverIds.contains(record['id']) && keepLocal(kind, record),
             );
       await local.replaceRecords(userId, kind, [...downloaded, ...kept]);
       rows += downloaded.length;

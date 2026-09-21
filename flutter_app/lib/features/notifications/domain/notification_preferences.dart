@@ -140,8 +140,9 @@ class NotificationPreferences {
   String encode() => jsonEncode(toMap());
 
   static NotificationPreferences decode(String? source) {
-    if (source == null || source.isEmpty)
+    if (source == null || source.isEmpty) {
       return const NotificationPreferences();
+    }
     try {
       final decoded = jsonDecode(source);
       if (decoded is Map) {

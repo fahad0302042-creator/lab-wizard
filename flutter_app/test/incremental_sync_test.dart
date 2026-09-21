@@ -7,7 +7,6 @@ import 'package:lab_wizard/app/providers.dart';
 import 'package:lab_wizard/core/database/local_database.dart';
 import 'package:lab_wizard/core/theme/app_theme.dart';
 import 'package:lab_wizard/features/inventory/data/inventory_repository.dart';
-import 'package:lab_wizard/features/inventory/domain/models.dart';
 import 'package:lab_wizard/features/sync/data/incremental_sync.dart';
 import 'package:lab_wizard/features/sync/presentation/sync_center_screen.dart';
 import 'package:path/path.dart' as p;
@@ -17,7 +16,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// In-memory stand-in for PostgREST with the same ordering and filter
 /// semantics the real source relies on.
 class _FakeSource implements SyncSource {
-  _FakeSource({this.incremental = true});
+  _FakeSource() : incremental = true;
 
   bool incremental;
   final tables = <String, List<Map<String, dynamic>>>{};
@@ -35,9 +34,8 @@ class _FakeSource implements SyncSource {
     Map<String, dynamic> b,
     String column,
   ) {
-    final byTime = DateTime.parse(
-      a[column] as String,
-    ).compareTo(DateTime.parse(b[column] as String));
+    final byTime = DateTime.parse(a[column] as String)
+        .compareTo(DateTime.parse(b[column] as String));
     return byTime != 0 ? byTime : _compareIds(a['id'], b['id']);
   }
 
@@ -189,10 +187,10 @@ void main() {
   );
 
   Future<List<String>> cachedIds(LocalDatabase local, String kind) async =>
-      (await local.loadRecords('u1', kind))
-          .map((row) => row['id'] as String)
-          .toList()
-        ..sort();
+      (await local.loadRecords(
+        'u1',
+        kind,
+      )).map((row) => row['id'] as String).toList()..sort();
 
   group('SyncCursor', () {
     test('round-trips and rejects markers', () {
@@ -232,32 +230,41 @@ void main() {
       clock: () => now,
     );
 
-    test('first run downloads everything in pages and stores cursors', () async {
-      final report = await engine().run(
-        'u1',
-        tables: IncrementalSync.tableKinds.keys,
-      );
-      expect(report.mode, SyncMode.full);
-      expect(report.fetched, 5);
-      expect(report.pages, greaterThanOrEqualTo(3));
-      expect(report.lastFullSyncAt, now);
-      expect(await cachedIds(local, 'chemical'), ['c0', 'c1', 'c2', 'c3', 'c4']);
-      final meta = await local.allMeta('u1');
-      expect(meta[IncrementalSync.fullSyncKey], now.toIso8601String());
-      expect(
-        SyncCursor.decode(meta[IncrementalSync.cursorKey('chemical')])?.id,
-        'c4',
-      );
-      // Empty tables get the epoch cursor so nothing depends on the clock.
-      expect(
-        SyncCursor.decode(meta[IncrementalSync.cursorKey('apparatus')])?.at,
-        IncrementalSync.epoch,
-      );
-      expect(
-        SyncCursor.decode(meta[IncrementalSync.deletionsCursorKey])?.at,
-        IncrementalSync.epoch,
-      );
-    });
+    test(
+      'first run downloads everything in pages and stores cursors',
+      () async {
+        final report = await engine().run(
+          'u1',
+          tables: IncrementalSync.tableKinds.keys,
+        );
+        expect(report.mode, SyncMode.full);
+        expect(report.fetched, 5);
+        expect(report.pages, greaterThanOrEqualTo(3));
+        expect(report.lastFullSyncAt, now);
+        expect(await cachedIds(local, 'chemical'), [
+          'c0',
+          'c1',
+          'c2',
+          'c3',
+          'c4',
+        ]);
+        final meta = await local.allMeta('u1');
+        expect(meta[IncrementalSync.fullSyncKey], now.toIso8601String());
+        expect(
+          SyncCursor.decode(meta[IncrementalSync.cursorKey('chemical')])?.id,
+          'c4',
+        );
+        // Empty tables get the epoch cursor so nothing depends on the clock.
+        expect(
+          SyncCursor.decode(meta[IncrementalSync.cursorKey('apparatus')])?.at,
+          IncrementalSync.epoch,
+        );
+        expect(
+          SyncCursor.decode(meta[IncrementalSync.deletionsCursorKey])?.at,
+          IncrementalSync.epoch,
+        );
+      },
+    );
 
     test('later runs fetch only changes and apply tombstones', () async {
       final sync = engine();
@@ -269,8 +276,14 @@ void main() {
       rows.firstWhere((row) => row['id'] == 'c1')
         ..['quantity'] = 3
         ..['updated_at'] = _iso(now.subtract(const Duration(minutes: 10)));
-      rows.add(_chemical('c9', updated: now.subtract(const Duration(minutes: 5))));
-      source.delete('chemicals', 'c3', now.subtract(const Duration(minutes: 3)));
+      rows.add(
+        _chemical('c9', updated: now.subtract(const Duration(minutes: 5))),
+      );
+      source.delete(
+        'chemicals',
+        'c3',
+        now.subtract(const Duration(minutes: 3)),
+      );
       source.tables['apparatus']!.add({
         'id': 'a1',
         'user_id': 'u1',
@@ -292,7 +305,13 @@ void main() {
       expect(report.removed, 1);
       expect(report.fetched, greaterThanOrEqualTo(3));
       expect(report.fetched, lessThanOrEqualTo(4), reason: 'no full reload');
-      expect(await cachedIds(local, 'chemical'), ['c0', 'c1', 'c2', 'c4', 'c9']);
+      expect(await cachedIds(local, 'chemical'), [
+        'c0',
+        'c1',
+        'c2',
+        'c4',
+        'c9',
+      ]);
       expect(await cachedIds(local, 'apparatus'), ['a1']);
       final cachedC1 = (await local.loadRecords(
         'u1',
@@ -317,7 +336,13 @@ void main() {
         tables: IncrementalSync.tableKinds.keys,
       );
       expect(quiet.removed, 0);
-      expect(await cachedIds(local, 'chemical'), ['c0', 'c1', 'c2', 'c4', 'c9']);
+      expect(await cachedIds(local, 'chemical'), [
+        'c0',
+        'c1',
+        'c2',
+        'c4',
+        'c9',
+      ]);
     });
 
     test('keyset paging survives identical timestamps', () async {
@@ -427,7 +452,13 @@ void main() {
     test('rows of another user never enter the offline copy', () async {
       source.tables['chemicals']!.add(_chemical('intruder', user: 'u2'));
       await engine().run('u1', tables: const ['chemicals']);
-      expect(await cachedIds(local, 'chemical'), ['c0', 'c1', 'c2', 'c3', 'c4']);
+      expect(await cachedIds(local, 'chemical'), [
+        'c0',
+        'c1',
+        'c2',
+        'c3',
+        'c4',
+      ]);
       expect(await local.loadRecords('u2', 'chemical'), isEmpty);
       expect(await local.allMeta('u2'), isEmpty);
     });

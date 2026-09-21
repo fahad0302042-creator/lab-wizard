@@ -291,10 +291,7 @@ class _DownloadCard extends StatelessWidget {
                   'flutter_app/supabase/007_incremental_sync.sql once to '
                   'switch to incremental downloads.',
                   key: const Key('sync-legacy-hint'),
-                  style: TextStyle(
-                    color: context.lowColor,
-                    fontSize: 12.5,
-                  ),
+                  style: TextStyle(color: context.lowColor, fontSize: 12.5),
                 ),
               ),
           ],
