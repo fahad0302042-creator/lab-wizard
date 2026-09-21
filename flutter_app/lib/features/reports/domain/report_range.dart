@@ -18,9 +18,12 @@ enum ReportRangeKind {
 /// 23:59 on the last day belongs to the range and one stamped 00:00 the day
 /// after does not, regardless of the device's zone or daylight-saving shifts.
 class ReportRange {
-  ReportRange._({required this.kind, required DateTime start, required DateTime end})
-    : start = _dateOnly(start),
-      end = _dateOnly(end);
+  ReportRange._({
+    required this.kind,
+    required DateTime start,
+    required DateTime end,
+  }) : start = _dateOnly(start),
+       end = _dateOnly(end);
 
   /// Today and the [days] - 1 days before it.
   factory ReportRange.lastDays(int days, {DateTime? today}) {
@@ -72,9 +75,11 @@ class ReportRange {
 
   /// Number of calendar days, daylight-saving safe.
   int get dayCount =>
-      DateTime.utc(end.year, end.month, end.day)
-          .difference(DateTime.utc(start.year, start.month, start.day))
-          .inDays +
+      DateTime.utc(
+        end.year,
+        end.month,
+        end.day,
+      ).difference(DateTime.utc(start.year, start.month, start.day)).inDays +
       1;
 
   /// Whether [time] (any zone) falls on one of the range's local days.

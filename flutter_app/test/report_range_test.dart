@@ -61,8 +61,14 @@ void main() {
       expect(week.label, 'last 7 days');
       expect(week.dates, '15 Sep – 21 Sep 2026');
       expect(week.fileStem, '2026-09-15_2026-09-21');
-      expect(ReportRange.lastDays(30, today: today).kind, ReportRangeKind.last30);
-      expect(ReportRange.lastDays(30, today: today).start, DateTime(2026, 8, 23));
+      expect(
+        ReportRange.lastDays(30, today: today).kind,
+        ReportRangeKind.last30,
+      );
+      expect(
+        ReportRange.lastDays(30, today: today).start,
+        DateTime(2026, 8, 23),
+      );
       expect(ReportRange.lastDays(1, today: today).dayCount, 1);
     });
 
@@ -109,7 +115,10 @@ void main() {
         ReportRange.custom(DateTime(2026, 9, 5), DateTime(2026, 9, 5)).label,
         '5 Sep 2026',
       );
-      expect(custom, ReportRange.custom(DateTime(2026, 9, 3), DateTime(2026, 9, 21)));
+      expect(
+        custom,
+        ReportRange.custom(DateTime(2026, 9, 3), DateTime(2026, 9, 21)),
+      );
     });
 
     test('buckets are daily for short ranges and weekly for long ones', () {

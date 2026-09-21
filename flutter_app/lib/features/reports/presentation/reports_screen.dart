@@ -263,8 +263,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        PageHeading(_range.dayCount > 62 ? 'activity by week' : 'activity by day'),
-        NotebookCard(child: _ActivityChart(range: _range, logs: logs)),
+        PageHeading(
+          _range.dayCount > 62 ? 'activity by week' : 'activity by day',
+        ),
+        NotebookCard(
+          child: _ActivityChart(range: _range, logs: logs),
+        ),
         if (topUsage.isNotEmpty) ...[
           const SizedBox(height: 24),
           PageHeading(
