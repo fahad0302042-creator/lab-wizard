@@ -139,6 +139,11 @@ void main() {
         scale: maxTextScale,
       );
       expect(find.textContaining('Aisha'), findsWidgets);
+      await tester.scrollUntilVisible(
+        find.text('chemicals').first,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
     });
 
     testWidgets('reports', (tester) async {
@@ -146,6 +151,11 @@ void main() {
         tester,
         const Scaffold(body: ReportsScreen()),
         scale: maxTextScale,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('metric-consume')),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
       expect(find.byKey(const Key('metric-consume')), findsOneWidget);
       await tester.tap(find.byKey(const Key('report-range-month')));

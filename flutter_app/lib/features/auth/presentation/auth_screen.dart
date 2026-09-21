@@ -80,7 +80,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                         const SizedBox(height: 24),
                         AnimatedSize(
-                          duration: const Duration(milliseconds: 250),
+                          duration: context.motion(const Duration(milliseconds: 250)),
                           child: _signUp
                               ? Padding(
                                   padding: const EdgeInsets.only(bottom: 12),

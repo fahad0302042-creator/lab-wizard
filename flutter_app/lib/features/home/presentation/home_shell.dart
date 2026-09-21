@@ -189,7 +189,9 @@ class NotebookBottomNavigation extends StatelessWidget {
                             Transform.translate(
                               offset: const Offset(0, -4),
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
+                                duration: context.motion(
+                                  const Duration(milliseconds: 180),
+                                ),
                                 width: 42,
                                 height: 42,
                                 decoration: BoxDecoration(
@@ -224,7 +226,9 @@ class NotebookBottomNavigation extends StatelessWidget {
                           else
                             AnimatedRotation(
                               turns: selected ? -.008 : 0,
-                              duration: const Duration(milliseconds: 180),
+                              duration: context.motion(
+                                const Duration(milliseconds: 180),
+                              ),
                               child: Icon(
                                 selected ? item.selected : item.icon,
                                 color: color,

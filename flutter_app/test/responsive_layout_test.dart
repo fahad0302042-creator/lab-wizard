@@ -92,6 +92,11 @@ void main() {
           ),
           size: size,
         );
+        await tester.scrollUntilVisible(
+          find.text('chemicals').first,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
         expect(find.text('chemicals'), findsWidgets);
       });
 
@@ -130,7 +135,8 @@ void main() {
       final ethanol = tester.getTopLeft(find.text('Ethanol')).dy;
       final acid = tester.getTopLeft(find.textContaining('Hydrochloric')).dy;
       final pellets = tester.getTopLeft(find.textContaining('Sodium')).dy;
-      expect(ethanol, acid, reason: 'first row holds two cards');
+      // Cards are drawn with a slight alternating tilt, hence the tolerance.
+      expect(ethanol, closeTo(acid, 8), reason: 'first row holds two cards');
       expect(pellets, greaterThan(ethanol), reason: 'third card wraps');
       expect(shelfColumns(1024), 2);
       expect(shelfColumns(600), 1);
@@ -144,7 +150,7 @@ void main() {
       );
       final ethanol = tester.getTopLeft(find.text('Ethanol')).dy;
       final acid = tester.getTopLeft(find.textContaining('Hydrochloric')).dy;
-      expect(ethanol, isNot(acid));
+      expect((ethanol - acid).abs(), greaterThan(40));
     });
 
     testWidgets('the A–Z strip thins out when the list is short', (
@@ -184,11 +190,22 @@ void main() {
         ),
         size: _sizes['small tablet']!,
       );
-      final tops = {
+      await tester.scrollUntilVisible(
+        find.text('need attention').first,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      final tops = [
         for (final label in ['chemicals', 'apparatus', 'need attention'])
-          tester.getTopLeft(find.text(label).first).dy.round(),
-      };
-      expect(tops, hasLength(1), reason: 'tiles share one row');
+          tester.getTopLeft(find.text(label).first).dy,
+      ];
+      // Tiles are drawn with a slight alternating tilt, hence the tolerance.
+      expect(
+        tops.reduce((a, b) => a > b ? a : b) -
+            tops.reduce((a, b) => a < b ? a : b),
+        lessThan(10),
+        reason: 'tiles share one row',
+      );
     });
   });
 }

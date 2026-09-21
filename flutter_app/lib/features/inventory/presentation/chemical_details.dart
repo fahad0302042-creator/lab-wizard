@@ -362,12 +362,13 @@ class HazardStrip extends StatelessWidget {
     if (hazards.isEmpty) return const SizedBox.shrink();
     return Semantics(
       label: 'hazards: ${hazards.map((hazard) => hazard.label).join(', ')}',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        spacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           for (final hazard in hazards.take(4))
             Padding(
-              padding: const EdgeInsets.only(right: 2),
+              padding: EdgeInsets.zero,
               child: Tooltip(
                 message: '${hazard.code} · ${hazard.label}',
                 child: Icon(

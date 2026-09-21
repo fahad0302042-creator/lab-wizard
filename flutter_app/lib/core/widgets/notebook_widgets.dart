@@ -107,7 +107,9 @@ class PageHeading extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: SketchTitle(text, fontSize: fontSize ?? 35)),
-        ?trailing,
+        // Flexible so a wide trailing button wraps its label under large
+        // text instead of pushing past the edge.
+        if (trailing != null) Flexible(child: trailing!),
       ],
     );
   }
@@ -134,6 +136,13 @@ class _SketchTitleState extends State<SketchTitle>
       vsync: this,
       duration: const Duration(milliseconds: 480),
     )..forward();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduced motion: the underline is simply drawn, no ticker runs.
+    if (MediaQuery.disableAnimationsOf(context)) _controller.value = 1;
   }
 
   @override
@@ -631,8 +640,11 @@ class NotebookFilterWord extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        // 48 dp touch target around a hand-written word (A11Y-05).
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: Text(
             label,
             style: TextStyle(
@@ -675,10 +687,11 @@ class DetailsToggle extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
-      child: Padding(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
               expanded ? Icons.expand_less : Icons.expand_more,
@@ -801,7 +814,7 @@ class EmptyNotebookState extends StatelessWidget {
           TweenAnimationBuilder<double>(
             tween: Tween(begin: .8, end: 1),
             curve: Curves.elasticOut,
-            duration: const Duration(milliseconds: 700),
+            duration: context.motion(const Duration(milliseconds: 700)),
             builder: (_, value, child) =>
                 Transform.scale(scale: value, child: child),
             child: Icon(icon, size: 48, color: context.mutedInkColor),

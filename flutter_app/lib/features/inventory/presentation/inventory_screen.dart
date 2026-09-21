@@ -744,15 +744,17 @@ class _ShelfControls extends StatelessWidget {
                   ),
                 ),
               ),
-              TextButton.icon(
-                key: const Key('selection-select-all'),
-                onPressed: onSelectAllVisible,
-                icon: Icon(
-                  allVisibleSelected ? Icons.remove_done : Icons.done_all,
-                  size: 18,
-                ),
-                label: Text(
-                  allVisibleSelected ? 'clear shown' : 'select shown',
+              Flexible(
+                child: TextButton.icon(
+                  key: const Key('selection-select-all'),
+                  onPressed: onSelectAllVisible,
+                  icon: Icon(
+                    allVisibleSelected ? Icons.remove_done : Icons.done_all,
+                    size: 18,
+                  ),
+                  label: Text(
+                    allVisibleSelected ? 'clear shown' : 'select shown',
+                  ),
                 ),
               ),
             ],
@@ -885,8 +887,9 @@ class _ShelfControls extends StatelessWidget {
                     child: Text('sort by ${value.name}'),
                   ),
               ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -977,7 +980,23 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
           (constraints.maxHeight - stripHeight) / 2,
         );
         final activeIndex = _active == null ? -1 : letters.indexOf(_active!);
-        return SizedBox(
+        // One screen-reader node for the whole strip: the letters are far
+        // smaller than a 48 dp target, so TalkBack offers them as actions
+        // ("Jump to M") instead of 27 tiny buttons (A11Y-01/05).
+        final reachable = letters.where(widget.available.contains).toList();
+        return Semantics(
+          container: true,
+          label: 'A to Z index',
+          hint: reachable.isEmpty
+              ? 'no letters to jump to'
+              : 'jump to a letter from the actions menu',
+          customSemanticsActions: {
+            for (final letter in reachable)
+              CustomSemanticsAction(label: 'Jump to $letter'): () =>
+                  widget.onSelected(letter),
+          },
+          excludeSemantics: true,
+          child: SizedBox(
           width: 78,
           child: Stack(
             children: [
@@ -1008,14 +1027,7 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         for (final letter in letters)
-                          Semantics(
-                            button: true,
-                            enabled: widget.available.contains(letter),
-                            label: 'jump to $letter',
-                            onTap: widget.available.contains(letter)
-                                ? () => widget.onSelected(letter)
-                                : null,
-                            child: SizedBox(
+                          SizedBox(
                               height: slot,
                               width: 22,
                               child: Center(
@@ -1040,7 +1052,6 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                                 ),
                               ),
                             ),
-                          ),
                       ],
                     ),
                   ),
@@ -1083,6 +1094,7 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                   ),
                 ),
             ],
+          ),
           ),
         );
       },
@@ -1499,10 +1511,19 @@ class _InventoryCard extends StatelessWidget {
                     const SizedBox(height: 10),
                     StockBar(progress: item.progress, status: item.status),
                     const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
+                    // Caption left, actions right; on a narrow card or with
+                    // large text the actions drop to their own line.
+                    LayoutBuilder(
+                      builder: (context, constraints) => Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        children: [
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: constraints.maxWidth,
+                            ),
+                            child: Text(
                             stockCaption(item.status),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1521,19 +1542,27 @@ class _InventoryCard extends StatelessWidget {
                                   : null,
                             ),
                           ),
-                        ),
-                        _CardAction(
-                          label: kind == ItemKind.chemical ? 'use' : 'damage',
-                          color: context.marginRedColor,
-                          onTap: selecting ? onTap : onConsume,
-                        ),
-                        const SizedBox(width: 10),
-                        _CardAction(
-                          label: '+ stock',
-                          color: context.healthyColor,
-                          onTap: selecting ? onTap : onRestock,
-                        ),
-                      ],
+                          ),
+                          Wrap(
+                            spacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _CardAction(
+                                label: kind == ItemKind.chemical
+                                    ? 'use'
+                                    : 'damage',
+                                color: context.marginRedColor,
+                                onTap: selecting ? onTap : onConsume,
+                              ),
+                              _CardAction(
+                                label: '+ stock',
+                                color: context.healthyColor,
+                                onTap: selecting ? onTap : onRestock,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1719,7 +1748,6 @@ class _CompactRow extends StatelessWidget {
                     IconButton(
                       tooltip: chemical ? 'Use' : 'Report damage',
                       onPressed: onConsume,
-                      visualDensity: VisualDensity.compact,
                       iconSize: 21,
                       color: context.marginRedColor,
                       icon: Icon(
@@ -1731,7 +1759,6 @@ class _CompactRow extends StatelessWidget {
                     IconButton(
                       tooltip: 'Restock',
                       onPressed: onRestock,
-                      visualDensity: VisualDensity.compact,
                       iconSize: 21,
                       color: context.healthyColor,
                       icon: const Icon(Icons.add_circle_outline),
@@ -1759,7 +1786,7 @@ class _SelectionMark extends StatelessWidget {
     return Semantics(
       label: selected ? 'selected' : 'not selected',
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: context.motion(const Duration(milliseconds: 160)),
         width: 24,
         height: 24,
         decoration: BoxDecoration(
@@ -1927,8 +1954,11 @@ class _CardAction extends StatelessWidget {
       button: true,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
+        // 48 dp target around the underlined word (A11Y-05).
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(
             label,
             style: TextStyle(

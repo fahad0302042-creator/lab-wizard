@@ -65,9 +65,21 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     _line = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1700),
-    )..repeat(reverse: true);
+    );
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _startScanner());
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The sweeping line is decoration; it stays still (and costs no frames)
+    // when the system asks for reduced motion (A11Y-05).
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _line.stop();
+    } else if (!_line.isAnimating) {
+      _line.repeat(reverse: true);
     }
   }
 
@@ -233,7 +245,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                   right: 14,
                   bottom: 14,
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
+                    duration: context.motion(const Duration(milliseconds: 220)),
                     child: Container(
                       key: ValueKey(_message),
                       padding: const EdgeInsets.symmetric(

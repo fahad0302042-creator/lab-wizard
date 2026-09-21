@@ -853,7 +853,9 @@ class _WeekActivity extends StatelessWidget {
                   const SizedBox(height: 3),
                   TweenAnimationBuilder<double>(
                     tween: Tween(end: ratio),
-                    duration: Duration(milliseconds: 400 + index * 55),
+                    duration: context.motion(
+                      Duration(milliseconds: 400 + index * 55),
+                    ),
                     curve: Curves.easeOutBack,
                     builder: (_, value, _) => Container(
                       height: 68 * value + 5,

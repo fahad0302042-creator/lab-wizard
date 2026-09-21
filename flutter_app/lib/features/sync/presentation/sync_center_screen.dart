@@ -442,7 +442,8 @@ class _OperationCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              DecoratedBox(
+              Flexible(
+                child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: .14),
                   borderRadius: BorderRadius.circular(8),
@@ -458,6 +459,8 @@ class _OperationCard extends StatelessWidget {
                         : failed
                         ? 'needs attention'
                         : 'waiting',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: statusColor,
                       fontFamily: 'Caveat',
@@ -466,6 +469,7 @@ class _OperationCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                ),
                 ),
               ),
             ],

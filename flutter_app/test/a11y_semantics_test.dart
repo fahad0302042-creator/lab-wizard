@@ -213,46 +213,76 @@ void main() {
           _chemical('m$index', '${String.fromCharCode(65 + index)}-reagent'),
       ];
       await _pumpShelf(tester, state: InventoryState(chemicals: many));
-      // Unavailable letters are disabled buttons, not silent text.
-      final q = tester.getSemantics(find.byKey(const Key('alpha-Q')));
-      expect(q.label, 'jump to Q');
-      expect(q.flagsCollection.isEnabled, Tristate.isFalse);
-      final a = tester.getSemantics(find.byKey(const Key('alpha-A')));
-      expect(a.flagsCollection.isEnabled, Tristate.isTrue);
+      // One node for the strip; letters with items are TalkBack actions,
+      // letters without are simply absent (A11Y-05 keeps targets at 48 dp).
+      final strip = _node(tester, 'A to Z index');
+      expect(_hasCustomAction(strip, 'Jump to A'), isTrue);
+      expect(_hasCustomAction(strip, 'Jump to H'), isTrue);
+      expect(_hasCustomAction(strip, 'Jump to Q'), isFalse);
+      tester.semantics.performAction(
+        find.semantics.byLabel('A to Z index'),
+        SemanticsAction.customAction,
+        args: CustomSemanticsAction.getIdentifier(
+          const CustomSemanticsAction(label: 'Jump to H'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final listTop = tester.getTopLeft(find.byType(CustomScrollView)).dy;
+      final itemTop = tester.getTopLeft(find.text('H-reagent')).dy;
+      expect(itemTop - listTop, lessThan(80));
       handle.dispose();
     });
 
-    for (final dark in [false, true]) {
-      testWidgets(
-        'A11Y-04: text contrast on the shelf in ${dark ? 'dark' : 'light'}',
-        (tester) async {
-          final handle = tester.ensureSemantics();
-          tester.view.physicalSize = const Size(420, 900);
-          tester.view.devicePixelRatio = 1;
-          addTearDown(tester.view.reset);
-          await tester.pumpWidget(
-            ProviderScope(
-              overrides: [
-                inventoryProvider.overrideWith(
-                  () => _SeededInventory(InventoryState(chemicals: chemicals)),
-                ),
-                isOnlineProvider.overrideWithValue(() async => true),
-              ],
-              child: MaterialApp(
-                theme: dark ? AppTheme.dark() : AppTheme.light(),
-                home: const InventoryScreen(kind: ItemKind.chemical),
-              ),
-            ),
+    test('A11Y-04: every text colour meets 4.5:1 on paper and card', () {
+      const lightText = {
+        'ink': LabColors.ink,
+        'muted ink': LabColors.mutedInk,
+        'margin red': LabColors.marginRed,
+        'amber': LabColors.amber,
+        'green': LabColors.green,
+        'blue': LabColors.blue,
+      };
+      const darkText = {
+        'ink': LabColors.inkDark,
+        'muted ink': LabColors.mutedInkDark,
+        'margin red': LabColors.marginRedDark,
+        'amber': LabColors.amberDark,
+        'green': LabColors.greenDark,
+      };
+      for (final entry in lightText.entries) {
+        for (final background in [LabColors.paper, LabColors.card]) {
+          expect(
+            contrastRatio(entry.value, background),
+            greaterThanOrEqualTo(4.5),
+            reason: '${entry.key} on light background',
           );
-          await tester.pumpAndSettle();
-          await expectLater(tester, meetsGuideline(textContrastGuideline));
-          await tester.tap(find.byTooltip('Show compact rows'));
-          await tester.pumpAndSettle();
-          await expectLater(tester, meetsGuideline(textContrastGuideline));
-          handle.dispose();
-        },
+        }
+      }
+      for (final entry in darkText.entries) {
+        for (final background in [LabColors.paperDark, LabColors.cardDark]) {
+          expect(
+            contrastRatio(entry.value, background),
+            greaterThanOrEqualTo(4.5),
+            reason: '${entry.key} on dark background',
+          );
+        }
+      }
+      // Ink on the highlighter (empty badge) and white on the status fills.
+      expect(
+        contrastRatio(LabColors.ink, LabColors.highlighter),
+        greaterThanOrEqualTo(4.5),
       );
-    }
+      for (final fill in [
+        LabColors.marginRed,
+        LabColors.amber,
+        LabColors.green,
+        LabColors.blue,
+      ]) {
+        expect(contrastRatio(Colors.white, fill), greaterThanOrEqualTo(4.5));
+      }
+      expect(contrastRatio(Colors.white, Colors.white), 1);
+      expect(contrastRatio(Colors.black, Colors.white), closeTo(21, .01));
+    });
 
     testWidgets('apparatus rows speak condition, assignee and damage action', (
       tester,

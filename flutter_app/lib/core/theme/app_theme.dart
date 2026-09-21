@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Shared notebook palette. These values intentionally mirror the web app so
@@ -235,6 +237,11 @@ abstract final class AppTheme {
 
 extension LabThemeX on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  /// [duration] unless the person asked the system to reduce motion, in
+  /// which case animations complete at once (A11Y-05).
+  Duration motion(Duration duration) =>
+      MediaQuery.disableAnimationsOf(this) ? Duration.zero : duration;
   Color get paperColor => isDark ? LabColors.paperDark : LabColors.paper;
   Color get cardColor => isDark ? LabColors.cardDark : LabColors.card;
   Color get inkColor => isDark ? LabColors.inkDark : LabColors.ink;
@@ -247,4 +254,17 @@ extension LabThemeX on BuildContext {
       isDark ? LabColors.marginRedDark : LabColors.marginRed;
   Color get healthyColor => isDark ? LabColors.greenDark : LabColors.green;
   Color get lowColor => isDark ? LabColors.amberDark : LabColors.amber;
+}
+
+/// WCAG 2 contrast ratio between two opaque colours (1 to 21). Used by the
+/// palette audit (A11Y-04); text needs 4.5:1, large text 3:1.
+double contrastRatio(Color a, Color b) {
+  double channel(double value) => value <= 0.03928
+      ? value / 12.92
+      : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+  double luminance(Color color) =>
+      0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+  final light = math.max(luminance(a), luminance(b));
+  final dark = math.min(luminance(a), luminance(b));
+  return (light + 0.05) / (dark + 0.05);
 }

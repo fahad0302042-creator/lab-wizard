@@ -332,7 +332,7 @@ class _PinDots extends StatelessWidget {
       children: [
         for (var i = 0; i < total; i++)
           AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
+            duration: context.motion(const Duration(milliseconds: 120)),
             margin: const EdgeInsets.symmetric(horizontal: 6),
             width: 14,
             height: 14,
