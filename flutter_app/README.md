@@ -194,6 +194,10 @@ Stock is handled separately: quantities are never sent as absolute numbers when 
 
 Settings → *Sync center* (also reachable from the dashboard sync banner) lists every change waiting on the device with its attempts, last error and status. Connection problems keep a change `pending` and retry automatically; any other server error marks only that change as `failed` so other items keep syncing. Failed changes can be retried individually, all at once, or discarded — discarding rolls the offline copy back to what it was before the change.
 
+## TalkBack (A11Y-01)
+
+Every shelf row or card is **one spoken item**: name, amount, stock status in words, formula or category, and whatever is otherwise only an icon or a colour (expired / expires soon, hazards, condition, assignee, loans, due services, selection state). *Use* / *Report damage* and *Restock* are offered in TalkBack's actions menu (swipe up or down, or the local context menu) instead of the swipe gestures; double-tap opens the details and long-press starts selection. Page titles are headings, so heading navigation works; the dashboard tiles read as "3, low stock, button"; the activity charts speak a summary (total, busiest day, quiet days) instead of bars; the scanner's status line is a live region, so "Found Acetone" or "not in your lab notebook" is announced as soon as a code is read; stock status is spoken as "in stock / low stock / out of stock" without symbols. Icon-only buttons all have tooltips (which TalkBack reads as labels). An automated audit (`test/a11y_semantics_test.dart`) checks that every tappable node on the shelves has a label and that the row summaries, custom actions, heading flags and A–Z strip states are present.
+
 ## Signing
 
 GitHub builds use `android/app/lab-wizard-github.jks`, a stable development-distribution key committed intentionally so phone-only testers can install future APKs as updates. Do not use this key for Play Store production. Configure private Play App Signing before publishing commercially.

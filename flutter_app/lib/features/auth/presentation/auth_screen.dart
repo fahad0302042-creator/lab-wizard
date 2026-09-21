@@ -124,6 +124,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
+                              tooltip: _obscure
+                                  ? 'Show password'
+                                  : 'Hide password',
                               onPressed: () =>
                                   setState(() => _obscure = !_obscure),
                               icon: Icon(

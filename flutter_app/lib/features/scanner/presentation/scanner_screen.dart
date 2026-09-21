@@ -152,13 +152,19 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ColoredBox(
-                  color: Colors.black,
-                  child: MobileScanner(
-                    controller: _scanner,
-                    onDetect: _onDetect,
-                    placeholderBuilder: (_) =>
-                        const Center(child: CircularProgressIndicator()),
+                Semantics(
+                  label:
+                      'Camera viewfinder. Hold the phone over a Lab Wizard '
+                      'label; the result is announced.',
+                  excludeSemantics: true,
+                  child: ColoredBox(
+                    color: Colors.black,
+                    child: MobileScanner(
+                      controller: _scanner,
+                      onDetect: _onDetect,
+                      placeholderBuilder: (_) =>
+                          const Center(child: CircularProgressIndicator()),
+                    ),
                   ),
                 ),
                 const _ScannerShade(),
@@ -238,12 +244,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                         color: Colors.black54,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        _message ?? _idleMessage,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                      // Live region: TalkBack speaks each new status
+                      // ("Found Acetone", "not in your lab notebook").
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _message ?? _idleMessage,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),

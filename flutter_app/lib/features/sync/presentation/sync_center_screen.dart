@@ -33,6 +33,7 @@ class SyncCenterScreen extends ConsumerWidget {
             Row(
               children: [
                 IconButton(
+                  tooltip: 'Back',
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.arrow_back),
                 ),

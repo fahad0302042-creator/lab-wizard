@@ -236,3 +236,24 @@ List<ReportBucket> bucketize(
       ),
   ];
 }
+
+/// Spoken summary of the activity chart for screen readers (A11Y-01): the
+/// total, the busiest bucket and how many buckets were empty.
+String activityChartSummary(List<ReportBucket> buckets) {
+  if (buckets.isEmpty) return 'Activity chart: nothing to show';
+  final total = buckets.fold<int>(0, (sum, bucket) => sum + bucket.count);
+  if (total == 0) return 'Activity chart: no activity in this range';
+  var busiest = buckets.first;
+  for (final bucket in buckets) {
+    if (bucket.count > busiest.count) busiest = bucket;
+  }
+  final when = busiest.isSingleDay
+      ? DateFormat('d MMMM').format(busiest.start)
+      : 'the week of ${DateFormat('d MMMM').format(busiest.start)}';
+  final quiet = buckets.where((bucket) => bucket.count == 0).length;
+  final unit = buckets.first.isSingleDay ? 'day' : 'week';
+  return 'Activity chart: $total action${total == 1 ? '' : 's'} over '
+      '${buckets.length} $unit${buckets.length == 1 ? '' : 's'}; '
+      'busiest $when with ${busiest.count}'
+      '${quiet == 0 ? '' : '; $quiet $unit${quiet == 1 ? '' : 's'} with none'}';
+}

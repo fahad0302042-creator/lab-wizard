@@ -864,7 +864,11 @@ class _ActivityChart extends StatelessWidget {
         : buckets.length <= 31
         ? 5
         : (buckets.length / 6).ceil();
-    return SizedBox(
+    // The bars themselves say nothing to a screen reader; one summary does.
+    return Semantics(
+      label: activityChartSummary(buckets),
+      excludeSemantics: true,
+      child: SizedBox(
       height: 180,
       child: BarChart(
         BarChartData(
@@ -932,6 +936,7 @@ class _ActivityChart extends StatelessWidget {
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 500),
+      ),
       ),
     );
   }

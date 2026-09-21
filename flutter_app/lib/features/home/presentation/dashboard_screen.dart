@@ -463,6 +463,7 @@ class _GlobalSearchSheetState extends State<_GlobalSearchSheet> {
                   suffixIcon: query.isEmpty
                       ? null
                       : IconButton(
+                          tooltip: 'Clear search',
                           onPressed: () {
                             _controller.clear();
                             setState(() {});
@@ -622,7 +623,9 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StaggerIn(
+    // Value and caption are one spoken item ("3, low stock, button").
+    return MergeSemantics(
+      child: StaggerIn(
       index: index,
       child: NotebookCard(
         onTap: onTap,
@@ -656,6 +659,7 @@ class _MetricCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -740,7 +744,9 @@ class _SyncBanner extends StatelessWidget {
         : pending
         ? LabColors.amber
         : LabColors.blue;
-    return Material(
+    // Icon, message and chevron read as one button.
+    return MergeSemantics(
+      child: Material(
       color: color.withValues(alpha: .12),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
@@ -779,6 +785,7 @@ class _SyncBanner extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -810,7 +817,16 @@ class _WeekActivity extends StatelessWidget {
       1,
       (max, value) => value > max ? value : max,
     );
-    return SizedBox(
+    final total = counts.fold<int>(0, (sum, value) => sum + value);
+    final busiest = counts.indexOf(maxCount);
+    return Semantics(
+      label: total == 0
+          ? 'Last 7 days: no activity recorded'
+          : 'Last 7 days: $total action${total == 1 ? '' : 's'}, most on '
+                '${DateFormat.EEEE().format(days[busiest])} '
+                '($maxCount)',
+      excludeSemantics: true,
+      child: SizedBox(
       height: 130,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -852,6 +868,7 @@ class _WeekActivity extends StatelessWidget {
             ),
           );
         }),
+      ),
       ),
     );
   }

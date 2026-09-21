@@ -1120,6 +1120,98 @@ class _InventoryView {
     ExpiryState.expired || ExpiryState.expiringSoon => true,
     _ => false,
   };
+
+  /// One sentence for screen readers: name, amount, stock status and the
+  /// marks that are otherwise only icons or colours (A11Y-01).
+  String spokenSummary({bool selecting = false, bool selected = false}) {
+    final parts = <String>[
+      name,
+      '${formatQuantity(quantity)} $unit',
+      stockSpoken(status),
+      if (subtitle.isNotEmpty && subtitle != 'no formula noted') subtitle,
+    ];
+    final chem = chemical;
+    if (chem != null) {
+      switch (chem.expiryState()) {
+        case ExpiryState.expired:
+          parts.add('expired');
+        case ExpiryState.expiringSoon:
+          parts.add('expires soon');
+        case ExpiryState.none:
+        case ExpiryState.ok:
+          break;
+      }
+      if (chem.hazards.isNotEmpty) {
+        parts.add(
+          'hazards: ${chem.hazards.map((hazard) => hazard.label).join(', ')}',
+        );
+      }
+    }
+    final gear = apparatus;
+    if (gear != null) {
+      if (checkedOut > 0) parts.add('${formatQuantity(checkedOut)} lent out');
+      if (overdue) parts.add('overdue loan');
+      final service = urgentService;
+      if (service != null) parts.add('${service.kind.label} due');
+      if (gear.conditionValue == ApparatusCondition.needsRepair) {
+        parts.add('needs repair');
+      }
+      final who = gear.assignedTo;
+      if (who != null && who.trim().isNotEmpty) parts.add('assigned to $who');
+    }
+    if (selecting) parts.add(selected ? 'selected' : 'not selected');
+    return parts.join(', ');
+  }
+}
+
+/// Screen-reader wrapper for a shelf row or card: one node with the spoken
+/// summary, tap/long-press, and *use* / *restock* as custom actions (the
+/// TalkBack actions menu) instead of the swipe gestures. Everything inside
+/// is excluded so the row is not read three times over.
+class _RowSemantics extends StatelessWidget {
+  const _RowSemantics({
+    required this.item,
+    required this.kind,
+    required this.onTap,
+    required this.onConsume,
+    required this.onRestock,
+    required this.selecting,
+    required this.selected,
+    required this.child,
+    this.onLongPress,
+  });
+
+  final _InventoryView item;
+  final ItemKind kind;
+  final VoidCallback onTap;
+  final VoidCallback onConsume;
+  final VoidCallback onRestock;
+  final bool selecting;
+  final bool selected;
+  final VoidCallback? onLongPress;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selecting ? selected : null,
+      label: item.spokenSummary(selecting: selecting, selected: selected),
+      hint: selecting ? 'Toggles the selection' : 'Opens the details',
+      onTap: onTap,
+      onLongPress: onLongPress,
+      customSemanticsActions: selecting
+          ? const {}
+          : {
+              CustomSemanticsAction(
+                label: kind == ItemKind.chemical ? 'Use' : 'Report damage',
+              ): onConsume,
+              const CustomSemanticsAction(label: 'Restock'): onRestock,
+            },
+      excludeSemantics: true,
+      child: child,
+    );
+  }
 }
 
 /// Expiry badge and hazard icons shown next to a chemical's formula
@@ -1188,7 +1280,16 @@ class _InventoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final flagged = item.status != StockState.healthy;
-    return Stack(
+    return _RowSemantics(
+      item: item,
+      kind: kind,
+      onTap: onTap,
+      onConsume: onConsume,
+      onRestock: onRestock,
+      onLongPress: onLongPress,
+      selecting: selecting,
+      selected: selected,
+      child: Stack(
       clipBehavior: Clip.none,
       children: [
         if (flagged)
@@ -1354,6 +1455,7 @@ class _InventoryCard extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -1395,7 +1497,16 @@ class _CompactRow extends StatelessWidget {
       StockState.low => 'low',
       StockState.empty => 'empty',
     };
-    return Dismissible(
+    return _RowSemantics(
+      item: item,
+      kind: kind,
+      onTap: onTap,
+      onConsume: onConsume,
+      onRestock: onRestock,
+      onLongPress: onLongPress,
+      selecting: selecting,
+      selected: selected,
+      child: Dismissible(
       key: ValueKey('${kind.name}-${item.id}'),
       direction: selecting
           ? DismissDirection.none
@@ -1441,18 +1552,15 @@ class _CompactRow extends StatelessWidget {
                     ),
                   )
                 else
-                  Semantics(
-                    label: statusText,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: item.status == StockState.healthy
-                            ? statusColor.withValues(alpha: .35)
-                            : statusColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: statusColor, width: 1.6),
-                      ),
+                  Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: item.status == StockState.healthy
+                          ? statusColor.withValues(alpha: .35)
+                          : statusColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: statusColor, width: 1.6),
                     ),
                   ),
                 const SizedBox(width: 10),
@@ -1540,6 +1648,7 @@ class _CompactRow extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -1720,7 +1829,9 @@ class _CardAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Semantics(
+      button: true,
+      child: InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
@@ -1734,6 +1845,7 @@ class _CardAction extends StatelessWidget {
             decoration: TextDecoration.underline,
           ),
         ),
+      ),
       ),
     );
   }

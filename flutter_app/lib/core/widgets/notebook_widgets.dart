@@ -145,7 +145,10 @@ class _SketchTitleState extends State<SketchTitle>
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return RepaintBoundary(
+    // A heading for screen readers so TalkBack's heading navigation works.
+    return Semantics(
+      header: true,
+      child: RepaintBoundary(
       child: Transform.rotate(
         angle: -.012,
         alignment: Alignment.centerLeft,
@@ -172,6 +175,7 @@ class _SketchTitleState extends State<SketchTitle>
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -400,14 +404,20 @@ class AnimatedQuantity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 480),
-      curve: Curves.easeOutCubic,
-      tween: Tween(end: value),
-      builder: (_, animated, _) =>
-          Text('${formatQuantity(animated)}$suffix', style: style),
+    // Screen readers get the final value straight away instead of the
+    // intermediate numbers of the count-up animation.
+    return Semantics(
+      label: '${formatQuantity(value)}$suffix',
+      excludeSemantics: true,
+      child: TweenAnimationBuilder<double>(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 480),
+        curve: Curves.easeOutCubic,
+        tween: Tween(end: value),
+        builder: (_, animated, _) =>
+            Text('${formatQuantity(animated)}$suffix', style: style),
+      ),
     );
   }
 }
@@ -426,8 +436,10 @@ class StockBar extends StatelessWidget {
       StockState.empty => context.marginRedColor,
     };
     return Semantics(
-      label: '${(progress * 100).round()} percent full',
-      value: '${(progress * 100).round()}%',
+      label:
+          '${stockSpoken(status)}, '
+          '${(progress.clamp(0, 1) * 100).round()} percent of the '
+          'starting amount',
       child: TweenAnimationBuilder<double>(
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
@@ -520,6 +532,13 @@ String stockCaption(StockState status) => switch (status) {
   StockState.empty => 'out of stock!',
 };
 
+/// Plain words for screen readers (no symbols to read out).
+String stockSpoken(StockState status) => switch (status) {
+  StockState.healthy => 'in stock',
+  StockState.low => 'low stock',
+  StockState.empty => 'out of stock',
+};
+
 class StatusBadge extends StatelessWidget {
   const StatusBadge(this.status, {super.key});
 
@@ -532,7 +551,10 @@ class StatusBadge extends StatelessWidget {
       StockState.low => context.lowColor,
       StockState.empty => context.marginRedColor,
     };
-    return DecoratedBox(
+    return Semantics(
+      label: stockSpoken(status),
+      excludeSemantics: true,
+      child: DecoratedBox(
       decoration: BoxDecoration(
         color: status == StockState.empty
             ? LabColors.highlighter.withValues(alpha: .75)
@@ -555,6 +577,7 @@ class StatusBadge extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+      ),
       ),
     );
   }
