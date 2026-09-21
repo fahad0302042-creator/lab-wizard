@@ -71,8 +71,7 @@ class InventoryRepository {
 
   static List<InventoryReversal> _sortedReversals(
     Iterable<InventoryReversal> reversals,
-  ) => reversals.toList()
-    ..sort((a, b) => b.reversedAt.compareTo(a.reversedAt));
+  ) => reversals.toList()..sort((a, b) => b.reversedAt.compareTo(a.reversedAt));
 
   Future<DateTime?> lastSyncedAt(String userId) async => DateTime.tryParse(
     await local.getMeta(userId, LocalDatabase.lastSyncKey) ?? '',
@@ -634,7 +633,12 @@ class InventoryRepository {
         .eq('id', logId)
         .maybeSingle();
     if (existing == null) {
-      return {'item': null, 'reversal': null, 'duplicate': true, 'missing': true};
+      return {
+        'item': null,
+        'reversal': null,
+        'duplicate': true,
+        'missing': true,
+      };
     }
     final current = await remote!
         .from(table)

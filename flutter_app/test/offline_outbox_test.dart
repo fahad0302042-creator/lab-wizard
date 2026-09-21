@@ -318,7 +318,10 @@ void main() {
       expect(snapshot.reversals.single.action, InventoryAction.consume);
       expect(snapshot.reversals.single.amount, 40);
       expect(snapshot.outbox.single.type, 'undo_action');
-      expect(snapshot.outbox.single.description, 'Undo: Consume 40 mL of Acetone');
+      expect(
+        snapshot.outbox.single.description,
+        'Undo: Consume 40 mL of Acetone',
+      );
       expect(snapshot.outbox.single.itemId, chemical.id);
 
       // Discarding the queued undo brings the entry and the quantity back.
@@ -368,8 +371,14 @@ void main() {
         loggedAt: createdAt,
         createdAt: createdAt,
       );
-      expect(isUndoable(logAt(now.subtract(const Duration(days: 6))), now: now), isTrue);
-      expect(isUndoable(logAt(now.subtract(const Duration(days: 8))), now: now), isFalse);
+      expect(
+        isUndoable(logAt(now.subtract(const Duration(days: 6))), now: now),
+        isTrue,
+      );
+      expect(
+        isUndoable(logAt(now.subtract(const Duration(days: 8))), now: now),
+        isFalse,
+      );
     });
   });
 
