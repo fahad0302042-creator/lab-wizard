@@ -278,7 +278,11 @@ void main() {
       final local = openLocal('users.db');
       addTearDown(local.close);
       await local.upsertRecord('u1', 'chemical', _acetone());
-      await local.upsertRecord('u2', 'chemical', _acetone(userId: 'u2', id: 'c2'));
+      await local.upsertRecord(
+        'u2',
+        'chemical',
+        _acetone(userId: 'u2', id: 'c2'),
+      );
       final repository = InventoryRepository(
         local: local,
         remote: clientFor(server),

@@ -136,4 +136,3 @@ class FakePostgrest {
     return actual.toString() == operand;
   }
 }
-
