@@ -15,6 +15,7 @@ import '../domain/scan_batch.dart';
 import '../domain/scan_resolver.dart';
 import '../scanner_providers.dart';
 import 'batch_summary_sheet.dart';
+import 'link_barcode_sheet.dart';
 import 'recent_scans_section.dart';
 import 'scan_action_sheet.dart';
 
@@ -45,7 +46,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     super.initState();
     _scanner = MobileScannerController(
       autoStart: false,
-      formats: const [BarcodeFormat.qrCode],
+      // Product formats are decoded too, but only acted on when the
+      // "product barcodes" preference is on (SCAN-04).
+      formats: const [
+        BarcodeFormat.qrCode,
+        BarcodeFormat.dataMatrix,
+        BarcodeFormat.ean13,
+        BarcodeFormat.ean8,
+        BarcodeFormat.upcA,
+        BarcodeFormat.upcE,
+        BarcodeFormat.code128,
+        BarcodeFormat.code39,
+        BarcodeFormat.code93,
+        BarcodeFormat.itf,
+      ],
       detectionSpeed: DetectionSpeed.noDuplicates,
     );
     _line = AnimationController(
@@ -285,7 +299,21 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
             style: TextStyle(color: context.mutedInkColor, fontSize: 12),
           ),
         ],
-        const SizedBox(height: 24),
+        SwitchListTile.adaptive(
+          key: const Key('scan-product-barcodes'),
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Also read product barcodes'),
+          subtitle: Text(
+            'EAN, UPC, Code 128 and similar open only the item you linked '
+            'them to; nothing is matched by guesswork.',
+            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+          ),
+          value: ref.watch(productBarcodesProvider),
+          onChanged: (value) =>
+              ref.read(productBarcodesProvider.notifier).set(value),
+        ),
+        const SizedBox(height: 16),
         const RecentScansSection(),
         const PageHeading('or search manually', trailing: SizedBox.shrink()),
         TextField(
@@ -379,8 +407,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_handling) return;
-    final raw = capture.barcodes.firstOrNull?.rawValue;
-    if (raw == null || raw.isEmpty) return;
+    final barcode = capture.barcodes.firstOrNull;
+    final raw = barcode?.rawValue;
+    if (barcode == null || raw == null || raw.isEmpty) return;
+    final format = barcode.format;
+    final isProductCode =
+        format != BarcodeFormat.qrCode && format != BarcodeFormat.unknown;
+    if (isProductCode && !ref.read(productBarcodesProvider)) return;
     final now = DateTime.now();
     // The camera can re-read a label that stays in view; treat repeats within
     // a couple of seconds as the same read.
@@ -431,36 +464,47 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       return;
     }
 
-    if (match == null) {
-      unawaited(history.record(RecentScan.unknown(raw.trim(), DateTime.now())));
-      setState(() => _message = 'This code is not in your lab notebook');
-      HapticFeedback.heavyImpact();
-      await Future<void>.delayed(const Duration(seconds: 2));
-      if (mounted) setState(() => _message = null);
-      _handling = false;
-      return;
-    }
-    unawaited(
-      history.record(RecentScan.found(match, raw.trim(), DateTime.now())),
-    );
     await _scanner.stop();
-    HapticFeedback.mediumImpact();
     if (!mounted) return;
-    setState(() => _message = 'Found ${match.name}');
-    // SCAN-03: quick amount + action first; the full sheet is one tap away.
-    final result = await showScanActionSheet(
-      context,
-      kind: match.kind,
-      itemId: match.id,
-    );
-    if (!mounted) return;
-    if (result?.openDetails ?? false) {
-      await showItemDetailSheet(context, ref, match.kind, match.id);
+    var found = match;
+    if (found == null) {
+      // SCAN-04: nothing carries this code. Offer an explicit link instead of
+      // guessing; the person can also just dismiss the sheet.
+      unawaited(history.record(RecentScan.unknown(raw.trim(), now)));
+      HapticFeedback.heavyImpact();
+      setState(() => _message = 'This code is not in your lab notebook');
+      found = await showLinkBarcodeSheet(
+        context,
+        code: raw.trim(),
+        formatLabel: barcodeFormatLabel(format),
+      );
+      if (!mounted) return;
+    } else {
+      HapticFeedback.mediumImpact();
     }
-    if (!mounted) return;
-    final outcome = result?.message;
-    if (outcome != null) {
-      _flash(outcome, duration: const Duration(seconds: 3));
+    if (found != null) {
+      final item = found;
+      unawaited(
+        history.record(RecentScan.found(item, raw.trim(), DateTime.now())),
+      );
+      setState(() => _message = 'Found ${item.name}');
+      // SCAN-03: quick amount + action first; the full sheet is one tap away.
+      final result = await showScanActionSheet(
+        context,
+        kind: item.kind,
+        itemId: item.id,
+      );
+      if (!mounted) return;
+      if (result?.openDetails ?? false) {
+        await showItemDetailSheet(context, ref, item.kind, item.id);
+        if (!mounted) return;
+      }
+      final outcome = result?.message;
+      if (outcome != null) {
+        _flash(outcome, duration: const Duration(seconds: 3));
+      } else {
+        setState(() => _message = null);
+      }
     } else {
       setState(() => _message = null);
     }

@@ -10,6 +10,7 @@ import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
 import '../domain/recent_scan.dart';
 import '../scanner_providers.dart';
+import 'link_barcode_sheet.dart';
 
 /// The scanner's history (SCAN-01): the last codes read on this device for
 /// the signed-in user, newest first, with one tap back into the item.
@@ -105,8 +106,8 @@ class _RecentScansSectionState extends ConsumerState<RecentScansSection> {
     await showItemDetailSheet(context, ref, scan.kind!, scan.itemId!);
   }
 
-  Future<void> _showUnknownCode(BuildContext context, RecentScan scan) {
-    return showDialog<void>(
+  Future<void> _showUnknownCode(BuildContext context, RecentScan scan) async {
+    final link = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Code not in your notebook'),
@@ -116,7 +117,8 @@ class _RecentScansSectionState extends ConsumerState<RecentScansSection> {
           children: [
             Text(
               'Scanned ${relativeTime(scan.scannedAt)}. Lab Wizard labels '
-              'start with "labwizard:"; other codes are not matched to items.',
+              'start with "labwizard:"; other codes open an item only after '
+              'you link them to it.',
               style: TextStyle(color: context.mutedInkColor, fontSize: 13),
             ),
             const SizedBox(height: 10),
@@ -135,12 +137,27 @@ class _RecentScansSectionState extends ConsumerState<RecentScansSection> {
             },
             child: const Text('Copy'),
           ),
+          TextButton(
+            key: const Key('recent-scan-link'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Link to item…'),
+          ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Close'),
           ),
         ],
       ),
+    );
+    if (link != true || !context.mounted) return;
+    final linked = await showLinkBarcodeSheet(context, code: scan.raw);
+    if (linked == null || !context.mounted) return;
+    final history = ref.read(recentScansProvider.notifier);
+    await history.remove(scan);
+    await history.record(RecentScan.found(linked, scan.raw, scan.scannedAt));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Linked to ${linked.name}')),
     );
   }
 

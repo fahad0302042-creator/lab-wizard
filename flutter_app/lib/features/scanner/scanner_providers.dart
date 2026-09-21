@@ -36,6 +36,35 @@ List<RecentScan> decodeRecentScans(String? encoded) {
   }
 }
 
+/// Device preference (SCAN-04): also read product barcodes such as EAN-13,
+/// UPC and Code 128. Off by default so the camera only reacts to QR codes.
+final productBarcodesProvider = NotifierProvider<ProductBarcodesController, bool>(
+  ProductBarcodesController.new,
+);
+
+class ProductBarcodesController extends Notifier<bool> {
+  static const key = 'scanner.product_barcodes';
+
+  @override
+  bool build() {
+    unawaited(_restore());
+    return false;
+  }
+
+  Future<void> _restore() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!ref.mounted) return;
+    final stored = preferences.getBool(key);
+    if (stored != null && stored != state) state = stored;
+  }
+
+  Future<void> set(bool value) async {
+    state = value;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(key, value);
+  }
+}
+
 class RecentScansController extends Notifier<List<RecentScan>> {
   String _key = recentScansKey(null);
 
@@ -64,6 +93,14 @@ class RecentScansController extends Notifier<List<RecentScan>> {
   /// Adds a scan to the front of the history and persists it.
   Future<void> record(RecentScan scan) async {
     state = pushRecentScan(state, scan);
+    await _persist();
+  }
+
+  /// Drops one entry, e.g. an unknown code that has just been linked.
+  Future<void> remove(RecentScan scan) async {
+    state = state
+        .where((entry) => entry.dedupeKey != scan.dedupeKey)
+        .toList(growable: false);
     await _persist();
   }
 

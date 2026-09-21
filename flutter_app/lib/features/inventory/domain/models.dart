@@ -39,6 +39,11 @@ const chemicalMetadataColumns = {
 /// Days before the expiry date at which a chemical counts as "expiring".
 const expiryWarningWindow = Duration(days: 30);
 
+/// Nullable column on both item tables added by
+/// `supabase/008_external_barcodes.sql` (SCAN-04): the raw text of a product
+/// barcode or third-party code a person explicitly linked to the item.
+const barcodeColumn = 'barcode';
+
 enum ExpiryState { none, ok, expiringSoon, expired }
 
 /// GHS hazard pictograms, used as chips on forms and in the item detail.
@@ -88,6 +93,7 @@ class Chemical {
     this.location,
     this.expiryDate,
     this.hazardClasses = const [],
+    this.barcode,
   });
 
   final String id;
@@ -108,6 +114,9 @@ class Chemical {
   /// Calendar date (local); the time component is ignored.
   final DateTime? expiryDate;
   final List<String> hazardClasses;
+
+  /// Explicitly linked external barcode (SCAN-04); never guessed.
+  final String? barcode;
 
   bool get hasMetadata =>
       (supplier ?? '').isNotEmpty ||
@@ -156,6 +165,7 @@ class Chemical {
     String? location,
     DateTime? expiryDate,
     List<String>? hazardClasses,
+    String? barcode,
   }) => Chemical(
     id: id,
     name: name ?? this.name,
@@ -173,6 +183,7 @@ class Chemical {
     location: location ?? this.location,
     expiryDate: expiryDate ?? this.expiryDate,
     hazardClasses: hazardClasses ?? this.hazardClasses,
+    barcode: barcode ?? this.barcode,
   );
 
   factory Chemical.fromMap(Map<String, dynamic> map) => Chemical(
@@ -194,6 +205,7 @@ class Chemical {
     location: _emptyToNull(map['location']),
     expiryDate: parseDateOnly(map['expiry_date']),
     hazardClasses: parseHazardList(map['hazard_classes']),
+    barcode: _emptyToNull(map[barcodeColumn]),
   );
 
   /// Row shape shared with the server. Metadata keys are only present when
@@ -220,6 +232,7 @@ class Chemical {
     if ((location ?? '').isNotEmpty) 'location': location,
     if (expiryDate != null) 'expiry_date': formatDateOnly(expiryDate!),
     if (hazardClasses.isNotEmpty) 'hazard_classes': hazardClasses,
+    if ((barcode ?? '').isNotEmpty) barcodeColumn: barcode,
   };
 }
 
@@ -411,6 +424,7 @@ class Apparatus {
     this.location,
     this.purchaseDate,
     this.warrantyUntil,
+    this.barcode,
   });
 
   final String id;
@@ -429,6 +443,9 @@ class Apparatus {
   final String? location;
   final DateTime? purchaseDate;
   final DateTime? warrantyUntil;
+
+  /// Explicitly linked external barcode (SCAN-04); never guessed.
+  final String? barcode;
 
   bool get hasMetadata =>
       (serialNumber ?? '').isNotEmpty ||
@@ -475,6 +492,7 @@ class Apparatus {
     String? location,
     DateTime? purchaseDate,
     DateTime? warrantyUntil,
+    String? barcode,
   }) => Apparatus(
     id: id,
     name: name ?? this.name,
@@ -490,6 +508,7 @@ class Apparatus {
     location: location ?? this.location,
     purchaseDate: purchaseDate ?? this.purchaseDate,
     warrantyUntil: warrantyUntil ?? this.warrantyUntil,
+    barcode: barcode ?? this.barcode,
   );
 
   factory Apparatus.fromMap(Map<String, dynamic> map) => Apparatus(
@@ -509,6 +528,7 @@ class Apparatus {
     location: _emptyToNull(map['location']),
     purchaseDate: parseDateOnly(map['purchase_date']),
     warrantyUntil: parseDateOnly(map['warranty_until']),
+    barcode: _emptyToNull(map[barcodeColumn]),
   );
 
   /// Metadata keys are only present when set (see [Chemical.toMap]).
@@ -531,6 +551,7 @@ class Apparatus {
     if ((location ?? '').isNotEmpty) 'location': location,
     if (purchaseDate != null) 'purchase_date': formatDateOnly(purchaseDate!),
     if (warrantyUntil != null) 'warranty_until': formatDateOnly(warrantyUntil!),
+    if ((barcode ?? '').isNotEmpty) barcodeColumn: barcode,
   };
 }
 

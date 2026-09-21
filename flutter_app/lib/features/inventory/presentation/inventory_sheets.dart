@@ -11,6 +11,7 @@ import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../labels/domain/label_spec.dart';
 import '../../labels/presentation/label_actions.dart';
+import '../../scanner/presentation/link_barcode_sheet.dart';
 import '../../sync/domain/sync_conflict.dart';
 import '../data/inventory_repository.dart';
 import '../domain/apparatus_history.dart';
@@ -1422,6 +1423,15 @@ class _ItemDetail extends ConsumerWidget {
                     ? LabelSpec.chemical(chemical)
                     : LabelSpec.apparatus(apparatus!),
               ),
+              if ((chemical?.barcode ?? apparatus?.barcode) != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: LinkedBarcodeRow(
+                    kind: kind,
+                    itemId: itemId,
+                    barcode: (chemical?.barcode ?? apparatus?.barcode)!,
+                  ),
+                ),
             ],
             if (chemical != null) ChemicalDetailsSummary(chemical),
             if (apparatus != null) ApparatusDetailsSummary(apparatus),
