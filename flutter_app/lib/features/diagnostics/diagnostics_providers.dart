@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,7 +106,7 @@ class DiagnosticsController extends Notifier<DiagnosticsState> {
     final inventory = ref.read(inventoryProvider);
     final email = ref.read(authProvider).user?.email;
     return [
-      if (email != null) email,
+      ?email,
       for (final item in inventory.chemicals) ...[
         item.name,
         item.notes,

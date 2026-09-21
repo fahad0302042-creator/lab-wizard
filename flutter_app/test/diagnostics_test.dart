@@ -280,7 +280,10 @@ void main() {
       expect(reports.first.message, 'error ${diagnosticsLimit + 2}');
       h.diagnostics.now = h.diagnostics.now.add(const Duration(days: 15));
       await h.diagnostics.record('fresh');
-      expect(h.container.read(diagnosticsProvider).reports.single.message, 'fresh');
+      expect(
+        h.container.read(diagnosticsProvider).reports.single.message,
+        'fresh',
+      );
     });
   });
 
@@ -320,7 +323,10 @@ void main() {
       await diagnostics.record('Something about Acetone broke');
       await tester.pumpAndSettle();
       expect(find.text('1 stored'), findsOneWidget);
-      expect(find.textContaining('Something about [redacted] broke'), findsOneWidget);
+      expect(
+        find.textContaining('Something about [redacted] broke'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('diagnostics-share')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('diagnostics-clear')));

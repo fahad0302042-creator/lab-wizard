@@ -650,18 +650,20 @@ class NotebookFilterWord extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? context.marginRedColor : context.mutedInkColor,
-              fontFamily: 'Caveat',
-              fontSize: fontSize,
-              height: 1,
-              fontWeight: FontWeight.w700,
-              decoration: selected ? TextDecoration.underline : null,
-              decorationColor: context.marginRedColor,
-              decorationThickness: 2,
+              label,
+              style: TextStyle(
+                color: selected
+                    ? context.marginRedColor
+                    : context.mutedInkColor,
+                fontFamily: 'Caveat',
+                fontSize: fontSize,
+                height: 1,
+                fontWeight: FontWeight.w700,
+                decoration: selected ? TextDecoration.underline : null,
+                decorationColor: context.marginRedColor,
+                decorationThickness: 2,
+              ),
             ),
-          ),
           ),
         ),
       ),

@@ -89,10 +89,9 @@ class DiagnosticReport {
 
   /// First line of the message, for lists.
   String get headline {
-    final line = message.split('\n').firstWhere(
-      (part) => part.trim().isNotEmpty,
-      orElse: () => kind.label,
-    );
+    final line = message
+        .split('\n')
+        .firstWhere((part) => part.trim().isNotEmpty, orElse: () => kind.label);
     return line.length > 140 ? '${line.substring(0, 139)}…' : line;
   }
 }
