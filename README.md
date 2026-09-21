@@ -56,6 +56,8 @@ Apparatus metadata (GEAR-01) follows the same pattern with [`flutter_app/supabas
 
 Apparatus checkouts (GEAR-02) add one new table with [`flutter_app/supabase/005_apparatus_checkouts.sql`](flutter_app/supabase/005_apparatus_checkouts.sql): `apparatus_checkouts` (own rows only via RLS, `on delete cascade` from `apparatus`, unique per queued operation so a retried mobile checkout is never lent twice). Loans do not modify `apparatus.quantity`, so the web app's numbers and queries are unaffected; the table is simply invisible to it.
 
+Maintenance and calibration (GEAR-03) add [`flutter_app/supabase/006_apparatus_maintenance.sql`](flutter_app/supabase/006_apparatus_maintenance.sql): an `apparatus_services` table (kind `maintenance` / `calibration`, due and completion timestamps, performer, result, note) with the same own-rows RLS, cascade and retry-safe unique operation id. Again nothing existing changes and the web app never reads the table.
+
 ## Improvement program
 
 The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.

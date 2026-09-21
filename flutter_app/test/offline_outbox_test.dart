@@ -552,6 +552,132 @@ void main() {
     });
   });
 
+  group('services (GEAR-03)', () {
+    test('tasks are scheduled and completed offline with rollback', () async {
+      final local = openLocal('services.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+
+      final item = await repository.addApparatus(
+        userId: 'u1',
+        name: 'pH meter',
+        category: 'electronics',
+        quantity: 1,
+        threshold: 0,
+        notes: '',
+      );
+      final due = DateTime(2026, 9, 30, 23, 59);
+      final task = await repository.scheduleService(
+        userId: 'u1',
+        apparatusId: item.id,
+        kind: ServiceKind.calibration,
+        title: ' Buffer check ',
+        note: 'pH 4 / 7 / 10',
+        dueAt: due,
+        itemName: item.name,
+      );
+      expect(task.title, 'Buffer check');
+      expect(task.isOpen, isTrue);
+      expect(task.dueState(now: DateTime(2026, 9, 21)), ExpiryState.expiringSoon);
+      expect(task.dueState(now: DateTime(2026, 8, 1)), ExpiryState.ok);
+      expect(task.dueState(now: DateTime(2026, 10, 2)), ExpiryState.expired);
+      expect(task.isOverdue(now: DateTime(2026, 10, 2)), isTrue);
+
+      var snapshot = await repository.loadCached('u1');
+      expect(snapshot.services.single.id, task.id);
+      expect(snapshot.services.single.dueAt, due);
+      expect(snapshot.outbox, hasLength(2));
+      expect(snapshot.outbox.last.type, 'schedule_service');
+      expect(
+        snapshot.outbox.last.description,
+        'Schedule calibration for pH meter',
+      );
+      expect(snapshot.outbox.last.itemId, item.id);
+      expect(snapshot.outbox.last.payload['user_id'], 'u1');
+      expect(snapshot.outbox.last.payload['kind'], 'calibration');
+
+      final done = await repository.completeService(
+        userId: 'u1',
+        service: task,
+        completedAt: DateTime(2026, 9, 22, 10),
+        performedBy: 'Sara',
+        result: 'pass',
+        note: 'slope 98%',
+        itemName: item.name,
+      );
+      expect(done.isDone, isTrue);
+      expect(done.performedBy, 'Sara');
+      expect(done.result, 'pass');
+      expect(done.note, 'pH 4 / 7 / 10 · slope 98%');
+      expect(done.dueState(now: DateTime(2026, 10, 2)), ExpiryState.none);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.services.single.isDone, isTrue);
+      expect(snapshot.outbox, hasLength(3));
+      expect(snapshot.outbox.last.type, 'complete_service');
+      expect(
+        snapshot.outbox.last.description,
+        'Complete calibration of pH meter',
+      );
+      expect(snapshot.outbox.last.payload['previous'], {
+        'completed_at': null,
+        'performed_by': '',
+        'result': '',
+        'note': 'pH 4 / 7 / 10',
+      });
+
+      // Discarding the completion reopens the task with its old note.
+      await repository.discardOperation('u1', snapshot.outbox.last);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.services.single.isOpen, isTrue);
+      expect(snapshot.services.single.note, 'pH 4 / 7 / 10');
+      expect(snapshot.services.single.performedBy, '');
+
+      // Discarding the schedule removes the task entirely.
+      await repository.discardOperation('u1', snapshot.outbox.last);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.services, isEmpty);
+      expect(snapshot.outbox.single.type, 'add_apparatus');
+    });
+
+    test('open tasks sort by due date ahead of completed ones', () {
+      ApparatusService task(
+        String id, {
+        DateTime? due,
+        DateTime? done,
+        DateTime? created,
+      }) => ApparatusService(
+        id: id,
+        apparatusId: 'a1',
+        kind: ServiceKind.maintenance,
+        createdAt: created ?? DateTime(2026, 1, 1),
+        dueAt: due,
+        completedAt: done,
+      );
+      final sorted = InventoryRepository.sortedServices([
+        task('done-old', done: DateTime(2026, 5, 1)),
+        task('undated', created: DateTime(2026, 3, 1)),
+        task('later', due: DateTime(2026, 12, 1)),
+        task('done-new', done: DateTime(2026, 8, 1)),
+        task('soon', due: DateTime(2026, 10, 1)),
+      ]);
+      expect(sorted.map((t) => t.id), [
+        'soon',
+        'later',
+        'undated',
+        'done-new',
+        'done-old',
+      ]);
+      final map = task('x', due: DateTime(2026, 10, 1, 23, 59)).toMap();
+      expect(map['kind'], 'maintenance');
+      expect(map['due_at'], endsWith('Z'));
+      final parsed = ApparatusService.fromMap(map);
+      expect(parsed.dueAt, DateTime(2026, 10, 1, 23, 59));
+      expect(parsed.displayTitle, 'Maintenance');
+      expect(ServiceKind.parse('calibration'), ServiceKind.calibration);
+      expect(ServiceKind.parse('anything'), ServiceKind.maintenance);
+    });
+  });
+
   group('sync center copy', () {
     test('relative times read like a notebook note', () {
       final now = DateTime(2026, 9, 21, 12);

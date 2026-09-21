@@ -13,6 +13,7 @@ class InventorySnapshot {
     required this.fromCache,
     this.reversals = const [],
     this.checkouts = const [],
+    this.services = const [],
     this.lastSyncedAt,
   });
 
@@ -26,6 +27,9 @@ class InventorySnapshot {
 
   /// Apparatus loans, newest first (GEAR-02).
   final List<ApparatusCheckout> checkouts;
+
+  /// Maintenance and calibration tasks, soonest due first (GEAR-03).
+  final List<ApparatusService> services;
   final bool fromCache;
   final DateTime? lastSyncedAt;
 
@@ -43,6 +47,7 @@ class InventoryRepository {
   bool? _undoRpcAvailable;
   bool? _reversalsTableAvailable;
   bool? _checkoutsTableAvailable;
+  bool? _servicesTableAvailable;
 
   /// Whether the last server round-trip found the `apparatus_checkouts`
   /// table (null until the first refresh).
@@ -57,6 +62,7 @@ class InventoryRepository {
       lastSyncedAt(userId),
       local.loadRecords(userId, 'reversal'),
       local.loadRecords(userId, 'checkout'),
+      local.loadRecords(userId, 'service'),
     ]);
     return InventorySnapshot(
       chemicals: (results[0] as List<Map<String, dynamic>>)
@@ -81,8 +87,34 @@ class InventoryRepository {
           ApparatusCheckout.fromMap,
         ),
       ),
+      services: sortedServices(
+        (results[7] as List<Map<String, dynamic>>).map(
+          ApparatusService.fromMap,
+        ),
+      ),
     );
   }
+
+  /// Open tasks first (soonest due, undated last), then completed tasks
+  /// newest first.
+  static List<ApparatusService> sortedServices(
+    Iterable<ApparatusService> services,
+  ) => services.toList()..sort((a, b) {
+    if (a.isOpen != b.isOpen) return a.isOpen ? -1 : 1;
+    if (a.isOpen) {
+      final dueA = a.dueAt;
+      final dueB = b.dueAt;
+      if (dueA == null && dueB == null) {
+        return b.createdAt.compareTo(a.createdAt);
+      }
+      if (dueA == null) return 1;
+      if (dueB == null) return -1;
+      return dueA.compareTo(dueB);
+    }
+    return (b.completedAt ?? b.createdAt).compareTo(
+      a.completedAt ?? a.createdAt,
+    );
+  });
 
   static List<InventoryReversal> _sortedReversals(
     Iterable<InventoryReversal> reversals,
@@ -122,6 +154,7 @@ class InventoryRepository {
     ]);
     final reversalMaps = await _refreshReversals(userId, client);
     final checkoutMaps = await _refreshCheckouts(userId, client);
+    final serviceMaps = await _refreshServices(userId, client);
     final syncedAt = DateTime.now();
     await local.setMeta(
       userId,
@@ -138,6 +171,7 @@ class InventoryRepository {
       lastSyncedAt: syncedAt,
       reversals: _sortedReversals(reversalMaps.map(InventoryReversal.fromMap)),
       checkouts: _sortedCheckouts(checkoutMaps.map(ApparatusCheckout.fromMap)),
+      services: sortedServices(serviceMaps.map(ApparatusService.fromMap)),
     );
   }
 
@@ -147,36 +181,71 @@ class InventoryRepository {
   Future<List<Map<String, dynamic>>> _refreshCheckouts(
     String userId,
     SupabaseClient client,
-  ) async {
-    if (_checkoutsTableAvailable != false) {
+  ) => _refreshOptionalRows(
+    userId: userId,
+    client: client,
+    table: 'apparatus_checkouts',
+    kind: 'checkout',
+    queuedType: 'checkout_apparatus',
+    orderBy: 'checked_out_at',
+    available: _checkoutsTableAvailable,
+    setAvailable: (value) => _checkoutsTableAvailable = value,
+  );
+
+  /// Downloads maintenance/calibration tasks when the additive
+  /// `apparatus_services` table is installed (GEAR-03).
+  Future<List<Map<String, dynamic>>> _refreshServices(
+    String userId,
+    SupabaseClient client,
+  ) => _refreshOptionalRows(
+    userId: userId,
+    client: client,
+    table: 'apparatus_services',
+    kind: 'service',
+    queuedType: 'schedule_service',
+    orderBy: 'created_at',
+    available: _servicesTableAvailable,
+    setAvailable: (value) => _servicesTableAvailable = value,
+  );
+
+  /// Shared download for tables that only exist after an optional migration.
+  /// A missing table keeps the cached rows and remembers that the table is
+  /// absent; queued-but-unsynced rows survive the refresh.
+  Future<List<Map<String, dynamic>>> _refreshOptionalRows({
+    required String userId,
+    required SupabaseClient client,
+    required String table,
+    required String kind,
+    required String queuedType,
+    required String orderBy,
+    required bool? available,
+    required void Function(bool value) setAvailable,
+  }) async {
+    if (available != false) {
       try {
         final rows = _mapList(
-          await client
-              .from('apparatus_checkouts')
-              .select()
-              .order('checked_out_at', ascending: false),
+          await client.from(table).select().order(orderBy, ascending: false),
         );
-        _checkoutsTableAvailable = true;
+        setAvailable(true);
         final queuedIds = <String>{
           for (final operation in await local.pendingOperations(userId))
-            if (operation.type == 'checkout_apparatus')
-              operation.payload['id'] as String,
+            if (operation.type == queuedType) operation.payload['id'] as String,
         };
         final serverIds = rows.map((row) => row['id']).toSet();
-        final queued = (await local.loadRecords(userId, 'checkout')).where(
+        final queued = (await local.loadRecords(userId, kind)).where(
           (record) =>
               queuedIds.contains(record['id']) &&
               !serverIds.contains(record['id']),
         );
         final merged = [...rows, ...queued];
-        await local.replaceRecords(userId, 'checkout', merged);
+        await local.replaceRecords(userId, kind, merged);
         return merged;
       } on PostgrestException catch (error) {
         if (!_isMissingRelation(error)) rethrow;
-        _checkoutsTableAvailable = false;
+        setAvailable(false);
       }
     }
-    return local.loadRecords(userId, 'checkout');
+    return local.loadRecords(userId, kind);
   }
 
   /// Downloads undo records when the additive `inventory_reversals` table is
@@ -897,6 +966,144 @@ class InventoryRepository {
     }
   }
 
+  /// Schedules a maintenance or calibration task (GEAR-03). Works offline
+  /// through the `schedule_service` queue entry.
+  Future<ApparatusService> scheduleService({
+    required String userId,
+    required String apparatusId,
+    required ServiceKind kind,
+    required String title,
+    required String note,
+    DateTime? dueAt,
+    String? itemName,
+  }) async {
+    final now = DateTime.now();
+    final service = ApparatusService(
+      id: _uuid.v4(),
+      apparatusId: apparatusId,
+      kind: kind,
+      title: title.trim(),
+      note: note.trim(),
+      dueAt: dueAt,
+      createdAt: now,
+      operationId: _uuid.v4(),
+    );
+    final payload = {...service.toMap(), 'user_id': userId};
+    try {
+      if (remote == null) throw const _OfflineException();
+      final data = await remote!
+          .from('apparatus_services')
+          .insert(payload)
+          .select()
+          .single();
+      final saved = ApparatusService.fromMap(data);
+      _servicesTableAvailable = true;
+      await local.upsertRecord(userId, 'service', saved.toMap());
+      return saved;
+    } on PostgrestException catch (error) {
+      if (_isMissingRelation(error)) {
+        _servicesTableAvailable = false;
+        throw StateError(servicesMigrationHint);
+      }
+      rethrow;
+    } catch (error) {
+      if (error is _OfflineException || _isConnectivityError(error)) {
+        await local.upsertRecord(userId, 'service', service.toMap());
+        await local.enqueue(
+          PendingOperation(
+            id: _uuid.v4(),
+            userId: userId,
+            type: 'schedule_service',
+            payload: payload,
+            createdAt: now,
+            label:
+                'Schedule ${kind.label.toLowerCase()} for '
+                '${itemName ?? 'apparatus'}',
+          ),
+        );
+        return service;
+      }
+      rethrow;
+    }
+  }
+
+  /// Marks a task as done. Works offline through the `complete_service`
+  /// queue entry, which remembers the previous values for discard.
+  Future<ApparatusService> completeService({
+    required String userId,
+    required ApparatusService service,
+    required DateTime completedAt,
+    required String performedBy,
+    required String result,
+    required String note,
+    String? itemName,
+  }) async {
+    final combinedNote = [
+      if (service.note.isNotEmpty) service.note,
+      if (note.trim().isNotEmpty && note.trim() != service.note) note.trim(),
+    ].join(' · ');
+    final changes = <String, dynamic>{
+      'completed_at': completedAt.toUtc().toIso8601String(),
+      'performed_by': performedBy.trim(),
+      'result': result.trim(),
+      'note': combinedNote,
+    };
+    final updated = service.copyWith(
+      completedAt: completedAt,
+      performedBy: performedBy.trim(),
+      result: result.trim(),
+      note: combinedNote,
+    );
+    try {
+      if (remote == null) throw const _OfflineException();
+      final data = await remote!
+          .from('apparatus_services')
+          .update(changes)
+          .eq('id', service.id)
+          .select()
+          .single();
+      final saved = ApparatusService.fromMap(data);
+      await local.upsertRecord(userId, 'service', saved.toMap());
+      return saved;
+    } on PostgrestException catch (error) {
+      if (_isMissingRelation(error)) {
+        _servicesTableAvailable = false;
+        throw StateError(servicesMigrationHint);
+      }
+      rethrow;
+    } catch (error) {
+      if (error is _OfflineException || _isConnectivityError(error)) {
+        await local.upsertRecord(userId, 'service', updated.toMap());
+        await local.enqueue(
+          PendingOperation(
+            id: _uuid.v4(),
+            userId: userId,
+            type: 'complete_service',
+            payload: {
+              'id': service.id,
+              'apparatus_id': service.apparatusId,
+              'changes': changes,
+              'previous': {
+                'completed_at': service.completedAt
+                    ?.toUtc()
+                    .toIso8601String(),
+                'performed_by': service.performedBy,
+                'result': service.result,
+                'note': service.note,
+              },
+            },
+            createdAt: DateTime.now(),
+            label:
+                'Complete ${service.kind.label.toLowerCase()} of '
+                '${itemName ?? 'apparatus'}',
+          ),
+        );
+        return updated;
+      }
+      rethrow;
+    }
+  }
+
   Future<void> deleteItem({
     required String userId,
     required ItemKind type,
@@ -926,6 +1133,11 @@ class InventoryRepository {
     await local.deleteRecordsWhere(
       userId,
       'checkout',
+      (record) => record['apparatus_id'] == id,
+    );
+    await local.deleteRecordsWhere(
+      userId,
+      'service',
       (record) => record['apparatus_id'] == id,
     );
   }
@@ -1002,6 +1214,15 @@ class InventoryRepository {
               Map<String, dynamic>.from(operation.payload['changes'] as Map),
             )
             .eq('id', operation.payload['id']);
+      case 'schedule_service':
+        await remote!.from('apparatus_services').upsert(operation.payload);
+      case 'complete_service':
+        await remote!
+            .from('apparatus_services')
+            .update(
+              Map<String, dynamic>.from(operation.payload['changes'] as Map),
+            )
+            .eq('id', operation.payload['id']);
       default:
         throw StateError('Unknown operation ${operation.type}');
     }
@@ -1033,6 +1254,11 @@ class InventoryRepository {
         await local.deleteRecordsWhere(
           userId,
           'checkout',
+          (record) => record['apparatus_id'] == id,
+        );
+        await local.deleteRecordsWhere(
+          userId,
+          'service',
           (record) => record['apparatus_id'] == id,
         );
         // Changes to an item that never reached the server can never apply.
@@ -1109,18 +1335,30 @@ class InventoryRepository {
             await local.completeOperation(other.id);
           }
         }
-      case 'return_apparatus':
+      case 'return_apparatus' || 'complete_service':
+        final kind = operation.type == 'return_apparatus'
+            ? 'checkout'
+            : 'service';
         final previous = payload['previous'];
         if (previous is Map) {
-          final rows = await local.loadRecords(userId, 'checkout');
+          final rows = await local.loadRecords(userId, kind);
           final current = rows
               .where((row) => row['id'] == payload['id'])
               .firstOrNull;
           if (current != null) {
-            await local.upsertRecord(userId, 'checkout', {
+            await local.upsertRecord(userId, kind, {
               ...current,
               ...Map<String, dynamic>.from(previous),
             });
+          }
+        }
+      case 'schedule_service':
+        await local.deleteRecord(userId, 'service', payload['id'] as String);
+        for (final other in await local.pendingOperations(userId)) {
+          if (other.id != operation.id &&
+              other.type == 'complete_service' &&
+              other.payload['id'] == payload['id']) {
+            await local.completeOperation(other.id);
           }
         }
       default:
@@ -1174,6 +1412,12 @@ class InventoryRepository {
 const checkoutsMigrationHint =
     'Checkouts need the database update in '
     'flutter_app/supabase/005_apparatus_checkouts.sql. Run it, then try '
+    'again.';
+
+/// Shown when the `apparatus_services` table has not been created yet.
+const servicesMigrationHint =
+    'Maintenance and calibration need the database update in '
+    'flutter_app/supabase/006_apparatus_maintenance.sql. Run it, then try '
     'again.';
 
 /// Outcome of [InventoryRepository.undoAction].

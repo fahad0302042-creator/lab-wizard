@@ -135,6 +135,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   overdue: state
                       .openCheckoutsFor(item.id)
                       .any((checkout) => checkout.isOverdue()),
+                  urgentService: state.urgentServiceFor(item.id),
                 ),
               )
               .toList();
@@ -1098,6 +1099,7 @@ class _InventoryView {
     this.apparatus,
     this.checkedOut = 0,
     this.overdue = false,
+    this.urgentService,
   });
 
   factory _InventoryView.chemical(Chemical item) => _InventoryView(
@@ -1120,6 +1122,7 @@ class _InventoryView {
     Apparatus item, {
     double checkedOut = 0,
     bool overdue = false,
+    ApparatusService? urgentService,
   }) => _InventoryView(
     id: item.id,
     name: item.name,
@@ -1136,6 +1139,7 @@ class _InventoryView {
     apparatus: item,
     checkedOut: checkedOut,
     overdue: overdue,
+    urgentService: urgentService,
   );
 
   final String id;
@@ -1159,6 +1163,9 @@ class _InventoryView {
 
   /// Whether an open loan of this apparatus is past due (GEAR-02).
   final bool overdue;
+
+  /// Overdue / due-soon maintenance or calibration task (GEAR-03).
+  final ApparatusService? urgentService;
 
   String get letter => indexLetterFor(name);
 
@@ -1185,6 +1192,7 @@ class _MetadataMarks extends StatelessWidget {
         compact: compact,
         checkedOut: item.checkedOut,
         overdue: item.overdue,
+        urgentService: item.urgentService,
       );
     }
     final chemical = item.chemical;

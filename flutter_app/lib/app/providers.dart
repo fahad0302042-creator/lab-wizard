@@ -391,6 +391,7 @@ class InventoryState {
     this.outbox = const [],
     this.reversals = const [],
     this.checkouts = const [],
+    this.services = const [],
     this.loading = false,
     this.refreshing = false,
     this.fromCache = false,
@@ -411,6 +412,9 @@ class InventoryState {
 
   /// Apparatus loans, newest first (GEAR-02).
   final List<ApparatusCheckout> checkouts;
+
+  /// Maintenance and calibration tasks, open ones first (GEAR-03).
+  final List<ApparatusService> services;
   final bool loading;
   final bool refreshing;
   final bool fromCache;
@@ -453,6 +457,62 @@ class InventoryState {
       if (checkout.isOverdue(now: now)) checkout,
   ];
 
+  /// Tasks of one apparatus in display order (open first).
+  List<ApparatusService> servicesFor(String apparatusId) => [
+    for (final service in services)
+      if (service.apparatusId == apparatusId) service,
+  ];
+
+  /// Open tasks of one apparatus, soonest due first.
+  List<ApparatusService> openServicesFor(String apparatusId) => [
+    for (final service in services)
+      if (service.apparatusId == apparatusId && service.isOpen) service,
+  ];
+
+  /// Most urgent state among an apparatus' open tasks: `expired` when a
+  /// task is overdue, `expiringSoon` when one is due within two weeks.
+  ExpiryState serviceStateFor(String apparatusId, {DateTime? now}) {
+    var worst = ExpiryState.none;
+    for (final service in openServicesFor(apparatusId)) {
+      final state = service.dueState(now: now);
+      if (state.index > worst.index) worst = state;
+    }
+    return worst;
+  }
+
+  /// The overdue or soonest due-soon open task of one apparatus, or null
+  /// when nothing needs attention.
+  ApparatusService? urgentServiceFor(String apparatusId, {DateTime? now}) {
+    ApparatusService? best;
+    var bestState = ExpiryState.none;
+    for (final service in openServicesFor(apparatusId)) {
+      final state = service.dueState(now: now);
+      if (state != ExpiryState.expired && state != ExpiryState.expiringSoon) {
+        continue;
+      }
+      final better =
+          best == null ||
+          state.index > bestState.index ||
+          (state == bestState &&
+              service.dueAt != null &&
+              best.dueAt != null &&
+              service.dueAt!.isBefore(best.dueAt!));
+      if (better) {
+        best = service;
+        bestState = state;
+      }
+    }
+    return best;
+  }
+
+  /// Open tasks that are overdue or due soon, across all apparatus.
+  List<ApparatusService> serviceAlerts({DateTime? now}) => [
+    for (final service in services)
+      if (service.dueState(now: now) == ExpiryState.expired ||
+          service.dueState(now: now) == ExpiryState.expiringSoon)
+        service,
+  ];
+
   InventoryState copyWith({
     List<Chemical>? chemicals,
     List<Apparatus>? apparatus,
@@ -460,6 +520,7 @@ class InventoryState {
     List<PendingOperation>? outbox,
     List<InventoryReversal>? reversals,
     List<ApparatusCheckout>? checkouts,
+    List<ApparatusService>? services,
     bool? loading,
     bool? refreshing,
     bool? fromCache,
@@ -473,6 +534,7 @@ class InventoryState {
     outbox: outbox ?? this.outbox,
     reversals: reversals ?? this.reversals,
     checkouts: checkouts ?? this.checkouts,
+    services: services ?? this.services,
     loading: loading ?? this.loading,
     refreshing: refreshing ?? this.refreshing,
     fromCache: fromCache ?? this.fromCache,
@@ -618,6 +680,7 @@ class InventoryController extends Notifier<InventoryState> {
       outbox: snapshot.outbox,
       reversals: snapshot.reversals,
       checkouts: snapshot.checkouts,
+      services: snapshot.services,
       loading: loading,
       fromCache: snapshot.fromCache,
       lastUpdated: DateTime.now(),
@@ -854,7 +917,96 @@ class InventoryController extends Notifier<InventoryState> {
       checkouts: state.checkouts
           .where((checkout) => checkout.apparatusId != id)
           .toList(),
+      services: state.services
+          .where((service) => service.apparatusId != id)
+          .toList(),
     );
+  }
+
+  /// Schedules maintenance or calibration for an apparatus (GEAR-03).
+  Future<ApparatusService> scheduleService({
+    required String apparatusId,
+    required ServiceKind kind,
+    required String title,
+    required String note,
+    DateTime? dueAt,
+  }) async {
+    final userId = _requireUser();
+    final item = state.apparatus
+        .where((entry) => entry.id == apparatusId)
+        .firstOrNull;
+    if (item == null) throw StateError('The apparatus no longer exists.');
+    final service = await _repository.scheduleService(
+      userId: userId,
+      apparatusId: apparatusId,
+      kind: kind,
+      title: title,
+      note: note,
+      dueAt: dueAt,
+      itemName: item.name,
+    );
+    final cached = await _repository.loadCached(userId);
+    state = state.copyWith(
+      services: InventoryRepository.sortedServices([
+        service,
+        ...state.services.where((entry) => entry.id != service.id),
+      ]),
+      outbox: cached.outbox,
+      fromCache: cached.pendingCount > 0,
+    );
+    return service;
+  }
+
+  /// Marks a task done and optionally schedules the next one of the same
+  /// kind (recurring maintenance / calibration intervals).
+  Future<ApparatusService> completeService({
+    required String serviceId,
+    required DateTime completedAt,
+    required String performedBy,
+    required String result,
+    required String note,
+    DateTime? nextDueAt,
+  }) async {
+    final userId = _requireUser();
+    final service = state.services
+        .where((entry) => entry.id == serviceId)
+        .firstOrNull;
+    if (service == null) throw StateError('The task no longer exists.');
+    if (service.isDone) throw StateError('This task is already completed.');
+    if (completedAt.isAfter(DateTime.now().add(const Duration(days: 1)))) {
+      throw ArgumentError('The completion date cannot be in the future.');
+    }
+    final updated = await _repository.completeService(
+      userId: userId,
+      service: service,
+      completedAt: completedAt,
+      performedBy: performedBy,
+      result: result,
+      note: note,
+      itemName: _nameOf(ItemKind.apparatus, service.apparatusId),
+    );
+    var services = state.services
+        .map((entry) => entry.id == updated.id ? updated : entry)
+        .toList();
+    if (nextDueAt != null) {
+      final next = await _repository.scheduleService(
+        userId: userId,
+        apparatusId: service.apparatusId,
+        kind: service.kind,
+        title: service.title,
+        note: '',
+        dueAt: nextDueAt,
+        itemName: _nameOf(ItemKind.apparatus, service.apparatusId),
+      );
+      services = [next, ...services];
+    }
+    final cached = await _repository.loadCached(userId);
+    state = state.copyWith(
+      services: InventoryRepository.sortedServices(services),
+      outbox: cached.outbox,
+      fromCache: cached.pendingCount > 0,
+    );
+    return updated;
   }
 
   /// Lends pieces of an apparatus to a person (GEAR-02).

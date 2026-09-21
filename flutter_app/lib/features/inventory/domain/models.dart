@@ -826,6 +826,131 @@ class ApparatusCheckout {
   }
 }
 
+/// Kind of service task tracked for an apparatus (GEAR-03).
+enum ServiceKind {
+  maintenance('maintenance', 'Maintenance'),
+  calibration('calibration', 'Calibration');
+
+  const ServiceKind(this.value, this.label);
+
+  final String value;
+  final String label;
+
+  static ServiceKind parse(Object? value) => switch (value?.toString()) {
+    'calibration' => ServiceKind.calibration,
+    _ => ServiceKind.maintenance,
+  };
+}
+
+/// Suggested outcomes offered when a task is completed.
+const serviceResults = ['pass', 'adjusted', 'fail', 'serviced'];
+
+/// One maintenance or calibration task for an apparatus, stored in the
+/// additive `apparatus_services` table (GEAR-03). Scheduled tasks have a
+/// [dueAt] and no [completedAt]; completing fills in the rest.
+class ApparatusService {
+  const ApparatusService({
+    required this.id,
+    required this.apparatusId,
+    required this.kind,
+    required this.createdAt,
+    this.title = '',
+    this.note = '',
+    this.dueAt,
+    this.completedAt,
+    this.performedBy = '',
+    this.result = '',
+    this.operationId,
+  });
+
+  final String id;
+  final String apparatusId;
+  final ServiceKind kind;
+  final String title;
+  final String note;
+  final DateTime? dueAt;
+  final DateTime? completedAt;
+  final String performedBy;
+  final String result;
+  final String? operationId;
+  final DateTime createdAt;
+
+  bool get isDone => completedAt != null;
+
+  bool get isOpen => completedAt == null;
+
+  /// Title shown in lists: the custom title or the kind.
+  String get displayTitle => title.isEmpty ? kind.label : title;
+
+  /// How urgent an open task is: `expired` = overdue, `expiringSoon` = due
+  /// within [soonDays], `ok` otherwise, `none` when done or undated.
+  ExpiryState dueState({DateTime? now, int soonDays = 14}) {
+    final due = dueAt;
+    if (!isOpen || due == null) return ExpiryState.none;
+    final reference = now ?? DateTime.now();
+    final today = DateTime(reference.year, reference.month, reference.day);
+    final days = DateTime(due.year, due.month, due.day).difference(today).inDays;
+    if (days < 0) return ExpiryState.expired;
+    return days <= soonDays ? ExpiryState.expiringSoon : ExpiryState.ok;
+  }
+
+  bool isOverdue({DateTime? now}) =>
+      dueState(now: now) == ExpiryState.expired;
+
+  ApparatusService copyWith({
+    String? title,
+    String? note,
+    DateTime? dueAt,
+    DateTime? completedAt,
+    String? performedBy,
+    String? result,
+    bool clearCompletedAt = false,
+  }) => ApparatusService(
+    id: id,
+    apparatusId: apparatusId,
+    kind: kind,
+    createdAt: createdAt,
+    title: title ?? this.title,
+    note: note ?? this.note,
+    dueAt: dueAt ?? this.dueAt,
+    completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
+    performedBy: performedBy ?? this.performedBy,
+    result: result ?? this.result,
+    operationId: operationId,
+  );
+
+  factory ApparatusService.fromMap(Map<String, dynamic> map) =>
+      ApparatusService(
+        id: map['id'] as String,
+        apparatusId: map['apparatus_id'] as String,
+        kind: ServiceKind.parse(map['kind']),
+        title: (map['title'] as String?) ?? '',
+        note: (map['note'] as String?) ?? '',
+        dueAt: ApparatusCheckout._asLocalTime(map['due_at']),
+        completedAt: ApparatusCheckout._asLocalTime(map['completed_at']),
+        performedBy: (map['performed_by'] as String?) ?? '',
+        result: (map['result'] as String?) ?? '',
+        operationId: map['operation_id'] as String?,
+        createdAt:
+            ApparatusCheckout._asLocalTime(map['created_at']) ?? DateTime.now(),
+      );
+
+  /// Timestamps travel as UTC ISO strings so the cache and Supabase agree.
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'apparatus_id': apparatusId,
+    'kind': kind.value,
+    'title': title,
+    'note': note,
+    'due_at': dueAt?.toUtc().toIso8601String(),
+    'completed_at': completedAt?.toUtc().toIso8601String(),
+    'performed_by': performedBy,
+    'result': result,
+    'operation_id': operationId,
+    'created_at': createdAt.toUtc().toIso8601String(),
+  };
+}
+
 /// Whether a queued change is still waiting for a connection or needs the
 /// user to look at it (SYNC-01).
 enum PendingStatus { pending, failed }
@@ -877,6 +1002,9 @@ class PendingOperation {
       'checkout_apparatus' =>
         'Check out apparatus to ${payload['person'] ?? ''}'.trim(),
       'return_apparatus' => 'Return apparatus',
+      'schedule_service' =>
+        'Schedule ${ServiceKind.parse(payload['kind']).label.toLowerCase()}',
+      'complete_service' => 'Complete service task',
       _ => type.replaceAll('_', ' '),
     };
   }

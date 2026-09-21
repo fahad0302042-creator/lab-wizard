@@ -303,6 +303,7 @@ class ApparatusMarks extends StatelessWidget {
     this.compact = false,
     this.checkedOut = 0,
     this.overdue = false,
+    this.urgentService,
   });
 
   final Apparatus item;
@@ -314,6 +315,10 @@ class ApparatusMarks extends StatelessWidget {
   /// Whether any open loan of this item is past its due date.
   final bool overdue;
 
+  /// The most pressing overdue / due-soon maintenance or calibration task
+  /// (GEAR-03), when there is one.
+  final ApparatusService? urgentService;
+
   @override
   Widget build(BuildContext context) {
     final condition = item.conditionValue;
@@ -324,7 +329,12 @@ class ApparatusMarks extends StatelessWidget {
     final warrantyWarning =
         warranty == ExpiryState.expired || warranty == ExpiryState.expiringSoon;
     final lent = checkedOut > 0;
-    if (!showCondition && !assigned && !warrantyWarning && !lent) {
+    final service = urgentService;
+    if (!showCondition &&
+        !assigned &&
+        !warrantyWarning &&
+        !lent &&
+        service == null) {
       return const SizedBox.shrink();
     }
     final conditionMark = condition != null && showCondition
@@ -361,6 +371,18 @@ class ApparatusMarks extends StatelessWidget {
                   ? '${formatQuantity(checkedOut)} out · overdue'
                   : '${formatQuantity(checkedOut)} out',
               color: overdue ? context.marginRedColor : context.mutedInkColor,
+              fontSize: size,
+            ),
+          if (service != null)
+            _Mark(
+              key: const Key('mark-service'),
+              icon: service.kind == ServiceKind.calibration
+                  ? Icons.straighten_outlined
+                  : Icons.build_outlined,
+              text: service.isOverdue()
+                  ? '${service.kind.label.toLowerCase()} overdue'
+                  : '${service.kind.label.toLowerCase()} due',
+              color: expiryColor(context, service.dueState()),
               fontSize: size,
             ),
           if (warrantyWarning)
