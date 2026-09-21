@@ -117,9 +117,15 @@ Ground rules for every item:
 | TEST-05 | VALIDATING | Scanner and QR tests | QR routing, malformed codes, apparatus labels, batch scanning and generated PDF structure. | QR-02, SCAN-02 |
 | TEST-06 | VALIDATING | Large-data performance tests | 500–1,000 items, search/sort/filter/scroll and report responsiveness with budgets. | UX-01, SYNC-02 |
 
-## Future platform milestone — Multi-lab and multi-organization
+## Milestone K — Multi-lab and multi-organization
 
-This remains intentionally after the current single-lab quality program: organizations, memberships, lab types, roles, tenant RLS, organization/lab-scoped offline cache, quotas, invitations and optional dedicated enterprise projects.
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| ORG-01 | VALIDATING | Multi-tenant schema migration | Additive `010_multi_lab_organizations.sql` (`organizations`, `labs`, `organization_members`, `lab_members`, nullable `organization_id`/`lab_id` on items and logs), dual-mode permissive RLS policies keeping single-user web app and personal rows 100% compatible. | Additive SQL |
+| ORG-02 | VALIDATING | Domain models and lab state | Organization, Lab, Role models (`manager`, `member`, `viewer`), `activeLabProvider`, persistence of last selected lab per account with graceful personal-mode fallback. | ORG-01 |
+| ORG-03 | VALIDATING | Multi-tenant local cache scoping | LocalDatabase schema v5: `cache_records` and `outbox` tagged with `organization_id` and `lab_id`; queries scoped to active lab while personal items remain private. | ORG-02 |
+| ORG-04 | VALIDATING | Lab switcher and organization settings | Notebook header lab selector chip, modal lab switcher sheet, organization card in settings with role badges and atomic organization setup dialog. | ORG-02, ORG-03 |
+| ORG-05 | VALIDATING | Automated multi-lab tests | Unit tests for domain models and role permissions, SQLite v5 upgrade and multi-tenant cache isolation tests, and widget tests for the switcher sheet and settings card. | ORG-01..04 |
 
 ## Status log
 
@@ -178,3 +184,4 @@ This remains intentionally after the current single-lab quality program: organiz
 | 2026-09-21 | RELEASE-01 | `BLOCKED` → `VALIDATING` | Dual-mode Gradle signing in `flutter_app/android/app/build.gradle.kts` (decodes `ANDROID_KEYSTORE_BASE64` or reads `key.properties` when provided, otherwise cleanly falls back to `lab-wizard-github.jks`), updated release and branch CI workflows, comprehensive key generation, storage, and Google Play App Signing upload key recovery documentation in `docs/RELEASE_AND_PLAY_STORE_GUIDE.md`. |
 | 2026-09-21 | RELEASE-02 | `BLOCKED` → `VALIDATING` | Added Android App Bundle (`.aab`) build step to `.github/workflows/android-apk.yml`, configured Play App Signing strategy, documented permissions and justifications (`CAMERA`, `POST_NOTIFICATIONS`, `USE_BIOMETRIC`), detailed Google Play Data Safety questionnaire answers (Supabase cloud persistence, optional scrubbed local crash log OBS-01, account deletion ACCOUNT-03), and tested upgrade path from developer APKs in `docs/RELEASE_AND_PLAY_STORE_GUIDE.md`. |
 | 2026-09-21 | Program | Milestones A through J fully `VALIDATING` | Run 35628333353 (commit `ecc40bd`): analyze, full test suite, dual-mode signing evaluation, and signed APK (`Lab-Wizard-Android-branch-51`) all green. All roadmap items through Milestone J (UX, BATCH, QR, IMPORT, DUP, FORM, DATA, GEAR, NOTIFY, SYNC, SCAN, REPORT, ACCOUNT, SECURITY, RELEASE, A11Y, OBS, TEST) are in `VALIDATING` status. Ready for owner deployment secrets and phone-based acceptance checks. |
+| 2026-09-21 | ORG-01..05 | `TODO` → `VALIDATING` | Milestone K implemented: additive migration `010_multi_lab_organizations.sql` with dual permissive RLS policies, domain models, active lab Riverpod state notifier with per-user SharedPreferences memory, LocalDatabase v5 multi-tenant isolation, notebook header `_LabChip`, modal `showLabSwitcherSheet`, `OrganizationCard` in settings, and `test/organizations_test.dart` suite. Single-user web app and personal mode remain 100% compatible. |

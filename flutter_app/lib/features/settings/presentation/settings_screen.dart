@@ -20,6 +20,7 @@ import '../../sync/presentation/sync_center_screen.dart';
 import 'app_lock_card.dart';
 import 'diagnostics_card.dart';
 import 'lab_profile_card.dart';
+import '../../organizations/presentation/organization_card.dart';
 import 'sessions_card.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -316,6 +317,8 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 13),
+            const OrganizationCard(),
             const SizedBox(height: 13),
             const LabProfileCard(),
             const SizedBox(height: 13),

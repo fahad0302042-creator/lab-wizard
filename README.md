@@ -64,6 +64,8 @@ External barcodes (SCAN-04) add [`flutter_app/supabase/008_external_barcodes.sql
 
 Account deletion (ACCOUNT-03) adds [`flutter_app/supabase/009_account_deletion.sql`](flutter_app/supabase/009_account_deletion.sql): one `public.delete_my_account()` function (SECURITY DEFINER, executable by `authenticated` only) that deletes the caller's own rows in every table and then the caller's `auth.users` row. No table, policy or trigger changes; the web app is unaffected.
 
+Multi-lab and organizations (ORG-01..05) add [`flutter_app/supabase/010_multi_lab_organizations.sql`](flutter_app/supabase/010_multi_lab_organizations.sql): `organizations`, `labs`, `organization_members`, and `lab_members` tables plus nullable `organization_id` and `lab_id` columns on `chemicals`, `apparatus`, and `consumption_logs`. Dual permissive RLS policies allow personal rows to remain strictly accessible via `user_id = auth.uid()`, keeping the Next.js web app 100% compatible, while team members can collaborate within shared lab spaces. The mobile app offers a notebook header lab switcher, settings organization card, and multi-tenant SQLite cache isolation.
+
 Background sync (SYNC-03) needs no database change: it reuses the incremental download and the idempotent outbox from an Android WorkManager job.
 
 Conflict resolution (SYNC-04) needs no database change either: the phone sends only the fields it changed, as a compare-and-set on their last-seen values (plain PostgREST filters), so an edit made in the web app in the meantime is never overwritten silently — the phone shows the conflict and asks.

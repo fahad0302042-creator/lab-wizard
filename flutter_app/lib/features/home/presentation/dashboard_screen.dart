@@ -10,6 +10,9 @@ import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
 import '../../notifications/presentation/alerts_screen.dart';
 import '../../sync/presentation/sync_center_screen.dart';
+import '../../organizations/domain/models.dart';
+import '../../organizations/presentation/lab_switcher_sheet.dart';
+import '../../organizations/presentation/organization_providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({
@@ -58,6 +61,11 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 3),
                       PageHeading('${_greeting(now)}, $firstName'),
+                      const SizedBox(height: 5),
+                      _LabChip(
+                        activeLab: ref.watch(activeLabProvider),
+                        onTap: () => showLabSwitcherSheet(context),
+                      ),
                     ],
                   ),
                 ),
@@ -956,5 +964,57 @@ extension<T> on Iterable<T> {
   T? get firstOrNull {
     final iterator = this.iterator;
     return iterator.moveNext() ? iterator.current : null;
+  }
+}
+
+
+class _LabChip extends StatelessWidget {
+  const _LabChip({required this.activeLab, required this.onTap});
+
+  final Lab? activeLab;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPersonal = activeLab == null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPersonal ? Icons.person_pin_outlined : (activeLab?.labType.icon ?? Icons.science_outlined),
+              size: 14,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isPersonal ? 'Personal Lab' : (activeLab?.name ?? 'Lab'),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: context.inkColor,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 16,
+              color: context.mutedInkColor,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

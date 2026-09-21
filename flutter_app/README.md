@@ -232,6 +232,16 @@ Off by default. Settings → *crash reports* turns on a local, opt-in log of err
 
 **Navigation paint regression.** `test/navigation_paint_test.dart` mounts the home shell and checks that inactive tabs stay mounted (state survives) but never paint (their `RepaintBoundary` has no layer), cannot be hit, are absent from the semantics tree and have muted tickers — and that switching tabs flips all of that.
 
+## Multi-Lab & Organizations (ORG-01 … ORG-05)
+
+Run `supabase/010_multi_lab_organizations.sql` to add collaborative multi-lab support. It creates `organizations`, `labs`, `organization_members`, and `lab_members` tables, plus nullable `organization_id` and `lab_id` columns on `chemicals`, `apparatus`, and `consumption_logs`. Dual permissive RLS policies ensure existing single-user personal rows remain accessible via `user_id = auth.uid()` so the Next.js web app works without modification, while team members can collaborate in shared labs with role-based permissions (manager, researcher, viewer).
+
+In the mobile app:
+- A notebook header chip lets users switch between their **Personal Lab** and shared team labs via `showLabSwitcherSheet`.
+- Active lab selection persists in SharedPreferences per signed-in user.
+- Local SQLite database (schema version 5) scopes offline cached records by `lab_id`, ensuring team inventory and personal inventory remain strictly isolated.
+- Settings includes an **organization & labs** card displaying workspace status, user role, and lab switching shortcuts.
+
 ## Signing and Google Play Distribution (RELEASE-01, RELEASE-02)
 
 The Gradle configuration (`android/app/build.gradle.kts`) and GitHub Actions workflows feature **dual-mode signing**:

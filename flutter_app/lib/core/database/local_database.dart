@@ -19,7 +19,7 @@ import '../../features/sync/domain/sync_conflict.dart';
 class LocalDatabase {
   LocalDatabase({this._factory, this._path});
 
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
   static const lastSyncKey = 'last_sync_at';
 
   final DatabaseFactory? _factory;
@@ -42,11 +42,13 @@ class LocalDatabase {
           await _upgradeToVersion2(db);
           await _upgradeToVersion3(db);
           await _upgradeToVersion4(db);
+          await _upgradeToVersion5(db);
         },
         onUpgrade: (db, oldVersion, _) async {
           if (oldVersion < 2) await _upgradeToVersion2(db);
           if (oldVersion < 3) await _upgradeToVersion3(db);
           if (oldVersion < 4) await _upgradeToVersion4(db);
+          if (oldVersion < 5) await _upgradeToVersion5(db);
         },
       ),
     );
@@ -106,16 +108,32 @@ class LocalDatabase {
     await db.execute('ALTER TABLE outbox ADD COLUMN conflict TEXT');
   }
 
+  static Future<void> _upgradeToVersion5(DatabaseExecutor db) async {
+    await db.execute('ALTER TABLE cache_records ADD COLUMN organization_id TEXT');
+    await db.execute('ALTER TABLE cache_records ADD COLUMN lab_id TEXT');
+    await db.execute('ALTER TABLE outbox ADD COLUMN organization_id TEXT');
+    await db.execute('ALTER TABLE outbox ADD COLUMN lab_id TEXT');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS cache_records_user_lab '
+      'ON cache_records(user_id, lab_id, kind)',
+    );
+  }
+
   Future<List<Map<String, dynamic>>> loadRecords(
     String userId,
-    String kind,
-  ) async {
+    String kind, {
+    String? labId,
+  }) async {
     final db = await database;
+    final where = labId != null
+        ? 'user_id = ? AND kind = ? AND lab_id = ?'
+        : 'user_id = ? AND kind = ?';
+    final whereArgs = labId != null ? [userId, kind, labId] : [userId, kind];
     final rows = await db.query(
       'cache_records',
       columns: ['body'],
-      where: 'user_id = ? AND kind = ?',
-      whereArgs: [userId, kind],
+      where: where,
+      whereArgs: whereArgs,
     );
     return rows
         .map(
@@ -127,15 +145,24 @@ class LocalDatabase {
   Future<void> replaceRecords(
     String userId,
     String kind,
-    Iterable<Map<String, dynamic>> records,
-  ) async {
+    Iterable<Map<String, dynamic>> records, {
+    String? labId,
+  }) async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.delete(
-        'cache_records',
-        where: 'user_id = ? AND kind = ?',
-        whereArgs: [userId, kind],
-      );
+      if (labId != null) {
+        await txn.delete(
+          'cache_records',
+          where: 'user_id = ? AND kind = ? AND lab_id = ?',
+          whereArgs: [userId, kind, labId],
+        );
+      } else {
+        await txn.delete(
+          'cache_records',
+          where: 'user_id = ? AND kind = ?',
+          whereArgs: [userId, kind],
+        );
+      }
       final batch = txn.batch();
       final now = DateTime.now().toIso8601String();
       for (final record in records) {
@@ -145,6 +172,8 @@ class LocalDatabase {
           'record_id': record['id'] as String,
           'body': jsonEncode(record),
           'updated_at': now,
+          'organization_id': record['organization_id']?.toString(),
+          'lab_id': record['lab_id']?.toString(),
         });
       }
       await batch.commit(noResult: true);
@@ -154,8 +183,10 @@ class LocalDatabase {
   Future<void> upsertRecord(
     String userId,
     String kind,
-    Map<String, dynamic> record,
-  ) async {
+    Map<String, dynamic> record, {
+    String? organizationId,
+    String? labId,
+  }) async {
     final db = await database;
     await db.insert('cache_records', {
       'user_id': userId,
@@ -163,6 +194,8 @@ class LocalDatabase {
       'record_id': record['id'] as String,
       'body': jsonEncode(record),
       'updated_at': DateTime.now().toIso8601String(),
+      'organization_id': organizationId ?? record['organization_id']?.toString(),
+      'lab_id': labId ?? record['lab_id']?.toString(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -184,6 +217,8 @@ class LocalDatabase {
         'record_id': record['id'] as String,
         'body': jsonEncode(record),
         'updated_at': now,
+        'organization_id': record['organization_id']?.toString(),
+        'lab_id': record['lab_id']?.toString(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
@@ -274,11 +309,18 @@ class LocalDatabase {
     return removed;
   }
 
-  Future<void> enqueue(PendingOperation operation) async {
+  Future<void> enqueue(
+    PendingOperation operation, {
+    String? organizationId,
+    String? labId,
+  }) async {
     final db = await database;
+    final map = operation.toDatabase();
+    map['organization_id'] = organizationId ?? operation.payload['organization_id']?.toString();
+    map['lab_id'] = labId ?? operation.payload['lab_id']?.toString();
     await db.insert(
       'outbox',
-      operation.toDatabase(),
+      map,
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
