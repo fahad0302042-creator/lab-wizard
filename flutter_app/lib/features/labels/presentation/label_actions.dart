@@ -32,7 +32,8 @@ Future<LabelSheetChoice?> showLabelSheetDialog(
 }) {
   return showDialog<LabelSheetChoice>(
     context: context,
-    builder: (context) => _LabelSheetDialog(count: count, initial: initialLayout),
+    builder: (context) =>
+        _LabelSheetDialog(count: count, initial: initialLayout),
   );
 }
 
@@ -62,31 +63,31 @@ class _LabelSheetDialogState extends State<_LabelSheetDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          RadioGroup<LabelSheetLayout>(
-            groupValue: _layout,
-            onChanged: (value) {
-              if (value != null) setState(() => _layout = value);
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final layout in LabelSheetLayout.values)
-                  RadioListTile<LabelSheetLayout>(
-                    key: Key('label-layout-${layout.name}'),
-                    value: layout,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(layout.name),
-                    subtitle: Text(layout.hint),
-                  ),
-              ],
+            RadioGroup<LabelSheetLayout>(
+              groupValue: _layout,
+              onChanged: (value) {
+                if (value != null) setState(() => _layout = value);
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final layout in LabelSheetLayout.values)
+                    RadioListTile<LabelSheetLayout>(
+                      key: Key('label-layout-${layout.name}'),
+                      value: layout,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(layout.name),
+                      subtitle: Text(layout.hint),
+                    ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '$pages page${pages == 1 ? '' : 's'} · labels are filled row by '
-            'row, so a partly used sheet can be printed again later.',
-            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-          ),
+            const SizedBox(height: 6),
+            Text(
+              '$pages page${pages == 1 ? '' : 's'} · labels are filled row by '
+              'row, so a partly used sheet can be printed again later.',
+              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+            ),
           ],
         ),
       ),
@@ -166,7 +167,9 @@ Future<void> shareLabelImage(BuildContext context, LabelSpec label) async {
   try {
     final bytes = await renderLabelPng(label);
     final directory = await getTemporaryDirectory();
-    final file = File('${directory.path}/lab-wizard-label-${label.fileStem}.png');
+    final file = File(
+      '${directory.path}/lab-wizard-label-${label.fileStem}.png',
+    );
     await file.writeAsBytes(bytes, flush: true);
     HapticFeedback.selectionClick();
     await SharePlus.instance.share(

@@ -74,9 +74,7 @@ String apparatusQrData(String id) => 'labwizard:apparatus:$id';
 /// apart on a shelf without printing the whole id.
 String shortId(String id) {
   final compact = id.replaceAll('-', '').toUpperCase();
-  return compact.length <= 8
-      ? compact
-      : compact.substring(compact.length - 8);
+  return compact.length <= 8 ? compact : compact.substring(compact.length - 8);
 }
 
 /// Labels for the given chemicals, skipping rows that never received a QR

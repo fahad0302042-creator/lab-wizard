@@ -79,7 +79,10 @@ class LabelPainter extends CustomPainter {
     final brand = TextPainter(
       text: TextSpan(
         text: 'Lab Wizard',
-        style: TextStyle(color: const Color(0xFF888888), fontSize: bodySize * .7),
+        style: TextStyle(
+          color: const Color(0xFF888888),
+          fontSize: bodySize * .7,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: textWidth);

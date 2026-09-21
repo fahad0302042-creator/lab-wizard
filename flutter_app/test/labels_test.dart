@@ -80,31 +80,40 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('QR-02 label specs', () {
-    test('chemical labels keep the web app payload; blank codes are skipped', () {
-      final labels = chemicalLabels([
-        _chemical('c1', qrCode: 'abc-123'),
-        _chemical('c2', qrCode: ''),
-        _chemical('c3', qrCode: '  '),
-      ]);
-      expect(labels, hasLength(1));
-      expect(labels.single.data, 'labwizard:chemical:abc-123');
-      expect(labels.single.title, 'Acetone c1');
-      expect(labels.single.subtitle, 'C3H6O');
-      expect(labels.single.detail, isEmpty);
-      expect(labels.single.fileStem, 'acetone-c1');
-    });
+    test(
+      'chemical labels keep the web app payload; blank codes are skipped',
+      () {
+        final labels = chemicalLabels([
+          _chemical('c1', qrCode: 'abc-123'),
+          _chemical('c2', qrCode: ''),
+          _chemical('c3', qrCode: '  '),
+        ]);
+        expect(labels, hasLength(1));
+        expect(labels.single.data, 'labwizard:chemical:abc-123');
+        expect(labels.single.title, 'Acetone c1');
+        expect(labels.single.subtitle, 'C3H6O');
+        expect(labels.single.detail, isEmpty);
+        expect(labels.single.fileStem, 'acetone-c1');
+      },
+    );
 
     test('apparatus labels use the stable row id plus a readable short id', () {
       final label = LabelSpec.apparatus(
         _apparatus('8f1c2b3a-1111-2222-3333-abcdef012345', serial: 'SN-42'),
       );
-      expect(label.data, 'labwizard:apparatus:8f1c2b3a-1111-2222-3333-abcdef012345');
+      expect(
+        label.data,
+        'labwizard:apparatus:8f1c2b3a-1111-2222-3333-abcdef012345',
+      );
       expect(label.kind, ItemKind.apparatus);
       expect(label.subtitle, 'glassware · S/N SN-42');
       expect(label.detail, 'ID EF012345');
       expect(LabelSpec.apparatus(_apparatus('a1')).subtitle, 'glassware');
       expect(shortId('abc'), 'ABC');
-      expect(apparatusLabels([_apparatus('a1'), _apparatus('a2')]), hasLength(2));
+      expect(
+        apparatusLabels([_apparatus('a1'), _apparatus('a2')]),
+        hasLength(2),
+      );
     });
   });
 
@@ -247,9 +256,7 @@ void main() {
       await _pumpShelf(
         tester,
         kind: ItemKind.apparatus,
-        seed: InventoryState(
-          apparatus: [_apparatus('a1'), _apparatus('a2')],
-        ),
+        seed: InventoryState(apparatus: [_apparatus('a1'), _apparatus('a2')]),
       );
       await tester.longPress(find.text('Beaker 250 mL a1'));
       await tester.pumpAndSettle();
