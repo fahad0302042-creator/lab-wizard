@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
+import '../domain/recent_scan.dart';
+import '../domain/scan_resolver.dart';
+import '../scanner_providers.dart';
+import 'recent_scans_section.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({this.active = true, super.key});
@@ -225,6 +231,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           ),
         ),
         const SizedBox(height: 24),
+        const RecentScansSection(),
         const PageHeading('or search manually', trailing: SizedBox.shrink()),
         TextField(
           controller: _search,
@@ -294,35 +301,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     if (raw == null || raw.isEmpty) return;
     _handling = true;
     final inventory = ref.read(inventoryProvider);
-    ItemKind? kind;
-    String? id;
-    String? name;
+    final match = resolveScan(
+      raw,
+      chemicals: inventory.chemicals,
+      apparatus: inventory.apparatus,
+    );
+    final history = ref.read(recentScansProvider.notifier);
 
-    if (raw.startsWith('labwizard:apparatus:')) {
-      final apparatusId = raw.substring('labwizard:apparatus:'.length);
-      final item = inventory.apparatus
-          .where((value) => value.id == apparatusId)
-          .firstOrNull;
-      if (item != null) {
-        kind = ItemKind.apparatus;
-        id = item.id;
-        name = item.name;
-      }
-    } else {
-      final qrCode = raw.startsWith('labwizard:chemical:')
-          ? raw.substring('labwizard:chemical:'.length)
-          : raw;
-      final item = inventory.chemicals
-          .where((value) => value.qrCode == qrCode)
-          .firstOrNull;
-      if (item != null) {
-        kind = ItemKind.chemical;
-        id = item.id;
-        name = item.name;
-      }
-    }
-
-    if (kind == null || id == null) {
+    if (match == null) {
+      unawaited(history.record(RecentScan.unknown(raw.trim(), DateTime.now())));
       setState(() => _message = 'This code is not in your lab notebook');
       HapticFeedback.heavyImpact();
       await Future<void>.delayed(const Duration(seconds: 2));
@@ -330,11 +317,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       _handling = false;
       return;
     }
+    unawaited(history.record(RecentScan.found(match, raw.trim(), DateTime.now())));
     await _scanner.stop();
     HapticFeedback.mediumImpact();
     if (mounted) {
-      setState(() => _message = 'Found $name');
-      await showItemDetailSheet(context, ref, kind, id);
+      setState(() => _message = 'Found ${match.name}');
+      await showItemDetailSheet(context, ref, match.kind, match.id);
     }
     if (mounted) {
       setState(() => _message = null);
