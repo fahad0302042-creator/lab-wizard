@@ -79,10 +79,16 @@ Future<void> _pumpShell(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Inactive pages are offstage, so finders must be told not to skip them.
+Finder _all<T extends Widget>() => find.byType(T, skipOffstage: false);
+
 RenderRepaintBoundary _page(WidgetTester tester, int index) =>
     tester.renderObject<RenderRepaintBoundary>(
-      find.byKey(ValueKey('main-page-$index')),
+      find.byKey(ValueKey('main-page-$index'), skipOffstage: false),
     );
+
+bool _ticking(WidgetTester tester, Finder finder) =>
+    TickerMode.valuesOf(tester.element(finder)).enabled;
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -91,12 +97,14 @@ void main() {
     final handle = tester.ensureSemantics();
     await _pumpShell(tester);
 
-    // All five pages are mounted (state is kept across tab switches)…
+    // All five pages are mounted (state is kept across tab switches) but
+    // only the dashboard is on stage: default finders skip the others.
     expect(find.byType(DashboardScreen), findsOneWidget);
-    expect(find.byType(InventoryScreen), findsNWidgets(2));
-    expect(find.byType(ReportsScreen), findsOneWidget);
+    expect(find.byType(InventoryScreen), findsNothing);
+    expect(_all<InventoryScreen>(), findsNWidgets(2));
+    expect(_all<ReportsScreen>(), findsOneWidget);
 
-    // …but only the dashboard has ever painted.
+    // Only the dashboard has ever painted.
     expect(_page(tester, 0).debugLayer, isNotNull, reason: 'dashboard painted');
     for (final index in [1, 2, 3, 4]) {
       expect(_page(tester, index).debugLayer, isNull, reason: 'page $index');
@@ -104,38 +112,25 @@ void main() {
 
     // Inactive pages cannot be hit and are not exposed to TalkBack.
     expect(find.byType(DashboardScreen).hitTestable(), findsOneWidget);
-    expect(find.byType(InventoryScreen).hitTestable(), findsNothing);
-    expect(find.byType(ReportsScreen).hitTestable(), findsNothing);
+    expect(_all<InventoryScreen>().hitTestable(), findsNothing);
+    expect(_all<ReportsScreen>().hitTestable(), findsNothing);
     expect(find.bySemanticsLabel('chemicals shelf'), findsNothing);
 
     // Their tickers are muted.
-    expect(
-      TickerMode.valuesOf(tester.element(find.byType(InventoryScreen).first))
-          .enabled,
-      isFalse,
-    );
-    expect(
-      TickerMode.valuesOf(tester.element(find.byType(DashboardScreen))).enabled,
-      isTrue,
-    );
+    expect(_ticking(tester, _all<InventoryScreen>().first), isFalse);
+    expect(_ticking(tester, find.byType(DashboardScreen)), isTrue);
 
     // Switching tabs flips all of the above.
     await tester.tap(find.text('chems'));
     await tester.pumpAndSettle();
     expect(_page(tester, 1).debugLayer, isNotNull);
     expect(_page(tester, 3).debugLayer, isNull, reason: 'gear still unpainted');
-    expect(find.byType(DashboardScreen).hitTestable(), findsNothing);
+    expect(find.byType(DashboardScreen), findsNothing, reason: 'offstage now');
+    expect(_all<DashboardScreen>().hitTestable(), findsNothing);
     expect(find.byType(InventoryScreen).hitTestable(), findsOneWidget);
     expect(find.bySemanticsLabel('chemicals shelf'), findsOneWidget);
-    expect(
-      TickerMode.valuesOf(tester.element(find.byType(DashboardScreen))).enabled,
-      isFalse,
-    );
-    expect(
-      TickerMode.valuesOf(tester.element(find.byType(InventoryScreen).first))
-          .enabled,
-      isTrue,
-    );
+    expect(_ticking(tester, _all<DashboardScreen>()), isFalse);
+    expect(_ticking(tester, find.byType(InventoryScreen)), isTrue);
     handle.dispose();
   });
 }

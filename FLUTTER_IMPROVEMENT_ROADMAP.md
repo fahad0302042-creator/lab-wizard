@@ -112,10 +112,10 @@ Ground rules for every item:
 |---|---|---|---|---|
 | TEST-01 | VALIDATING | Golden screenshot tests | Main screens, light/dark, compact/detailed and representative empty/loaded states. | UX-01 |
 | TEST-02 | VALIDATING | Navigation paint regression | Automated assertion that inactive tabs are offstage and cannot paint or receive input. | None |
-| TEST-03 | TODO | Responsive/font tests | Small width, tablet, landscape and large text overflow checks. | A11Y-02, A11Y-03 |
+| TEST-03 | VALIDATING | Responsive/font tests | Small width, tablet, landscape and large text overflow checks. | A11Y-02, A11Y-03 |
 | TEST-04 | VALIDATING | Offline/outbox integration tests | Add/update/action/retry/idempotency/conflict paths and per-user isolation. | SYNC-01, SYNC-02 |
-| TEST-05 | TODO | Scanner and QR tests | QR routing, malformed codes, apparatus labels, batch scanning and generated PDF structure. | QR-02, SCAN-02 |
-| TEST-06 | TODO | Large-data performance tests | 500–1,000 items, search/sort/filter/scroll and report responsiveness with budgets. | UX-01, SYNC-02 |
+| TEST-05 | VALIDATING | Scanner and QR tests | QR routing, malformed codes, apparatus labels, batch scanning and generated PDF structure. | QR-02, SCAN-02 |
+| TEST-06 | VALIDATING | Large-data performance tests | 500–1,000 items, search/sort/filter/scroll and report responsiveness with budgets. | UX-01, SYNC-02 |
 
 ## Future platform milestone — Multi-lab and multi-organization
 
@@ -170,3 +170,7 @@ This remains intentionally after the current single-lab quality program: organiz
 | 2026-09-21 | TEST-01 | `TODO` → `VALIDATING` | Golden tests for shelf (detailed/compact/empty), apparatus shelf, item detail, sync center with conflicts and lock screen in light and dark (14 images, 390×844), fixed-date fixtures; real fonts loaded for all tests via `flutter_test_config.dart`; Linux-only comparison; `update-goldens.yml` (workflow_dispatch) renders and commits the images. |
 | 2026-09-21 | TEST-02 | `TODO` → `VALIDATING` | Home shell tabs wrapped in keyed `RepaintBoundary`s; `navigation_paint_test.dart` asserts inactive tabs have no layer (never painted), are not hit-testable, are absent from semantics and have muted tickers, before and after switching tabs. |
 | 2026-09-21 | TEST-04 | `TODO` → `VALIDATING` | `outbox_integration_test.dart` against the shared fake PostgREST: add/update/action queued offline and flushed in order (insert, conditional PATCH, RPC); server 403 marks one change failed, plain flush leaves it, retry sends it; lost reply replayed with the same operation id is applied once; queues and offline copies are per user and `clearUser` wipes one account only. Conflict, paging and tombstone paths remain in `sync_conflicts_test.dart` / `incremental_sync_test.dart`. |
+| 2026-09-21 | TEST-03 | `TODO` → `VALIDATING` | `responsive_font_matrix_test.dart`: shelf (both densities), dashboard and item sheet at four sizes × 130 % / 200 % text (24 renders) on top of the single-axis suites; any overflow fails. |
+| 2026-09-21 | TEST-05 | `TODO` → `VALIDATING` | `scanner_qr_test.dart`: routing precedence, linked-barcode exactness, 13 malformed inputs never throw, printed labels scan back to their item, 300-scan batch counts, PDF bytes (header, trailer, A4 box, page objects per layout). |
+| 2026-09-21 | TEST-06 | `TODO` → `VALIDATING` | `large_data_test.dart`: 1 000-item shelf stays lazy (< 60 rows built, also after flings), search/filter/A–Z jump land within budgets, report maths over 20 000 entries within 4 s; budgets are loose on purpose (CI runners, unoptimised test mode). |
+| 2026-09-21 | TEST-01 | note | First rendered goldens matched on re-run except the sync center, whose fixture printed the wall-clock sync time; the fixture now has no last-sync stamp and the images were re-rendered. |

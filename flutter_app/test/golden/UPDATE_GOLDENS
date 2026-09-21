@@ -2,3 +2,4 @@ Change this file (a date and a reason) and push to have CI re-render the golden 
 
 2026-09-21 first render (TEST-01)
 2026-09-21 second request (first push was rejected because the branch had moved)
+2026-09-21 third request: sync center fixture no longer shows the wall-clock sync time

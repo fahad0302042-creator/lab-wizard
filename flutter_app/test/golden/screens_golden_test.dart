@@ -92,7 +92,11 @@ InventoryState _loaded() => InventoryState(
   lastUpdated: fixtureNow,
 );
 
-InventoryState _withConflicts() => _loaded().copyWith(
+/// No last-sync stamp: it would print the wall-clock time of the run.
+InventoryState _withConflicts() => InventoryState(
+  chemicals: _loaded().chemicals,
+  apparatus: _loaded().apparatus,
+  lastUpdated: fixtureNow,
   outbox: [
     PendingOperation(
       id: 'op-1',
