@@ -48,8 +48,9 @@ Future<void> showBatchDeleteSheet(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
-  builder: (_) =>
-      NotebookSheetFrame(child: _BatchDeleteForm(kind: kind, itemIds: itemIds)),
+  builder: (_) => NotebookSheetFrame(
+    child: _BatchDeleteForm(kind: kind, itemIds: itemIds),
+  ),
 );
 
 /// Deletions of this many items or more must be confirmed by typing.
@@ -146,7 +147,11 @@ class _BatchItem {
   final String unit;
 }
 
-List<_BatchItem> _itemsFor(InventoryState state, ItemKind kind, Set<String> ids) {
+List<_BatchItem> _itemsFor(
+  InventoryState state,
+  ItemKind kind,
+  Set<String> ids,
+) {
   final items = kind == ItemKind.chemical
       ? [
           for (final item in state.chemicals)
@@ -378,10 +383,7 @@ class _BatchRestockFormState extends ConsumerState<_BatchRestockForm> {
     final restocked = (previous?.succeeded ?? 0) + outcome.succeeded;
     setState(() {
       _running = false;
-      _outcome = BatchOutcome(
-        succeeded: restocked,
-        failures: outcome.failures,
-      );
+      _outcome = BatchOutcome(succeeded: restocked, failures: outcome.failures);
     });
     if (outcome.hasFailures) return;
     HapticFeedback.mediumImpact();
@@ -389,9 +391,7 @@ class _BatchRestockFormState extends ConsumerState<_BatchRestockForm> {
     Navigator.pop(context);
     messenger.showSnackBar(
       SnackBar(
-        content: Text(
-          '$restocked item${restocked == 1 ? '' : 's'} restocked',
-        ),
+        content: Text('$restocked item${restocked == 1 ? '' : 's'} restocked'),
       ),
     );
   }
@@ -565,7 +565,11 @@ class _BatchThresholdFormState extends ConsumerState<_BatchThresholdForm> {
                 size: 18,
                 color: context.mutedInkColor,
               ),
-              title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+              title: Text(
+                item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               subtitle: Text(
                 parsed == null
                     ? 'min ${formatQuantity(item.threshold)} ${item.unit}'
@@ -690,7 +694,8 @@ class _BatchDeleteFormState extends ConsumerState<_BatchDeleteForm> {
     final logCount = state.logs.where((log) => ids.contains(log.itemId)).length;
     final unsynced = items
         .where(
-          (item) => state.outbox.any((operation) => operation.itemId == item.id),
+          (item) =>
+              state.outbox.any((operation) => operation.itemId == item.id),
         )
         .toList();
     final large = items.length >= largeDeletionThreshold;

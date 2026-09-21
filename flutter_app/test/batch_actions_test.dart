@@ -203,7 +203,10 @@ void main() {
     testWidgets('applies one restock per item with its own amount', (
       tester,
     ) async {
-      final fake = await _pump(tester, InventoryState(chemicals: _chemicals(3)));
+      final fake = await _pump(
+        tester,
+        InventoryState(chemicals: _chemicals(3)),
+      );
       await _selectFirst(tester, 2);
       await tester.tap(find.byKey(const Key('selection-restock')));
       await tester.pumpAndSettle();
@@ -217,7 +220,10 @@ void main() {
       await tester.enterText(find.byKey(const Key('batch-same-amount')), '5');
       await tester.tap(find.byKey(const Key('batch-apply-same')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('batch-amount-chem-1')), '7.5');
+      await tester.enterText(
+        find.byKey(const Key('batch-amount-chem-1')),
+        '7.5',
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('batch-restock-submit')));
@@ -262,10 +268,11 @@ void main() {
   });
 
   group('BATCH-02 threshold', () {
-    testWidgets('previews old → new and skips unchanged items', (
-      tester,
-    ) async {
-      final fake = await _pump(tester, InventoryState(chemicals: _chemicals(3)));
+    testWidgets('previews old → new and skips unchanged items', (tester) async {
+      final fake = await _pump(
+        tester,
+        InventoryState(chemicals: _chemicals(3)),
+      );
       await _selectFirst(tester, 3);
       await tester.tap(find.byKey(const Key('selection-threshold')));
       await tester.pumpAndSettle();
@@ -278,7 +285,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Cannot be negative'), findsOneWidget);
 
-      await tester.enterText(find.byKey(const Key('batch-threshold-value')), '4');
+      await tester.enterText(
+        find.byKey(const Key('batch-threshold-value')),
+        '4',
+      );
       await tester.pumpAndSettle();
       expect(find.text('min 10 → 4 mL'), findsNWidgets(2));
       expect(find.text('already 4 mL — unchanged'), findsOneWidget);

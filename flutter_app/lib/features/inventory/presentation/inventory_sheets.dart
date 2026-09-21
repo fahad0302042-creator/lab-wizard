@@ -79,8 +79,10 @@ Future<void> showBatchConsumeSheet(BuildContext context, WidgetRef _) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) =>
-        const NotebookSheetFrame(maxHeightFactor: .92, child: _BatchConsumeForm()),
+    builder: (_) => const NotebookSheetFrame(
+      maxHeightFactor: .92,
+      child: _BatchConsumeForm(),
+    ),
   );
 }
 
