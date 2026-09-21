@@ -12,9 +12,7 @@ import '../../features/inventory/domain/models.dart';
 /// 2. Outbox `status`, `label`, and `last_attempt_at` columns and the
 ///    `sync_meta` table used by the sync center (SYNC-01).
 class LocalDatabase {
-  LocalDatabase({DatabaseFactory? factory, String? path})
-    : _factory = factory,
-      _path = path;
+  LocalDatabase({this._factory, this._path});
 
   static const schemaVersion = 2;
   static const lastSyncKey = 'last_sync_at';
@@ -206,7 +204,11 @@ class LocalDatabase {
   /// Records an attempt. Connectivity problems keep the change `pending` so
   /// it retries automatically; other errors mark it `failed` until the user
   /// retries or discards it.
-  Future<void> markAttempt(String id, Object error, {bool failed = false}) async {
+  Future<void> markAttempt(
+    String id,
+    Object error, {
+    bool failed = false,
+  }) async {
     final db = await database;
     await db.rawUpdate(
       'UPDATE outbox SET attempts = attempts + 1, last_error = ?, '

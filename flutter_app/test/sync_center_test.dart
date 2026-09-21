@@ -137,9 +137,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('nothing waiting'), findsOneWidget);
     expect(find.text('everything is on the server'), findsOneWidget);
-    expect(
-      find.text('No successful sync on this device yet.'),
-      findsOneWidget,
-    );
+    expect(find.text('No successful sync on this device yet.'), findsOneWidget);
   });
 }

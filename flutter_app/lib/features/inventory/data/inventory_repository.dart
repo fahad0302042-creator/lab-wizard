@@ -57,8 +57,9 @@ class InventoryRepository {
     );
   }
 
-  Future<DateTime?> lastSyncedAt(String userId) async =>
-      DateTime.tryParse(await local.getMeta(userId, LocalDatabase.lastSyncKey) ?? '');
+  Future<DateTime?> lastSyncedAt(String userId) async => DateTime.tryParse(
+    await local.getMeta(userId, LocalDatabase.lastSyncKey) ?? '',
+  );
 
   Future<InventorySnapshot> refresh(String userId) async {
     final client = remote;

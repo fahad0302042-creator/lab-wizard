@@ -187,9 +187,7 @@ class SyncCenterScreen extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: LabColors.marginRed,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: LabColors.marginRed),
             child: const Text('Discard'),
           ),
         ],
@@ -204,9 +202,8 @@ class SyncCenterScreen extends ConsumerWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     }
   }
 }

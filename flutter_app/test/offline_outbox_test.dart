@@ -97,7 +97,10 @@ void main() {
       expect(await local.failedCount('u1'), 0);
 
       await local.setMeta('u1', LocalDatabase.lastSyncKey, '2026-09-21T10:00');
-      expect(await local.getMeta('u1', LocalDatabase.lastSyncKey), '2026-09-21T10:00');
+      expect(
+        await local.getMeta('u1', LocalDatabase.lastSyncKey),
+        '2026-09-21T10:00',
+      );
       expect(await local.getMeta('u2', LocalDatabase.lastSyncKey), isNull);
 
       await local.clearUser('u1');
@@ -203,9 +206,14 @@ void main() {
       );
       var snapshot = await repository.loadCached('u1');
       expect(snapshot.outbox, hasLength(3));
-      expect(snapshot.outbox[1].description, 'Record damage of 1 pcs of Beaker 250 mL');
+      expect(
+        snapshot.outbox[1].description,
+        'Record damage of 1 pcs of Beaker 250 mL',
+      );
       expect(snapshot.outbox[2].description, 'Update Beaker 250 mL');
-      expect(snapshot.outbox[2].payload['previous'], {'low_stock_threshold': 2});
+      expect(snapshot.outbox[2].payload['previous'], {
+        'low_stock_threshold': 2,
+      });
       expect(snapshot.apparatus.single.lowStockThreshold, 4);
 
       // Discarding the edit restores the previous field value.
@@ -261,7 +269,10 @@ void main() {
         friendlyErrorMessage('StateError: Item not found or not owned'),
         contains('no longer exists'),
       );
-      expect(friendlyErrorMessage(''), 'Something went wrong. Please try again.');
+      expect(
+        friendlyErrorMessage(''),
+        'Something went wrong. Please try again.',
+      );
     });
   });
 }
