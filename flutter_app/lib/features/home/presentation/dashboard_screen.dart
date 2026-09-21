@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
+import '../../sync/presentation/sync_center_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({
@@ -731,32 +732,49 @@ class _SyncBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pending = state.pendingCount > 0;
+    final failed = state.failedCount > 0;
+    final color = failed
+        ? LabColors.marginRed
+        : pending
+        ? LabColors.amber
+        : LabColors.blue;
     return Material(
-      color: (pending ? LabColors.amber : LabColors.blue).withValues(
-        alpha: .12,
-      ),
+      color: color.withValues(alpha: .12),
       borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        child: Row(
-          children: [
-            Icon(
-              pending ? Icons.cloud_upload_outlined : Icons.cloud_off_outlined,
-              size: 19,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                pending
-                    ? '${state.pendingCount} change${state.pendingCount == 1 ? '' : 's'} waiting to sync'
-                    : state.error!,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SyncCenterScreen()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            children: [
+              Icon(
+                failed
+                    ? Icons.error_outline
+                    : pending
+                    ? Icons.cloud_upload_outlined
+                    : Icons.cloud_off_outlined,
+                size: 19,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  failed
+                      ? '${state.failedCount} change${state.failedCount == 1 ? '' : 's'} need${state.failedCount == 1 ? 's' : ''} attention — open sync center'
+                      : pending
+                      ? '${state.pendingCount} change${state.pendingCount == 1 ? '' : 's'} waiting to sync — tap for details'
+                      : state.error!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ],
+              const Icon(Icons.chevron_right, size: 18),
+            ],
+          ),
         ),
       ),
     );

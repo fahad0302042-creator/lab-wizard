@@ -49,6 +49,9 @@ jobs:
       - name: Analyze source
         run: flutter analyze --fatal-infos
 
+      - name: Install SQLite for database tests
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
+
       - name: Run tests
         run: flutter test
 

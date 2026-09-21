@@ -225,23 +225,35 @@ class InventoryState {
     this.chemicals = const [],
     this.apparatus = const [],
     this.logs = const [],
+    this.outbox = const [],
     this.loading = false,
     this.refreshing = false,
     this.fromCache = false,
-    this.pendingCount = 0,
     this.error,
     this.lastUpdated,
+    this.lastSyncedAt,
   });
 
   final List<Chemical> chemicals;
   final List<Apparatus> apparatus;
   final List<ConsumptionLog> logs;
+
+  /// Changes queued on this device, oldest first (SYNC-01).
+  final List<PendingOperation> outbox;
   final bool loading;
   final bool refreshing;
   final bool fromCache;
-  final int pendingCount;
   final String? error;
   final DateTime? lastUpdated;
+
+  /// Last time the server copy was fully downloaded on this device.
+  final DateTime? lastSyncedAt;
+
+  /// Every change still waiting on this device, including failed ones.
+  int get pendingCount => outbox.length;
+
+  /// Changes that stopped retrying and need the user to look at them.
+  int get failedCount => outbox.where((operation) => operation.isFailed).length;
 
   int get attentionCount =>
       chemicals.where((item) => item.stockState != StockState.healthy).length +
@@ -251,22 +263,24 @@ class InventoryState {
     List<Chemical>? chemicals,
     List<Apparatus>? apparatus,
     List<ConsumptionLog>? logs,
+    List<PendingOperation>? outbox,
     bool? loading,
     bool? refreshing,
     bool? fromCache,
-    int? pendingCount,
     String? error,
     DateTime? lastUpdated,
+    DateTime? lastSyncedAt,
   }) => InventoryState(
     chemicals: chemicals ?? this.chemicals,
     apparatus: apparatus ?? this.apparatus,
     logs: logs ?? this.logs,
+    outbox: outbox ?? this.outbox,
     loading: loading ?? this.loading,
     refreshing: refreshing ?? this.refreshing,
     fromCache: fromCache ?? this.fromCache,
-    pendingCount: pendingCount ?? this.pendingCount,
     error: error,
     lastUpdated: lastUpdated ?? this.lastUpdated,
+    lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
   );
 }
 
@@ -298,10 +312,8 @@ class InventoryController extends Notifier<InventoryState> {
       if (_activeUserId != userId) return;
       _applySnapshot(fresh);
     } catch (_) {
-      state = state.copyWith(
+      await _reloadOutbox(
         loading: false,
-        refreshing: false,
-        fromCache: true,
         error: 'Offline copy shown. Pull down to try syncing again.',
       );
     }
@@ -315,10 +327,73 @@ class InventoryController extends Notifier<InventoryState> {
       await _repository.syncPending(userId);
       _applySnapshot(await _repository.refresh(userId));
     } catch (_) {
+      await _reloadOutbox(
+        error: 'Still offline — your saved copy is available.',
+      );
+    }
+  }
+
+  /// Retries one queued change, then refreshes when the server is reachable.
+  Future<void> retryOperation(String operationId) async {
+    final userId = _activeUserId;
+    if (userId == null) return;
+    state = state.copyWith(refreshing: true);
+    try {
+      await _repository.syncPending(userId, operationId: operationId);
+      _applySnapshot(await _repository.refresh(userId));
+    } catch (_) {
+      await _reloadOutbox(
+        error: 'Still offline — the change stays in the queue.',
+      );
+    }
+  }
+
+  /// Retries every queued change, including the ones marked as failed.
+  Future<void> retryAll() async {
+    final userId = _activeUserId;
+    if (userId == null) return;
+    state = state.copyWith(refreshing: true);
+    try {
+      await _repository.syncPending(userId, retryFailed: true);
+      _applySnapshot(await _repository.refresh(userId));
+    } catch (_) {
+      await _reloadOutbox(
+        error: 'Still offline — the changes stay in the queue.',
+      );
+    }
+  }
+
+  /// Removes a queued change from this device without sending it.
+  Future<void> discardOperation(String operationId) async {
+    final userId = _requireUser();
+    final operation = state.outbox
+        .where((entry) => entry.id == operationId)
+        .firstOrNull;
+    if (operation == null) return;
+    await _repository.discardOperation(userId, operation);
+    _applySnapshot(await _repository.loadCached(userId));
+    unawaited(refresh());
+  }
+
+  Future<void> _reloadOutbox({bool? loading, required String error}) async {
+    final userId = _activeUserId;
+    if (userId == null) return;
+    try {
+      final cached = await _repository.loadCached(userId);
       state = state.copyWith(
+        loading: loading ?? state.loading,
         refreshing: false,
         fromCache: true,
-        error: 'Still offline — your saved copy is available.',
+        outbox: cached.outbox,
+        lastSyncedAt: cached.lastSyncedAt,
+        error: error,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        loading: loading ?? state.loading,
+        refreshing: false,
+        fromCache: true,
+        error: error,
       );
     }
   }
@@ -328,10 +403,11 @@ class InventoryController extends Notifier<InventoryState> {
       chemicals: snapshot.chemicals,
       apparatus: snapshot.apparatus,
       logs: snapshot.logs,
+      outbox: snapshot.outbox,
       loading: loading,
       fromCache: snapshot.fromCache,
-      pendingCount: snapshot.pendingCount,
       lastUpdated: DateTime.now(),
+      lastSyncedAt: snapshot.lastSyncedAt ?? state.lastSyncedAt,
     );
   }
 
@@ -359,7 +435,7 @@ class InventoryController extends Notifier<InventoryState> {
         item,
         ...state.chemicals.where((value) => value.id != item.id),
       ],
-      pendingCount: cached.pendingCount,
+      outbox: cached.outbox,
     );
   }
 
@@ -385,7 +461,7 @@ class InventoryController extends Notifier<InventoryState> {
         item,
         ...state.apparatus.where((value) => value.id != item.id),
       ],
-      pendingCount: cached.pendingCount,
+      outbox: cached.outbox,
     );
   }
 
@@ -400,6 +476,7 @@ class InventoryController extends Notifier<InventoryState> {
       type: type,
       id: id,
       changes: changes,
+      itemName: _nameOf(type, id),
     );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(
@@ -413,7 +490,7 @@ class InventoryController extends Notifier<InventoryState> {
                 .map((item) => item.id == id ? Apparatus.fromMap(saved) : item)
                 .toList()
           : state.apparatus,
-      pendingCount: cached.pendingCount,
+      outbox: cached.outbox,
       fromCache: cached.pendingCount > 0,
     );
   }
@@ -443,6 +520,8 @@ class InventoryController extends Notifier<InventoryState> {
       previousQuantity: current,
       note: note,
       loggedAt: date,
+      itemName: _nameOf(itemType, itemId),
+      unit: _unitOf(itemType, itemId),
     );
     final nextQuantity = switch (action) {
       InventoryAction.restock => current + amount,
@@ -469,7 +548,7 @@ class InventoryController extends Notifier<InventoryState> {
                 .toList()
           : state.apparatus,
       logs: [log, ...state.logs.where((value) => value.id != log.id)],
-      pendingCount: cached.pendingCount,
+      outbox: cached.outbox,
       fromCache: cached.pendingCount > 0,
     );
   }
@@ -493,9 +572,24 @@ class InventoryController extends Notifier<InventoryState> {
     state = const InventoryState();
   }
 
+  String? _nameOf(ItemKind type, String id) => type == ItemKind.chemical
+      ? state.chemicals.where((item) => item.id == id).firstOrNull?.name
+      : state.apparatus.where((item) => item.id == id).firstOrNull?.name;
+
+  String _unitOf(ItemKind type, String id) => type == ItemKind.chemical
+      ? state.chemicals.where((item) => item.id == id).firstOrNull?.unit ?? ''
+      : 'pcs';
+
   String _requireUser() {
     final userId = _activeUserId;
     if (userId == null) throw StateError('Please sign in first.');
     return userId;
+  }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull {
+    final iterator = this.iterator;
+    return iterator.moveNext() ? iterator.current : null;
   }
 }

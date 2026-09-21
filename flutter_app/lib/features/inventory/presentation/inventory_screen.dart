@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
@@ -415,7 +416,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     for (var attempt = 0; attempt < 6; attempt++) {
       if (!mounted || !_scrollController.hasClients) return;
       final targetContext = _itemKey(items[target].id).currentContext;
-      if (targetContext != null) {
+      if (targetContext != null && targetContext.mounted) {
         await Scrollable.ensureVisible(
           targetContext,
           alignment: 0,

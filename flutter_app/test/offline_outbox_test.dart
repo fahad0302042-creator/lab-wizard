@@ -1,0 +1,267 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:lab_wizard/core/database/local_database.dart';
+import 'package:lab_wizard/core/utils/errors.dart';
+import 'package:lab_wizard/core/utils/time.dart';
+import 'package:lab_wizard/features/inventory/data/inventory_repository.dart';
+import 'package:lab_wizard/features/inventory/domain/models.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+Future<void> _createLegacySchema(Database db) async {
+  await db.execute('''
+    CREATE TABLE cache_records (
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      record_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, kind, record_id)
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE outbox (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT
+    )
+  ''');
+  await db.execute(
+    'CREATE INDEX outbox_user_created ON outbox(user_id, created_at)',
+  );
+}
+
+void main() {
+  late Directory directory;
+
+  setUpAll(sqfliteFfiInit);
+
+  setUp(() async {
+    directory = await Directory.systemTemp.createTemp('lab-wizard-test');
+  });
+
+  tearDown(() async {
+    if (await directory.exists()) await directory.delete(recursive: true);
+  });
+
+  LocalDatabase openLocal(String name) => LocalDatabase(
+    factory: databaseFactoryFfi,
+    path: p.join(directory.path, name),
+  );
+
+  group('local database', () {
+    test('migrates a version 1 outbox and tracks status per change', () async {
+      final path = p.join(directory.path, 'legacy.db');
+      final legacy = await databaseFactoryFfi.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (db, _) => _createLegacySchema(db),
+        ),
+      );
+      await legacy.insert('outbox', {
+        'id': 'op-1',
+        'user_id': 'u1',
+        'type': 'update_item',
+        'payload': '{"id":"item-1","item_type":"chemical","changes":{}}',
+        'created_at': DateTime(2026, 9, 20).toIso8601String(),
+        'attempts': 2,
+        'last_error': 'SocketException: offline',
+      });
+      await legacy.close();
+
+      final local = LocalDatabase(factory: databaseFactoryFfi, path: path);
+      final operations = await local.pendingOperations('u1');
+      expect(operations.single.id, 'op-1');
+      expect(operations.single.status, PendingStatus.pending);
+      expect(operations.single.attempts, 2);
+      expect(operations.single.description, 'Update item');
+
+      await local.markAttempt('op-1', StateError('boom'), failed: true);
+      expect(await local.failedCount('u1'), 1);
+      expect(await local.pendingCount('u1'), 1);
+      final failed = await local.pendingOperations(
+        'u1',
+        status: PendingStatus.failed,
+      );
+      expect(failed.single.attempts, 3);
+      expect(failed.single.lastAttemptAt, isNotNull);
+      expect(failed.single.lastError, contains('boom'));
+
+      await local.resetOperation('op-1');
+      expect(await local.failedCount('u1'), 0);
+
+      await local.setMeta('u1', LocalDatabase.lastSyncKey, '2026-09-21T10:00');
+      expect(await local.getMeta('u1', LocalDatabase.lastSyncKey), '2026-09-21T10:00');
+      expect(await local.getMeta('u2', LocalDatabase.lastSyncKey), isNull);
+
+      await local.clearUser('u1');
+      expect(await local.pendingCount('u1'), 0);
+      expect(await local.getMeta('u1', LocalDatabase.lastSyncKey), isNull);
+      await local.close();
+    });
+  });
+
+  group('offline repository', () {
+    test('queues labelled changes and discards them safely', () async {
+      final local = openLocal('offline.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+
+      final chemical = await repository.addChemical(
+        userId: 'u1',
+        name: 'Acetone',
+        formula: 'C3H6O',
+        unit: 'mL',
+        quantity: 100,
+        threshold: 10,
+        notes: '',
+      );
+      var snapshot = await repository.loadCached('u1');
+      expect(snapshot.chemicals.single.quantity, 100);
+      expect(snapshot.outbox.single.description, 'Add chemical Acetone');
+      expect(snapshot.lastSyncedAt, isNull);
+
+      final log = await repository.applyAction(
+        userId: 'u1',
+        itemId: chemical.id,
+        itemType: ItemKind.chemical,
+        action: InventoryAction.consume,
+        amount: 10,
+        previousQuantity: 100,
+        note: 'titration',
+        loggedAt: DateTime(2026, 9, 21),
+        itemName: 'Acetone',
+        unit: 'mL',
+      );
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.chemicals.single.quantity, 90);
+      expect(snapshot.logs.single.id, log.id);
+      expect(snapshot.outbox, hasLength(2));
+      expect(snapshot.outbox.last.description, 'Consume 10 mL of Acetone');
+      expect(snapshot.outbox.last.itemId, chemical.id);
+      expect(snapshot.pendingCount, 2);
+      expect(snapshot.failedCount, 0);
+
+      // Another user never sees these rows.
+      expect((await repository.loadCached('u2')).chemicals, isEmpty);
+      expect((await repository.loadCached('u2')).outbox, isEmpty);
+
+      // Without a server there is nothing to replay.
+      await repository.syncPending('u1');
+      expect((await repository.loadCached('u1')).outbox, hasLength(2));
+
+      // Discarding the action puts the offline copy back.
+      await repository.discardOperation('u1', snapshot.outbox.last);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.chemicals.single.quantity, 100);
+      expect(snapshot.logs, isEmpty);
+      expect(snapshot.outbox.single.type, 'add_chemical');
+
+      // Discarding the add removes the item that never reached the server.
+      await repository.discardOperation('u1', snapshot.outbox.single);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.chemicals, isEmpty);
+      expect(snapshot.outbox, isEmpty);
+    });
+
+    test('discarding an add also drops changes that depend on it', () async {
+      final local = openLocal('cascade.db');
+      addTearDown(local.close);
+      final repository = InventoryRepository(local: local, remote: null);
+
+      final item = await repository.addApparatus(
+        userId: 'u1',
+        name: 'Beaker 250 mL',
+        category: 'glassware',
+        quantity: 12,
+        threshold: 2,
+        notes: '',
+      );
+      await repository.applyAction(
+        userId: 'u1',
+        itemId: item.id,
+        itemType: ItemKind.apparatus,
+        action: InventoryAction.breakage,
+        amount: 1,
+        previousQuantity: 12,
+        note: '',
+        loggedAt: DateTime(2026, 9, 21),
+        itemName: item.name,
+      );
+      await repository.updateItem(
+        userId: 'u1',
+        type: ItemKind.apparatus,
+        id: item.id,
+        changes: {'low_stock_threshold': 4},
+        itemName: item.name,
+      );
+      var snapshot = await repository.loadCached('u1');
+      expect(snapshot.outbox, hasLength(3));
+      expect(snapshot.outbox[1].description, 'Record damage of 1 pcs of Beaker 250 mL');
+      expect(snapshot.outbox[2].description, 'Update Beaker 250 mL');
+      expect(snapshot.outbox[2].payload['previous'], {'low_stock_threshold': 2});
+      expect(snapshot.apparatus.single.lowStockThreshold, 4);
+
+      // Discarding the edit restores the previous field value.
+      await repository.discardOperation('u1', snapshot.outbox[2]);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.apparatus.single.lowStockThreshold, 2);
+      expect(snapshot.apparatus.single.quantity, 11);
+
+      await repository.discardOperation('u1', snapshot.outbox.first);
+      snapshot = await repository.loadCached('u1');
+      expect(snapshot.apparatus, isEmpty);
+      expect(snapshot.logs, isEmpty);
+      expect(snapshot.outbox, isEmpty);
+    });
+  });
+
+  group('sync center copy', () {
+    test('relative times read like a notebook note', () {
+      final now = DateTime(2026, 9, 21, 12);
+      expect(relativeTime(now, now: now), 'just now');
+      expect(
+        relativeTime(now.subtract(const Duration(minutes: 5)), now: now),
+        '5 min ago',
+      );
+      expect(
+        relativeTime(now.subtract(const Duration(hours: 3)), now: now),
+        '3 h ago',
+      );
+      expect(
+        relativeTime(now.subtract(const Duration(hours: 30)), now: now),
+        'yesterday',
+      );
+      expect(
+        relativeTime(now.subtract(const Duration(days: 3)), now: now),
+        '3 days ago',
+      );
+      expect(
+        relativeTime(now.subtract(const Duration(days: 30)), now: now),
+        '22 Aug',
+      );
+    });
+
+    test('errors are explained without stack noise', () {
+      expect(
+        friendlyErrorMessage('SocketException: Failed host lookup'),
+        contains('offline'),
+      );
+      expect(
+        friendlyErrorMessage('PostgrestException: Insufficient stock: only 2'),
+        contains('less stock'),
+      );
+      expect(
+        friendlyErrorMessage('StateError: Item not found or not owned'),
+        contains('no longer exists'),
+      );
+      expect(friendlyErrorMessage(''), 'Something went wrong. Please try again.');
+    });
+  });
+}

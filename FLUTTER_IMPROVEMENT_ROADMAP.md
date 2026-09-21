@@ -14,9 +14,9 @@ Ground rules for every item:
 
 | ID | Status | Improvement | Acceptance criteria | Dependencies |
 |---|---|---|---|---|
-| UX-01 | IN PROGRESS | Compact/detailed inventory mode | User can switch modes from either shelf; preference persists; compact rows retain quantity, status, details, use/damage and restock access. | None |
-| UX-02 | IN PROGRESS | Alphabetical quick navigation | A–Z control jumps to the first matching item; unavailable letters are visibly disabled; works after sorting/searching. | UX-01 |
-| UX-03 | TODO | Sticky search and filters | Collapsing shelf heading; search/filter/sort controls remain reachable while scrolling without hiding most of the list. | UX-01, UX-02 |
+| UX-01 | VALIDATING | Compact/detailed inventory mode | User can switch modes from either shelf; preference persists; compact rows retain quantity, status, details, use/damage and restock access. | None |
+| UX-02 | VALIDATING | Alphabetical quick navigation | A–Z control jumps to the first matching item; unavailable letters are visibly disabled; works after sorting/searching. | UX-01 |
+| UX-03 | VALIDATING | Sticky search and filters | Collapsing shelf heading; search/filter/sort controls remain reachable while scrolling without hiding most of the list. | UX-01, UX-02 |
 | UX-04 | TODO | Undo inventory actions | Recent consume/restock/damage can be reversed safely; reversal is represented in the audit trail and works with offline outbox retries. | SYNC-01 |
 | BATCH-01 | TODO | Batch restock | Multi-select chemicals/apparatus, validate amounts, show progress and record separate audit entries. | None |
 | BATCH-02 | TODO | Batch threshold update | Multi-select items and set low-stock values with preview and validation. | None |
@@ -56,7 +56,7 @@ Ground rules for every item:
 
 | ID | Status | Improvement | Acceptance criteria | Dependencies |
 |---|---|---|---|---|
-| SYNC-01 | TODO | Sync center | List pending/failed operations, attempts, error, retry one/all, safely discard where allowed, and last successful sync. | Local DB migration |
+| SYNC-01 | VALIDATING | Sync center | List pending/failed operations, attempts, error, retry one/all, safely discard where allowed, and last successful sync. | Local DB migration |
 | SYNC-02 | TODO | Incremental synchronization | `updated_at` cursor, pagination, tombstone/deletion handling, full-resync escape hatch and per-user isolation. | Additive SQL migration |
 | SYNC-03 | TODO | Background synchronization | Connectivity/app-resume triggers and Android background scheduling without duplicate actions or battery abuse. | SYNC-01, SYNC-02 |
 | SYNC-04 | TODO | Conflict resolution | Explain server/local conflicts and offer safe resolution; never silently overwrite unrelated newer data. | SYNC-02 |
@@ -127,3 +127,5 @@ This remains intentionally after the current single-lab quality program: organiz
 |---|---|---|---|
 | 2026-09-21 | UX-01, UX-02 | `VALIDATING` → `IN PROGRESS` | Audit of `main` (700020e) found neither feature in `flutter_app/lib`; both are implemented as part of this program. |
 | 2026-09-21 | CI | Added `flutter-branch-ci.yml` | Branch pushes are formatted, auto-fixed, analyzed, tested and built on GitHub; APK artifacts are kept for 7 days for phone verification. Android `versionCode` is now minutes-since-epoch in both workflows so branch builds and releases install over each other as updates. |
+| 2026-09-21 | UX-01, UX-02, UX-03 | `IN PROGRESS` → `VALIDATING` | Compact/detailed shelf mode, A–Z quick navigation and collapsing heading with sticky controls implemented with widget tests; awaiting green branch CI + phone check of the branch APK. |
+| 2026-09-21 | SYNC-01 | `TODO` → `VALIDATING` | Local DB v2 (outbox status/label/last attempt + `sync_meta`), per-change failure handling (connectivity keeps `pending`; other errors mark `failed` and do not block other items), sync center screen with retry one/all + safe discard, last-successful-sync shown in Settings/Dashboard. SQLite-backed tests run on CI. Pulled ahead of UX-04 because UX-04 depends on it. |

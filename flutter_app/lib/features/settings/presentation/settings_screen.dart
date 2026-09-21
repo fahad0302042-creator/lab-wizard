@@ -7,8 +7,10 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
+import '../../sync/presentation/sync_center_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -132,20 +134,53 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     inventory.pendingCount == 0
                         ? 'Everything is synced. A private offline copy is kept on this device while you are signed in.'
+                        : inventory.failedCount > 0
+                        ? '${inventory.failedCount} change${inventory.failedCount == 1 ? '' : 's'} need${inventory.failedCount == 1 ? 's' : ''} attention in the sync center.'
                         : '${inventory.pendingCount} change${inventory.pendingCount == 1 ? '' : 's'} waiting for a connection.',
                   ),
+                  if (inventory.lastSyncedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Last successful sync ${relativeTime(inventory.lastSyncedAt!)}.',
+                      style: TextStyle(
+                        color: context.mutedInkColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: inventory.refreshing
-                        ? null
-                        : ref.read(inventoryProvider.notifier).refresh,
-                    icon: inventory.refreshing
-                        ? const SizedBox.square(
-                            dimension: 17,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.sync),
-                    label: const Text('Sync now'),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: inventory.refreshing
+                            ? null
+                            : ref.read(inventoryProvider.notifier).refresh,
+                        icon: inventory.refreshing
+                            ? const SizedBox.square(
+                                dimension: 17,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.sync),
+                        label: const Text('Sync now'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SyncCenterScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.list_alt_outlined),
+                        label: Text(
+                          inventory.pendingCount == 0
+                              ? 'Open sync center'
+                              : 'Sync center (${inventory.pendingCount})',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

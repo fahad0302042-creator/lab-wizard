@@ -9,15 +9,20 @@ class InventorySnapshot {
     required this.chemicals,
     required this.apparatus,
     required this.logs,
-    required this.pendingCount,
+    required this.outbox,
     required this.fromCache,
+    this.lastSyncedAt,
   });
 
   final List<Chemical> chemicals;
   final List<Apparatus> apparatus;
   final List<ConsumptionLog> logs;
-  final int pendingCount;
+  final List<PendingOperation> outbox;
   final bool fromCache;
+  final DateTime? lastSyncedAt;
+
+  int get pendingCount => outbox.length;
+  int get failedCount => outbox.where((operation) => operation.isFailed).length;
 }
 
 class InventoryRepository {
@@ -29,11 +34,12 @@ class InventoryRepository {
   bool? _atomicRpcAvailable;
 
   Future<InventorySnapshot> loadCached(String userId) async {
-    final results = await Future.wait([
+    final results = await Future.wait<dynamic>([
       local.loadRecords(userId, 'chemical'),
       local.loadRecords(userId, 'apparatus'),
       local.loadRecords(userId, 'log'),
-      local.pendingCount(userId),
+      local.pendingOperations(userId),
+      lastSyncedAt(userId),
     ]);
     return InventorySnapshot(
       chemicals: (results[0] as List<Map<String, dynamic>>)
@@ -45,10 +51,14 @@ class InventoryRepository {
       logs: (results[2] as List<Map<String, dynamic>>)
           .map(ConsumptionLog.fromMap)
           .toList(),
-      pendingCount: results[3] as int,
+      outbox: results[3] as List<PendingOperation>,
       fromCache: true,
+      lastSyncedAt: results[4] as DateTime?,
     );
   }
+
+  Future<DateTime?> lastSyncedAt(String userId) async =>
+      DateTime.tryParse(await local.getMeta(userId, LocalDatabase.lastSyncKey) ?? '');
 
   Future<InventorySnapshot> refresh(String userId) async {
     final client = remote;
@@ -72,13 +82,20 @@ class InventoryRepository {
       local.replaceRecords(userId, 'apparatus', apparatusMaps),
       local.replaceRecords(userId, 'log', logMaps),
     ]);
+    final syncedAt = DateTime.now();
+    await local.setMeta(
+      userId,
+      LocalDatabase.lastSyncKey,
+      syncedAt.toIso8601String(),
+    );
 
     return InventorySnapshot(
       chemicals: chemicalMaps.map(Chemical.fromMap).toList(),
       apparatus: apparatusMaps.map(Apparatus.fromMap).toList(),
       logs: logMaps.map(ConsumptionLog.fromMap).toList(),
-      pendingCount: await local.pendingCount(userId),
+      outbox: await local.pendingOperations(userId),
       fromCache: false,
+      lastSyncedAt: syncedAt,
     );
   }
 
@@ -124,6 +141,7 @@ class InventoryRepository {
             type: 'add_chemical',
             payload: payload,
             createdAt: now,
+            label: 'Add chemical ${chemical.name}',
           ),
         );
         return chemical;
@@ -171,6 +189,7 @@ class InventoryRepository {
             type: 'add_apparatus',
             payload: payload,
             createdAt: now,
+            label: 'Add apparatus ${item.name}',
           ),
         );
         return item;
@@ -184,6 +203,7 @@ class InventoryRepository {
     required ItemKind type,
     required String id,
     required Map<String, dynamic> changes,
+    String? itemName,
   }) async {
     final table = type == ItemKind.chemical ? 'chemicals' : 'apparatus';
     try {
@@ -203,6 +223,10 @@ class InventoryRepository {
       if (current == null) {
         throw StateError('The item is not available offline.');
       }
+      final previous = {
+        for (final key in changes.keys)
+          if (current.containsKey(key)) key: current[key],
+      };
       final saved = <String, dynamic>{...current, ...changes, 'id': id};
       await local.upsertRecord(userId, type.name, saved);
       await local.enqueue(
@@ -210,8 +234,14 @@ class InventoryRepository {
           id: _uuid.v4(),
           userId: userId,
           type: 'update_item',
-          payload: {'id': id, 'item_type': type.name, 'changes': changes},
+          payload: {
+            'id': id,
+            'item_type': type.name,
+            'changes': changes,
+            'previous': previous,
+          },
           createdAt: DateTime.now(),
+          label: 'Update ${itemName ?? current['name'] ?? 'item'}',
         ),
       );
       return saved;
@@ -227,6 +257,8 @@ class InventoryRepository {
     required double previousQuantity,
     required String note,
     required DateTime loggedAt,
+    String? itemName,
+    String? unit,
   }) async {
     final operationId = _uuid.v4();
     final newQuantity = _quantityAfter(previousQuantity, action, amount);
@@ -274,11 +306,11 @@ class InventoryRepository {
       return log;
     } catch (error) {
       if (!_isConnectivityError(error) && error is! _OfflineException) rethrow;
-      await _cacheOptimisticQuantity(
+      await _shiftCachedQuantity(
         userId: userId,
         itemType: itemType,
         itemId: itemId,
-        newQuantity: newQuantity,
+        delta: newQuantity - previousQuantity,
       );
       await local.upsertRecord(userId, 'log', optimisticLog.toMap());
       await local.enqueue(
@@ -288,10 +320,34 @@ class InventoryRepository {
           type: 'inventory_action',
           payload: payload,
           createdAt: DateTime.now(),
+          label: actionLabel(
+            action,
+            amount,
+            unit ?? (itemType == ItemKind.apparatus ? 'pcs' : ''),
+            itemName,
+          ),
         ),
       );
       return optimisticLog;
     }
+  }
+
+  /// "Consume 50 mL of Acetone" style summary used for outbox labels.
+  static String actionLabel(
+    InventoryAction action,
+    double amount,
+    String unit,
+    String? itemName,
+  ) {
+    final verb = switch (action) {
+      InventoryAction.consume => 'Consume',
+      InventoryAction.restock => 'Restock',
+      InventoryAction.breakage => 'Record damage of',
+    };
+    final quantity = '${formatQuantity(amount)}${unit.isEmpty ? '' : ' $unit'}';
+    return itemName == null || itemName.isEmpty
+        ? '$verb $quantity'
+        : '$verb $quantity of $itemName';
   }
 
   Future<Map<String, dynamic>> _applyRemoteAction(
@@ -362,18 +418,21 @@ class InventoryRepository {
     }
   }
 
-  Future<void> _cacheOptimisticQuantity({
+  /// Moves the cached quantity by [delta] without touching the server, so
+  /// offline changes (and their reversal) show immediately.
+  Future<void> _shiftCachedQuantity({
     required String userId,
     required ItemKind itemType,
     required String itemId,
-    required double newQuantity,
+    required double delta,
   }) async {
     final rows = await local.loadRecords(userId, itemType.name);
     final current = rows.where((row) => row['id'] == itemId).firstOrNull;
     if (current == null) return;
+    final quantity = _asNum(current['quantity'] ?? 0) + delta;
     await local.upsertRecord(userId, itemType.name, {
       ...current,
-      'quantity': newQuantity,
+      'quantity': quantity < 0 ? 0 : quantity,
     });
   }
 
@@ -393,39 +452,136 @@ class InventoryRepository {
         .eq('item_type', type.name);
     await remote!.from(table).delete().eq('id', id);
     await local.deleteRecord(userId, type.name, id);
+    await local.deleteRecordsWhere(
+      userId,
+      'log',
+      (record) => record['item_id'] == id,
+    );
   }
 
-  Future<int> syncPending(String userId) async {
-    if (remote == null) return local.pendingCount(userId);
-    final operations = await local.pendingOperations(userId);
+  /// Replays queued changes in order.
+  ///
+  /// Connectivity errors stop the run and keep the change `pending`; any
+  /// other error marks the change `failed` and moves on, because a failed
+  /// change on one item must not block unrelated items. Failed changes are
+  /// only retried when the user asks for it ([retryFailed] or a specific
+  /// [operationId]).
+  Future<void> syncPending(
+    String userId, {
+    String? operationId,
+    bool retryFailed = false,
+  }) async {
+    if (remote == null) return;
+    var operations = await local.pendingOperations(userId);
+    if (operationId != null) {
+      operations = operations
+          .where((operation) => operation.id == operationId)
+          .toList();
+    } else if (!retryFailed) {
+      operations = operations
+          .where((operation) => !operation.isFailed)
+          .toList();
+    }
     for (final operation in operations) {
       try {
-        if (operation.type == 'add_chemical') {
-          await remote!.from('chemicals').upsert(operation.payload);
-        } else if (operation.type == 'add_apparatus') {
-          await remote!.from('apparatus').upsert(operation.payload);
-        } else if (operation.type == 'inventory_action') {
-          await _applyRemoteAction(userId, operation.payload);
-        } else if (operation.type == 'update_item') {
-          final table = operation.payload['item_type'] == 'chemical'
-              ? 'chemicals'
-              : 'apparatus';
-          await remote!
-              .from(table)
-              .update(
-                Map<String, dynamic>.from(operation.payload['changes'] as Map),
-              )
-              .eq('id', operation.payload['id']);
-        } else {
-          throw StateError('Unknown operation ${operation.type}');
-        }
+        await _replay(userId, operation);
         await local.completeOperation(operation.id);
       } catch (error) {
-        await local.markAttempt(operation.id, error);
-        break;
+        final offline = _isConnectivityError(error);
+        await local.markAttempt(operation.id, error, failed: !offline);
+        if (offline) break;
       }
     }
-    return local.pendingCount(userId);
+  }
+
+  Future<void> _replay(String userId, PendingOperation operation) async {
+    switch (operation.type) {
+      case 'add_chemical':
+        await remote!.from('chemicals').upsert(operation.payload);
+      case 'add_apparatus':
+        await remote!.from('apparatus').upsert(operation.payload);
+      case 'inventory_action':
+        await _applyRemoteAction(userId, operation.payload);
+      case 'update_item':
+        final table = operation.payload['item_type'] == 'chemical'
+            ? 'chemicals'
+            : 'apparatus';
+        await remote!
+            .from(table)
+            .update(
+              Map<String, dynamic>.from(operation.payload['changes'] as Map),
+            )
+            .eq('id', operation.payload['id']);
+      default:
+        throw StateError('Unknown operation ${operation.type}');
+    }
+  }
+
+  /// Drops a queued change from this device. The offline copy is only
+  /// corrected when it still carries the change, i.e. when no successful
+  /// server sync happened after the change was queued.
+  Future<void> discardOperation(
+    String userId,
+    PendingOperation operation,
+  ) async {
+    final syncedAt = await lastSyncedAt(userId);
+    final cacheStillOptimistic =
+        syncedAt == null || !syncedAt.isAfter(operation.createdAt);
+    final payload = operation.payload;
+    switch (operation.type) {
+      case 'add_chemical' || 'add_apparatus':
+        final id = payload['id'] as String;
+        final kind = operation.type == 'add_chemical'
+            ? 'chemical'
+            : 'apparatus';
+        await local.deleteRecord(userId, kind, id);
+        await local.deleteRecordsWhere(
+          userId,
+          'log',
+          (record) => record['item_id'] == id,
+        );
+        // Changes to an item that never reached the server can never apply.
+        for (final other in await local.pendingOperations(userId)) {
+          if (other.id != operation.id && other.itemId == id) {
+            await local.completeOperation(other.id);
+          }
+        }
+      case 'inventory_action':
+        final logId = payload['local_log_id'] as String?;
+        if (logId != null) await local.deleteRecord(userId, 'log', logId);
+        if (cacheStillOptimistic) {
+          await _shiftCachedQuantity(
+            userId: userId,
+            itemType: payload['item_type'] == 'apparatus'
+                ? ItemKind.apparatus
+                : ItemKind.chemical,
+            itemId: payload['item_id'] as String,
+            delta:
+                _asNum(payload['previous_quantity']) -
+                _asNum(payload['new_quantity']),
+          );
+        }
+      case 'update_item':
+        final previous = payload['previous'];
+        if (cacheStillOptimistic && previous is Map && previous.isNotEmpty) {
+          final kind = payload['item_type'] == 'apparatus'
+              ? 'apparatus'
+              : 'chemical';
+          final rows = await local.loadRecords(userId, kind);
+          final current = rows
+              .where((row) => row['id'] == payload['id'])
+              .firstOrNull;
+          if (current != null) {
+            await local.upsertRecord(userId, kind, {
+              ...current,
+              ...Map<String, dynamic>.from(previous),
+            });
+          }
+        }
+      default:
+        break;
+    }
+    await local.completeOperation(operation.id);
   }
 
   static List<Map<String, dynamic>> _mapList(dynamic value) => (value as List)
@@ -442,7 +598,11 @@ class InventoryRepository {
     InventoryAction.restock => current + amount,
   };
 
-  static double _asNum(Object? value) => (value as num).toDouble();
+  static double _asNum(Object? value) => switch (value) {
+    num n => n.toDouble(),
+    String s => double.tryParse(s) ?? 0,
+    _ => 0,
+  };
 
   static bool _isMissingFunction(PostgrestException error) =>
       error.code == 'PGRST202' ||

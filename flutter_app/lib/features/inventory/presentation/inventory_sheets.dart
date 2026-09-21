@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../domain/models.dart';
 
@@ -1336,23 +1337,7 @@ class _QuantityPreview extends StatelessWidget {
   }
 }
 
-String _friendlyError(Object error) {
-  final message = error.toString().replaceFirst(
-    RegExp(r'^[A-Za-z]+Exception:\s*'),
-    '',
-  );
-  final lower = message.toLowerCase();
-  if (lower.contains('socket') ||
-      lower.contains('network') ||
-      lower.contains('connection') ||
-      lower.contains('host lookup')) {
-    return 'You appear to be offline. The change will sync when possible.';
-  }
-  if (lower.contains('permission') || lower.contains('row-level security')) {
-    return 'This account does not have permission to change that item.';
-  }
-  return message.isEmpty ? 'Something went wrong. Please try again.' : message;
-}
+String _friendlyError(Object error) => friendlyErrorMessage(error);
 
 extension<T> on Iterable<T> {
   T? get firstOrNull {

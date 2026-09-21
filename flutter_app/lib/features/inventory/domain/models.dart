@@ -253,6 +253,10 @@ class ConsumptionLog {
   };
 }
 
+/// Whether a queued change is still waiting for a connection or needs the
+/// user to look at it (SYNC-01).
+enum PendingStatus { pending, failed }
+
 class PendingOperation {
   const PendingOperation({
     required this.id,
@@ -262,6 +266,9 @@ class PendingOperation {
     required this.createdAt,
     this.attempts = 0,
     this.lastError,
+    this.status = PendingStatus.pending,
+    this.label,
+    this.lastAttemptAt,
   });
 
   final String id;
@@ -271,6 +278,30 @@ class PendingOperation {
   final DateTime createdAt;
   final int attempts;
   final String? lastError;
+  final PendingStatus status;
+  final String? label;
+  final DateTime? lastAttemptAt;
+
+  bool get isFailed => status == PendingStatus.failed;
+
+  /// The inventory item this change belongs to, when it has one.
+  String? get itemId => (payload['item_id'] ?? payload['id']) as String?;
+
+  /// Human-readable summary shown in the sync center.
+  String get description {
+    final saved = label;
+    if (saved != null && saved.isNotEmpty) return saved;
+    return switch (type) {
+      'add_chemical' => 'Add chemical ${payload['name'] ?? ''}'.trim(),
+      'add_apparatus' => 'Add apparatus ${payload['name'] ?? ''}'.trim(),
+      'update_item' => 'Update item',
+      'inventory_action' =>
+        '${_capitalize(payload['action']?.toString() ?? 'change')} '
+            '${formatQuantity(_asDouble(payload['amount']))}',
+      'undo_action' => 'Undo a recorded change',
+      _ => type.replaceAll('_', ' '),
+    };
+  }
 
   Map<String, Object?> toDatabase() => {
     'id': id,
@@ -280,6 +311,9 @@ class PendingOperation {
     'created_at': createdAt.toIso8601String(),
     'attempts': attempts,
     'last_error': lastError,
+    'status': status.name,
+    'label': label,
+    'last_attempt_at': lastAttemptAt?.toIso8601String(),
   };
 
   factory PendingOperation.fromDatabase(Map<String, Object?> row) =>
@@ -289,10 +323,20 @@ class PendingOperation {
         type: row['type']! as String,
         payload: jsonDecode(row['payload']! as String) as Map<String, dynamic>,
         createdAt: DateTime.parse(row['created_at']! as String),
-        attempts: row['attempts']! as int,
+        attempts: (row['attempts'] as int?) ?? 0,
         lastError: row['last_error'] as String?,
+        status: row['status'] == 'failed'
+            ? PendingStatus.failed
+            : PendingStatus.pending,
+        label: row['label'] as String?,
+        lastAttemptAt: DateTime.tryParse(
+          (row['last_attempt_at'] as String?) ?? '',
+        ),
       );
 }
+
+String _capitalize(String value) =>
+    value.isEmpty ? value : value[0].toUpperCase() + value.substring(1);
 
 DateTime localDayAtNoon(DateTime value) =>
     DateTime(value.year, value.month, value.day, 12);
