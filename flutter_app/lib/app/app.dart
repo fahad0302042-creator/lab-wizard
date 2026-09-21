@@ -27,7 +27,10 @@ class LabWizardApp extends ConsumerWidget {
           data: media.copyWith(
             disableAnimations:
                 media.disableAnimations || preferences.reduceMotion,
-            textScaler: media.textScaler.clamp(maxScaleFactor: 1.5),
+            // Android's largest font size is 200 %; everything above that
+            // (developer settings, some launchers) is capped so layouts
+            // verified at 200 % (A11Y-02) stay valid.
+            textScaler: media.textScaler.clamp(maxScaleFactor: 2),
           ),
           // Above the navigator so the lock also covers open sheets and
           // dialogs (SECURITY-01).

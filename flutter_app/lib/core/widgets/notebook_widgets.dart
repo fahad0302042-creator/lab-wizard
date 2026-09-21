@@ -731,15 +731,20 @@ class MarginNote extends StatelessWidget {
   Widget build(BuildContext context) {
     return Transform.rotate(
       angle: -.12,
-      child: Text(
-        text,
-        maxLines: 2,
-        style: TextStyle(
-          color: context.marginRedColor,
-          fontFamily: 'Caveat',
-          fontSize: 16,
-          height: .9,
-          fontWeight: FontWeight.w700,
+      // Lives in a narrow margin: shrinks rather than clips with large text.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          maxLines: 2,
+          style: TextStyle(
+            color: context.marginRedColor,
+            fontFamily: 'Caveat',
+            fontSize: 16,
+            height: .9,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

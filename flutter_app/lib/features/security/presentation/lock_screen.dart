@@ -248,8 +248,10 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                       total: lock.pinLength,
                     ),
                   ),
-                  SizedBox(
-                    height: 36,
+                  ConstrainedBox(
+                    // Reserves a line so the keypad does not jump; grows
+                    // with large text instead of clipping (A11Y-02).
+                    constraints: const BoxConstraints(minHeight: 36),
                     child: Center(
                       child: _error == null
                           ? null

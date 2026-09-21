@@ -953,6 +953,9 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                                 child: Text(
                                   letter,
                                   key: Key('alpha-$letter'),
+                                  // Sized by its slot, not the font setting;
+                                  // TalkBack has the label either way.
+                                  textScaler: TextScaler.noScaling,
                                   style: TextStyle(
                                     fontSize: fontSize,
                                     height: 1,
@@ -1389,28 +1392,36 @@ class _InventoryCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            AnimatedQuantity(
-                              item.quantity,
-                              suffix: ' ${item.unit}',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                height: 1.1,
-                                fontWeight: FontWeight.w700,
-                              ),
+                        // Large numbers with large text shrink to fit rather
+                        // than push past the card edge (A11Y-02).
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.topRight,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                AnimatedQuantity(
+                                  item.quantity,
+                                  suffix: ' ${item.unit}',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  item.threshold > 0
+                                      ? 'min ${formatQuantity(item.threshold)} ${item.unit}'
+                                      : item.unit,
+                                  style: TextStyle(
+                                    color: context.mutedInkColor,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              item.threshold > 0
-                                  ? 'min ${formatQuantity(item.threshold)} ${item.unit}'
-                                  : item.unit,
-                              style: TextStyle(
-                                color: context.mutedInkColor,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -1598,31 +1609,39 @@ class _CompactRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      AnimatedQuantity(
-                        item.quantity,
-                        suffix: ' ${item.unit}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.15,
-                          fontWeight: FontWeight.w700,
-                        ),
+                  // Shrinks with large text instead of overflowing (A11Y-02).
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 96),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          AnimatedQuantity(
+                            item.quantity,
+                            suffix: ' ${item.unit}',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              color: item.status == StockState.healthy
+                                  ? context.mutedInkColor
+                                  : statusColor,
+                              fontFamily: 'Caveat',
+                              fontSize: 14,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        statusText,
-                        style: TextStyle(
-                          color: item.status == StockState.healthy
-                              ? context.mutedInkColor
-                              : statusColor,
-                          fontFamily: 'Caveat',
-                          fontSize: 14,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                   const SizedBox(width: 2),
                   if (!selecting) ...[

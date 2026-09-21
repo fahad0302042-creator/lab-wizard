@@ -222,39 +222,52 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ],
         ),
         const SizedBox(height: 18),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _ReportMetric(
-                key: const Key('metric-consume'),
-                label: 'usage actions',
-                action: InventoryAction.consume,
-                trend: trend,
-                color: LabColors.amber,
-              ),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: _ReportMetric(
-                key: const Key('metric-restock'),
-                label: 'restocks',
-                action: InventoryAction.restock,
-                trend: trend,
-                color: LabColors.green,
-              ),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: _ReportMetric(
-                key: const Key('metric-breakage'),
-                label: 'damage',
-                action: InventoryAction.breakage,
-                trend: trend,
-                color: LabColors.marginRed,
-              ),
-            ),
-          ],
+        // Three tiles side by side; with large text or a narrow screen they
+        // stack so the numbers are never squeezed (A11Y-02).
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            final columns = constraints.maxWidth / scale >= 300 ? 3 : 1;
+            final width = columns == 1
+                ? constraints.maxWidth
+                : (constraints.maxWidth - 9 * (columns - 1)) / columns;
+            return Wrap(
+              spacing: 9,
+              runSpacing: 9,
+              children: [
+                SizedBox(
+                  width: width,
+                  child: _ReportMetric(
+                    key: const Key('metric-consume'),
+                    label: 'usage actions',
+                    action: InventoryAction.consume,
+                    trend: trend,
+                    color: LabColors.amber,
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _ReportMetric(
+                    key: const Key('metric-restock'),
+                    label: 'restocks',
+                    action: InventoryAction.restock,
+                    trend: trend,
+                    color: LabColors.green,
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _ReportMetric(
+                    key: const Key('metric-breakage'),
+                    label: 'damage',
+                    action: InventoryAction.breakage,
+                    trend: trend,
+                    color: LabColors.marginRed,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 6),
         Text(

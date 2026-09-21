@@ -182,11 +182,16 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
           ],
-          GridView.count(
-            crossAxisCount: 2,
-            childAspectRatio: 1.45,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+          GridView(
+            // Tile height follows the font size so the number and caption
+            // never clip at large text (A11Y-02).
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent:
+                  60 + 46 * (MediaQuery.textScalerOf(context).scale(10) / 10),
+            ),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
@@ -827,7 +832,8 @@ class _WeekActivity extends StatelessWidget {
                 '($maxCount)',
       excludeSemantics: true,
       child: SizedBox(
-        height: 130,
+        // Two text lines grow with the font; the bars keep their height.
+        height: 106 + 24 * (MediaQuery.textScalerOf(context).scale(10) / 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: List.generate(7, (index) {

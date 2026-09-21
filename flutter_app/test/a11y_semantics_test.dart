@@ -200,7 +200,20 @@ void main() {
         Tristate.isFalse,
       );
 
-      // A–Z strip: unavailable letters are disabled buttons, not silent text.
+      handle.dispose();
+    });
+
+    testWidgets('A–Z strip letters are buttons with an enabled state', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      // The strip only appears once a shelf is long enough to need it.
+      final many = [
+        for (var index = 0; index < 12; index++)
+          _chemical('m$index', '${String.fromCharCode(65 + index)}-reagent'),
+      ];
+      await _pumpShelf(tester, state: InventoryState(chemicals: many));
+      // Unavailable letters are disabled buttons, not silent text.
       final q = tester.getSemantics(find.byKey(const Key('alpha-Q')));
       expect(q.label, 'jump to Q');
       expect(q.flagsCollection.isEnabled, Tristate.isFalse);

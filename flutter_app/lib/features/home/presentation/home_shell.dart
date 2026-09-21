@@ -102,7 +102,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
         ),
       ),
-      bottomNavigationBar: _NotebookBottomNavigation(
+      bottomNavigationBar: NotebookBottomNavigation(
         selectedIndex: _index,
         onSelected: _selectTab,
       ),
@@ -121,8 +121,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 }
 
-class _NotebookBottomNavigation extends StatelessWidget {
-  const _NotebookBottomNavigation({
+class NotebookBottomNavigation extends StatelessWidget {
+  const NotebookBottomNavigation({
     required this.selectedIndex,
     required this.onSelected,
   });
@@ -148,7 +148,15 @@ class _NotebookBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    // Navigation chrome: labels grow with the system font up to 130 % and
+    // the bar grows with them; beyond that they would crowd the icons
+    // (A11Y-02). The labels are short and the icons carry the meaning.
+    final labelScale = MediaQuery.textScalerOf(
+      context,
+    ).clamp(maxScaleFactor: 1.3).scale(17) / 17;
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: DecoratedBox(
       decoration: BoxDecoration(
         color: context.cardColor,
         border: Border(top: BorderSide(color: context.inkColor, width: 1.35)),
@@ -156,7 +164,7 @@ class _NotebookBottomNavigation extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 70,
+          height: 70 + 17 * (labelScale - 1),
           child: Row(
             children: List.generate(_items.length, (index) {
               final item = _items[index];
@@ -227,6 +235,8 @@ class _NotebookBottomNavigation extends StatelessWidget {
                           offset: Offset(0, scan ? -5 : 0),
                           child: Text(
                             item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: color,
                               fontFamily: 'Caveat',
@@ -248,6 +258,7 @@ class _NotebookBottomNavigation extends StatelessWidget {
             }),
           ),
         ),
+      ),
       ),
     );
   }
