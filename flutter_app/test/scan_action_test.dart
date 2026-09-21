@@ -216,7 +216,13 @@ void main() {
     );
     expect(find.text('Acetone'), findsOneWidget);
     expect(find.text('50 mL in stock'), findsOneWidget);
-    expect(tester.widget<TextField>(find.byKey(const Key('scan-amount'))).controller!.text, isEmpty);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('scan-amount')))
+          .controller!
+          .text,
+      isEmpty,
+    );
 
     await tester.tap(find.byKey(const Key('scan-use')));
     await tester.pumpAndSettle();
@@ -238,7 +244,13 @@ void main() {
     // FORM-01: the amount is remembered for the next scan.
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(find.byKey(const Key('scan-amount'))).controller!.text, '5');
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('scan-amount')))
+          .controller!
+          .text,
+      '5',
+    );
   });
 
   testWidgets('stock errors stay inline and the sheet remains open', (
@@ -280,7 +292,13 @@ void main() {
     );
     expect(find.text('glassware · S/N SN-7'), findsOneWidget);
     expect(find.text('9 pcs in stock · 3 on loan'), findsOneWidget);
-    expect(tester.widget<TextField>(find.byKey(const Key('scan-amount'))).controller!.text, '1');
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('scan-amount')))
+          .controller!
+          .text,
+      '1',
+    );
     expect(find.text('Return (3 out)'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('scan-return')));
@@ -298,9 +316,7 @@ void main() {
     );
   });
 
-  testWidgets('a single open loan is returned without asking', (
-    tester,
-  ) async {
+  testWidgets('a single open loan is returned without asking', (tester) async {
     final results = <ScanActionResult?>[];
     final fake = await _pump(
       tester,

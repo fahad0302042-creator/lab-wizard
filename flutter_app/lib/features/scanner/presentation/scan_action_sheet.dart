@@ -34,8 +34,9 @@ Future<ScanActionResult?> showScanActionSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) =>
-        NotebookSheetFrame(child: ScanActionForm(kind: kind, itemId: itemId)),
+    builder: (_) => NotebookSheetFrame(
+      child: ScanActionForm(kind: kind, itemId: itemId),
+    ),
   );
 }
 
@@ -56,7 +57,8 @@ String scanActionMessage({
   return switch (action) {
     InventoryAction.consume => 'Used $quantity of $name · $left left',
     InventoryAction.restock => 'Restocked $quantity of $name · now $left',
-    InventoryAction.breakage => 'Damage recorded, $quantity of $name · $left left',
+    InventoryAction.breakage =>
+      'Damage recorded, $quantity of $name · $left left',
   };
 }
 
@@ -129,7 +131,8 @@ class _ScanActionFormState extends ConsumerState<ScanActionForm> {
           ].join(' · ');
     final unit = chemical?.unit ?? 'pcs';
     final current = chemical?.quantity ?? apparatus!.quantity;
-    final threshold = chemical?.lowStockThreshold ?? apparatus!.lowStockThreshold;
+    final threshold =
+        chemical?.lowStockThreshold ?? apparatus!.lowStockThreshold;
     final loans = apparatus == null
         ? const <ApparatusCheckout>[]
         : state.checkouts
@@ -228,7 +231,9 @@ class _ScanActionFormState extends ConsumerState<ScanActionForm> {
             Expanded(
               child: FilledButton.icon(
                 key: const Key('scan-restock'),
-                onPressed: _working ? null : () => _run(InventoryAction.restock),
+                onPressed: _working
+                    ? null
+                    : () => _run(InventoryAction.restock),
                 style: FilledButton.styleFrom(
                   backgroundColor: context.healthyColor,
                   minimumSize: const Size.fromHeight(48),
@@ -283,9 +288,9 @@ class _ScanActionFormState extends ConsumerState<ScanActionForm> {
           key: const Key('scan-details'),
           onPressed: _working
               ? null
-              : () => Navigator.of(
-                  context,
-                ).pop(const ScanActionResult(openDetails: true)),
+              : () =>
+                    Navigator.of(context)
+                        .pop(const ScanActionResult(openDetails: true)),
           icon: const Icon(Icons.open_in_new, size: 18),
           label: const Text('Open details'),
         ),
@@ -328,10 +333,14 @@ class _ScanActionFormState extends ConsumerState<ScanActionForm> {
       );
       final state = ref.read(inventoryProvider);
       final chemical = widget.kind == ItemKind.chemical
-          ? state.chemicals.where((item) => item.id == widget.itemId).firstOrNull
+          ? state.chemicals
+                .where((item) => item.id == widget.itemId)
+                .firstOrNull
           : null;
       final apparatus = widget.kind == ItemKind.apparatus
-          ? state.apparatus.where((item) => item.id == widget.itemId).firstOrNull
+          ? state.apparatus
+                .where((item) => item.id == widget.itemId)
+                .firstOrNull
           : null;
       final message = scanActionMessage(
         action: action,
