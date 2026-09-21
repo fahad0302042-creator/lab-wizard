@@ -59,7 +59,8 @@ enum HazardClass {
   static HazardClass? fromCode(String value) {
     final normalized = value.trim().toUpperCase();
     for (final hazard in values) {
-      if (hazard.code == normalized || hazard.name.toUpperCase() == normalized) {
+      if (hazard.code == normalized ||
+          hazard.name.toUpperCase() == normalized) {
         return hazard;
       }
     }
@@ -115,8 +116,7 @@ class Chemical {
       hazardClasses.isNotEmpty;
 
   List<HazardClass> get hazards => [
-    for (final code in hazardClasses)
-      if (HazardClass.fromCode(code) case final hazard?) hazard,
+    for (final code in hazardClasses) ?HazardClass.fromCode(code),
   ];
 
   ExpiryState expiryState({DateTime? now}) =>

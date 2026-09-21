@@ -1638,7 +1638,11 @@ class _DuplicateWarning extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.content_copy_outlined, size: 18, color: context.lowColor),
+              Icon(
+                Icons.content_copy_outlined,
+                size: 18,
+                color: context.lowColor,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

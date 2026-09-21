@@ -285,9 +285,7 @@ class FormMemoryController extends Notifier<FormMemory> {
 
   @override
   FormMemory build() {
-    final userId = ref.watch(
-      authProvider.select((value) => value.user?.id),
-    );
+    final userId = ref.watch(authProvider.select((value) => value.user?.id));
     _prefix = 'form.${userId ?? 'anonymous'}.';
     unawaited(_restore(_prefix));
     return const FormMemory();
@@ -301,7 +299,8 @@ class FormMemoryController extends Notifier<FormMemory> {
       lastCategory: preferences.getString('${prefix}category'),
       lastThresholds: _readDoubles(preferences, '${prefix}threshold.'),
       lastActionAmounts: _readDoubles(preferences, '${prefix}amount.'),
-      prefillThreshold: preferences.getBool('${prefix}prefill_threshold') ?? true,
+      prefillThreshold:
+          preferences.getBool('${prefix}prefill_threshold') ?? true,
       prefillActionAmount:
           preferences.getBool('${prefix}prefill_amount') ?? true,
     );
@@ -336,7 +335,10 @@ class FormMemoryController extends Notifier<FormMemory> {
       await preferences.setString('${_prefix}category', category);
     }
     if (threshold != null) {
-      await preferences.setDouble('${_prefix}threshold.${kind.name}', threshold);
+      await preferences.setDouble(
+        '${_prefix}threshold.${kind.name}',
+        threshold,
+      );
     }
   }
 

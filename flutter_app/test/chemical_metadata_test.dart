@@ -232,7 +232,10 @@ void main() {
         ),
       );
       expect(message, contains('flutter_app/supabase'));
-      expect(friendlyErrorMessage(StateError('Only 5 available.')), 'Only 5 available.');
+      expect(
+        friendlyErrorMessage(StateError('Only 5 available.')),
+        'Only 5 available.',
+      );
     });
   });
 
@@ -267,10 +270,7 @@ void main() {
 
       await tester.ensureVisible(find.byKey(const Key('detail-cas')));
       await tester.enterText(find.byKey(const Key('detail-cas')), '64-17-5');
-      await tester.enterText(
-        find.byKey(const Key('detail-supplier')),
-        'Merck',
-      );
+      await tester.enterText(find.byKey(const Key('detail-supplier')), 'Merck');
       await tester.enterText(
         find.byKey(const Key('detail-expiry')),
         '2030-01-31',

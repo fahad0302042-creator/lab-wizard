@@ -136,7 +136,10 @@ class SettingsScreen extends ConsumerWidget {
                     'The add and record sheets start from the unit, category, '
                     'low-stock level and amounts you used last. Kept on this '
                     'device for your account only.',
-                    style: TextStyle(color: context.mutedInkColor, fontSize: 13),
+                    style: TextStyle(
+                      color: context.mutedInkColor,
+                      fontSize: 13,
+                    ),
                   ),
                   SwitchListTile(
                     key: const Key('prefill-threshold'),
@@ -164,7 +167,10 @@ class SettingsScreen extends ConsumerWidget {
                     onPressed: formMemory.isEmpty
                         ? null
                         : ref.read(formMemoryProvider.notifier).forget,
-                    icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+                    icon: const Icon(
+                      Icons.cleaning_services_outlined,
+                      size: 18,
+                    ),
                     label: const Text('Forget remembered values'),
                   ),
                 ],

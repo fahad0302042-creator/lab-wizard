@@ -7,21 +7,18 @@ import '../domain/models.dart';
 /// Holds the optional chemical metadata fields (DATA-01) for the add and
 /// edit forms. The owning form disposes it.
 class ChemicalDetailsController extends ChangeNotifier {
-  ChemicalDetailsController([
-    ChemicalDetails initial = const ChemicalDetails(),
-  ]) : supplier = TextEditingController(text: initial.supplier ?? ''),
-       casNumber = TextEditingController(text: initial.casNumber ?? ''),
-       concentration = TextEditingController(
-         text: initial.concentration ?? '',
-       ),
-       location = TextEditingController(text: initial.location ?? ''),
-       expiry = TextEditingController(
-         text: initial.expiryDate == null
-             ? ''
-             : formatDateOnly(initial.expiryDate!),
-       ),
-       _hazards = {...parseHazardList(initial.hazardClasses)},
-       _expanded = !initial.isEmpty {
+  ChemicalDetailsController([ChemicalDetails initial = const ChemicalDetails()])
+    : supplier = TextEditingController(text: initial.supplier ?? ''),
+      casNumber = TextEditingController(text: initial.casNumber ?? ''),
+      concentration = TextEditingController(text: initial.concentration ?? ''),
+      location = TextEditingController(text: initial.location ?? ''),
+      expiry = TextEditingController(
+        text: initial.expiryDate == null
+            ? ''
+            : formatDateOnly(initial.expiryDate!),
+      ),
+      _hazards = {...parseHazardList(initial.hazardClasses)},
+      _expanded = !initial.isEmpty {
     for (final controller in textControllers) {
       controller.addListener(notifyListeners);
     }
@@ -147,9 +144,7 @@ class ChemicalDetailsFields extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      filled
-                          ? 'supplier · CAS · expiry · hazards'
-                          : 'optional',
+                      filled ? 'supplier · CAS · expiry · hazards' : 'optional',
                       style: TextStyle(
                         color: context.mutedInkColor,
                         fontSize: 12,
@@ -410,7 +405,10 @@ class HazardStrip extends StatelessWidget {
           if (hazards.length > 4)
             Text(
               '+${hazards.length - 4}',
-              style: TextStyle(fontSize: size - 3, color: context.marginRedColor),
+              style: TextStyle(
+                fontSize: size - 3,
+                color: context.marginRedColor,
+              ),
             ),
         ],
       ),
@@ -469,7 +467,10 @@ class ChemicalDetailsSummary extends StatelessWidget {
                         ),
                       ),
                       Expanded(
-                        child: Text(value, style: const TextStyle(fontSize: 14)),
+                        child: Text(
+                          value,
+                          style: const TextStyle(fontSize: 14),
+                        ),
                       ),
                     ],
                   ),

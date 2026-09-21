@@ -134,7 +134,11 @@ void main() {
       expect(byFormula.single.reason, 'same formula');
 
       expect(
-        findChemicalDuplicates(existing: [_acetone], name: 'Ethanol', formula: ''),
+        findChemicalDuplicates(
+          existing: [_acetone],
+          name: 'Ethanol',
+          formula: '',
+        ),
         isEmpty,
       );
       expect(
