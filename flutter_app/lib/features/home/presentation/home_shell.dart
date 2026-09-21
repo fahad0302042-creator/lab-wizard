@@ -123,6 +123,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
 class NotebookBottomNavigation extends StatelessWidget {
   const NotebookBottomNavigation({
+    super.key,
     required this.selectedIndex,
     required this.onSelected,
   });
@@ -151,114 +152,114 @@ class NotebookBottomNavigation extends StatelessWidget {
     // Navigation chrome: labels grow with the system font up to 130 % and
     // the bar grows with them; beyond that they would crowd the icons
     // (A11Y-02). The labels are short and the icons carry the meaning.
-    final labelScale = MediaQuery.textScalerOf(
-      context,
-    ).clamp(maxScaleFactor: 1.3).scale(17) / 17;
+    final labelScale =
+        MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3).scale(17) /
+        17;
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.3,
       child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        border: Border(top: BorderSide(color: context.inkColor, width: 1.35)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 70 + 17 * (labelScale - 1),
-          child: Row(
-            children: List.generate(_items.length, (index) {
-              final item = _items[index];
-              final selected = selectedIndex == index;
-              final scan = index == 2;
-              final color = selected
-                  ? context.marginRedColor
-                  : context.mutedInkColor;
-              return Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: selected,
-                  label: item.label,
-                  child: InkResponse(
-                    onTap: () => onSelected(index),
-                    radius: 34,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (scan)
-                          Transform.translate(
-                            offset: const Offset(0, -4),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? context.marginRedColor
-                                    : context.cardColor,
-                                border: Border.all(
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          border: Border(top: BorderSide(color: context.inkColor, width: 1.35)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 70 + 17 * (labelScale - 1),
+            child: Row(
+              children: List.generate(_items.length, (index) {
+                final item = _items[index];
+                final selected = selectedIndex == index;
+                final scan = index == 2;
+                final color = selected
+                    ? context.marginRedColor
+                    : context.mutedInkColor;
+                return Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: selected,
+                    label: item.label,
+                    child: InkResponse(
+                      onTap: () => onSelected(index),
+                      radius: 34,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (scan)
+                            Transform.translate(
+                              offset: const Offset(0, -4),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
                                   color: selected
                                       ? context.marginRedColor
-                                      : context.inkColor,
-                                  width: 2,
+                                      : context.cardColor,
+                                  border: Border.all(
+                                    color: selected
+                                        ? context.marginRedColor
+                                        : context.inkColor,
+                                    width: 2,
+                                  ),
+                                  shape: BoxShape.circle,
+                                  boxShadow: selected
+                                      ? const [
+                                          BoxShadow(
+                                            color: Color(0x33000000),
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ]
+                                      : null,
                                 ),
-                                shape: BoxShape.circle,
-                                boxShadow: selected
-                                    ? const [
-                                        BoxShadow(
-                                          color: Color(0x33000000),
-                                          offset: Offset(0, 2),
-                                        ),
-                                      ]
-                                    : null,
+                                child: Icon(
+                                  selected ? item.selected : item.icon,
+                                  color: selected
+                                      ? context.cardColor
+                                      : context.inkColor,
+                                  size: 23,
+                                ),
                               ),
+                            )
+                          else
+                            AnimatedRotation(
+                              turns: selected ? -.008 : 0,
+                              duration: const Duration(milliseconds: 180),
                               child: Icon(
                                 selected ? item.selected : item.icon,
-                                color: selected
-                                    ? context.cardColor
-                                    : context.inkColor,
-                                size: 23,
+                                color: color,
+                                size: 25,
                               ),
                             ),
-                          )
-                        else
-                          AnimatedRotation(
-                            turns: selected ? -.008 : 0,
-                            duration: const Duration(milliseconds: 180),
-                            child: Icon(
-                              selected ? item.selected : item.icon,
-                              color: color,
-                              size: 25,
+                          if (!scan) const SizedBox(height: 1),
+                          Transform.translate(
+                            offset: Offset(0, scan ? -5 : 0),
+                            child: Text(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: color,
+                                fontFamily: 'Caveat',
+                                fontSize: 17,
+                                height: .95,
+                                fontWeight: FontWeight.w700,
+                                decoration: selected
+                                    ? TextDecoration.underline
+                                    : null,
+                                decorationThickness: 1.6,
+                              ),
                             ),
                           ),
-                        if (!scan) const SizedBox(height: 1),
-                        Transform.translate(
-                          offset: Offset(0, scan ? -5 : 0),
-                          child: Text(
-                            item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: color,
-                              fontFamily: 'Caveat',
-                              fontSize: 17,
-                              height: .95,
-                              fontWeight: FontWeight.w700,
-                              decoration: selected
-                                  ? TextDecoration.underline
-                                  : null,
-                              decorationThickness: 1.6,
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
-      ),
       ),
     );
   }

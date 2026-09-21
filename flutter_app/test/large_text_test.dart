@@ -96,17 +96,21 @@ Apparatus _apparatus(String id, String name) => Apparatus(
   warrantyUntil: _now.add(const Duration(days: 20)),
 );
 
-ConsumptionLog _log(String id, String itemId, int daysAgo, {double amount = 250}) =>
-    ConsumptionLog(
-      id: id,
-      itemId: itemId,
-      itemType: ItemKind.chemical,
-      action: InventoryAction.consume,
-      amount: amount,
-      note: 'Titration practical, second year',
-      loggedAt: _now.subtract(Duration(days: daysAgo, hours: 2)),
-      createdAt: _now.subtract(Duration(days: daysAgo, hours: 2)),
-    );
+ConsumptionLog _log(
+  String id,
+  String itemId,
+  int daysAgo, {
+  double amount = 250,
+}) => ConsumptionLog(
+  id: id,
+  itemId: itemId,
+  itemType: ItemKind.chemical,
+  action: InventoryAction.consume,
+  amount: amount,
+  note: 'Titration practical, second year',
+  loggedAt: _now.subtract(Duration(days: daysAgo, hours: 2)),
+  createdAt: _now.subtract(Duration(days: daysAgo, hours: 2)),
+);
 
 InventoryState _richState() => InventoryState(
   chemicals: [
@@ -165,18 +169,17 @@ Future<void> _pumpLarge(
 }
 
 /// Opens a sheet from a button so the sheet gets a real navigator/context.
-Widget _opener(
-  void Function(BuildContext context, WidgetRef ref) open,
-) => Scaffold(
-  body: Consumer(
-    builder: (context, ref, _) => Center(
-      child: FilledButton(
-        onPressed: () => open(context, ref),
-        child: const Text('open'),
+Widget _opener(void Function(BuildContext context, WidgetRef ref) open) =>
+    Scaffold(
+      body: Consumer(
+        builder: (context, ref, _) => Center(
+          child: FilledButton(
+            onPressed: () => open(context, ref),
+            child: const Text('open'),
+          ),
+        ),
       ),
-    ),
-  ),
-);
+    );
 
 Future<void> _open(WidgetTester tester) async {
   await tester.tap(find.text('open'));
