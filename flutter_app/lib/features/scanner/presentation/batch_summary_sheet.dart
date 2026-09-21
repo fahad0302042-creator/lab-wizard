@@ -9,7 +9,10 @@ import '../domain/scan_batch.dart';
 
 /// Shows what a batch scan collected (SCAN-02). Resolves to `true` when the
 /// batch is finished and should be cleared, `false` to keep scanning into it.
-Future<bool> showBatchSummarySheet(BuildContext context, ScanBatch batch) async {
+Future<bool> showBatchSummarySheet(
+  BuildContext context,
+  ScanBatch batch,
+) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -45,7 +48,9 @@ class BatchSummary extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: NotebookCard(
-              key: Key('batch-entry-${entry.match.kind.name}-${entry.match.id}'),
+              key: Key(
+                'batch-entry-${entry.match.kind.name}-${entry.match.id}',
+              ),
               onTap: () => showItemDetailSheet(
                 context,
                 ref,

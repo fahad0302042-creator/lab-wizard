@@ -19,8 +19,12 @@ class ScanBatchEntry {
 
   String get key => '${match.kind.name}:${match.id}';
 
-  ScanBatchEntry _again(DateTime at) =>
-      ScanBatchEntry(match: match, count: count + 1, firstAt: firstAt, lastAt: at);
+  ScanBatchEntry _again(DateTime at) => ScanBatchEntry(
+    match: match,
+    count: count + 1,
+    firstAt: firstAt,
+    lastAt: at,
+  );
 }
 
 /// A continuous scanning session (SCAN-02): labels are collected without

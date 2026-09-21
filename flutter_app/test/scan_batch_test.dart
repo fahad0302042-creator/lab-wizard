@@ -86,10 +86,7 @@ void main() {
       expect(batch.entries.map((entry) => entry.match.id), ['c1', 'a1']);
       expect(batch.entries.first.count, 2);
       expect(batch.entries.first.firstAt, _now);
-      expect(
-        batch.entries.first.lastAt,
-        _now.add(const Duration(seconds: 9)),
-      );
+      expect(batch.entries.first.lastAt, _now.add(const Duration(seconds: 9)));
       expect(batch.entries.last.count, 1);
       expect(batch.unknown, {'https://example.com': 2});
       expect(batch.itemCount, 2);
@@ -162,7 +159,10 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
       expect(find.text('2 items · 4 scans · 1 unknown'), findsOneWidget);
-      expect(find.text('1 repeated read counted, not listed twice.'), findsOneWidget);
+      expect(
+        find.text('1 repeated read counted, not listed twice.'),
+        findsOneWidget,
+      );
       expect(find.text('Hydrochloric acid'), findsOneWidget);
       expect(find.text('×2'), findsOneWidget);
       expect(find.text('Volumetric flask'), findsOneWidget);
