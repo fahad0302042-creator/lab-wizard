@@ -934,13 +934,6 @@ class AlphabetIndex extends StatefulWidget {
   final Set<String> available;
   final ValueChanged<String> onSelected;
 
-  @override
-  State<AlphabetIndex> createState() => _AlphabetIndexState();
-}
-
-class _AlphabetIndexState extends State<AlphabetIndex> {
-  String? _active;
-
   /// Letters that fit [height] at a readable size: all of them on a phone in
   /// portrait, every second or third one in landscape, none when there is
   /// no room at all (A11Y-03). Taps still land on the shown letters only.
@@ -957,10 +950,17 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
   }
 
   @override
+  State<AlphabetIndex> createState() => _AlphabetIndexState();
+}
+
+class _AlphabetIndexState extends State<AlphabetIndex> {
+  String? _active;
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final letters = lettersFor(constraints.maxHeight);
+        final letters = AlphabetIndex.lettersFor(constraints.maxHeight);
         if (letters.isEmpty) return const SizedBox.shrink();
         final slot = math.min(
           18.0,
