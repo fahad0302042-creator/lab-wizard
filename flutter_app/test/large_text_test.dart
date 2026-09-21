@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lab_wizard/app/providers.dart';
 import 'package:lab_wizard/features/home/presentation/dashboard_screen.dart';
 import 'package:lab_wizard/features/home/presentation/home_shell.dart';
 import 'package:lab_wizard/features/inventory/domain/models.dart';

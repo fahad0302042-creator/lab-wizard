@@ -153,7 +153,10 @@ void main() {
       // Every second letter is shown; the hidden ones are simply absent.
       expect(find.byKey(const Key('alpha-A')), findsOneWidget);
       expect(find.byKey(const Key('alpha-B')), findsNothing);
-      expect(AlphabetIndex.lettersFor(1000), hasLength(alphabetIndexLetters.length));
+      expect(
+        AlphabetIndex.lettersFor(1000),
+        hasLength(alphabetIndexLetters.length),
+      );
       expect(
         AlphabetIndex.lettersFor(120).length,
         lessThan(alphabetIndexLetters.length),
