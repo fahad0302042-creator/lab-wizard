@@ -78,8 +78,7 @@ class _FakeServer {
         return http.Response(
           jsonEncode({
             'code': 'PGRST202',
-            'message':
-                'Could not find the function public.delete_my_account without parameters in the schema cache',
+            'message': 'Could not find the function public.delete_my_account without parameters in the schema cache',
             'details': null,
             'hint': null,
           }),
@@ -91,7 +90,10 @@ class _FakeServer {
     }
     if (path.endsWith('/auth/v1/logout')) {
       return http.Response(
-        jsonEncode({'code': 403, 'msg': 'User from sub claim in JWT does not exist'}),
+        jsonEncode({
+          'code': 403,
+          'msg': 'User from sub claim in JWT does not exist',
+        }),
         403,
         headers: {'content-type': 'application/json'},
       );
@@ -141,11 +143,22 @@ void main() {
 
   test('the migration only adds the function and guards it', () {
     final sql = File('supabase/009_account_deletion.sql').readAsStringSync();
-    expect(sql, contains('create or replace function public.delete_my_account()'));
+    expect(
+      sql,
+      contains('create or replace function public.delete_my_account()'),
+    );
     expect(sql, contains('auth.uid()'));
     expect(sql, contains('delete from auth.users where id = v_user_id'));
-    expect(sql, contains('grant execute on function public.delete_my_account() to authenticated'));
-    expect(sql, contains('revoke all on function public.delete_my_account() from anon'));
+    expect(
+      sql,
+      contains(
+        'grant execute on function public.delete_my_account() to authenticated',
+      ),
+    );
+    expect(
+      sql,
+      contains('revoke all on function public.delete_my_account() from anon'),
+    );
     expect(sql.toLowerCase(), isNot(contains('drop table')));
     expect(sql.toLowerCase(), isNot(contains('alter table')));
   });
@@ -177,34 +190,37 @@ void main() {
       addTearDown(container.dispose);
     });
 
-    test('re-authenticates, calls the server function and wipes the phone', () async {
-      final auth = container.read(authProvider.notifier);
-      await auth.signIn(_email, 'right');
-      server.requests.clear();
+    test(
+      're-authenticates, calls the server function and wipes the phone',
+      () async {
+        final auth = container.read(authProvider.notifier);
+        await auth.signIn(_email, 'right');
+        server.requests.clear();
 
-      expect(
-        await auth.deleteAccount(password: 'wrong'),
-        'The current password is not right.',
-      );
-      expect(server.requests.map((r) => r.url.path), ['/auth/v1/token']);
-      expect(local.cleared, isEmpty);
-      server.requests.clear();
+        expect(
+          await auth.deleteAccount(password: 'wrong'),
+          'The current password is not right.',
+        );
+        expect(server.requests.map((r) => r.url.path), ['/auth/v1/token']);
+        expect(local.cleared, isEmpty);
+        server.requests.clear();
 
-      expect(await auth.deleteAccount(password: 'right'), isNull);
-      expect(
-        server.requests.map((r) => '${r.method} ${r.url.path}').toList(),
-        [
-          'POST /auth/v1/token',
-          'POST /rest/v1/rpc/delete_my_account',
-          'POST /auth/v1/logout',
-        ],
-      );
-      expect(local.cleared, ['u1']);
-      await pumpEventQueue();
-      final state = container.read(authProvider);
-      expect(state.phase, AuthPhase.signedOut);
-      expect(state.notice, 'Your account and all its data were deleted.');
-    });
+        expect(await auth.deleteAccount(password: 'right'), isNull);
+        expect(
+          server.requests.map((r) => '${r.method} ${r.url.path}').toList(),
+          [
+            'POST /auth/v1/token',
+            'POST /rest/v1/rpc/delete_my_account',
+            'POST /auth/v1/logout',
+          ],
+        );
+        expect(local.cleared, ['u1']);
+        await pumpEventQueue();
+        final state = container.read(authProvider);
+        expect(state.phase, AuthPhase.signedOut);
+        expect(state.notice, 'Your account and all its data were deleted.');
+      },
+    );
 
     test('a missing server function becomes a setup hint', () async {
       server.functionInstalled = false;

@@ -79,9 +79,8 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test('the Android manifest registers the redirect deep link', () {
-    final manifest = File(
-      'android/app/src/main/AndroidManifest.xml',
-    ).readAsStringSync();
+    final manifest = File('android/app/src/main/AndroidManifest.xml')
+        .readAsStringSync();
     expect(
       manifest,
       contains('android:scheme="${AppConfig.passwordResetScheme}"'),
@@ -153,9 +152,7 @@ void main() {
 
     test('friendly messages', () {
       expect(
-        friendlyAuthMessage(
-          const AuthException('anything', statusCode: '429'),
-        ),
+        friendlyAuthMessage(const AuthException('anything', statusCode: '429')),
         'Too many attempts. Wait a minute and try again.',
       );
       expect(
@@ -283,10 +280,7 @@ void main() {
       expect(find.byKey(const Key('new-password-error')), findsOneWidget);
       await tester.tap(find.byKey(const Key('skip-recovery')));
       await tester.pumpAndSettle();
-      expect(
-        tester.container().read(authProvider).phase,
-        AuthPhase.signedIn,
-      );
+      expect(tester.container().read(authProvider).phase, AuthPhase.signedIn);
     });
   });
 }

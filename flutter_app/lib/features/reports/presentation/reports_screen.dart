@@ -350,7 +350,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 onPressed: logs.isEmpty || _exporting
                     ? null
                     : () => _shareCsv(
-                        name: 'lab-wizard-activity-${_kind.name}-'
+                        name:
+                            'lab-wizard-activity-${_kind.name}-'
                             '${_range.fileStem}.csv',
                         title: 'Lab Wizard activity ${_range.dates}',
                         csv: activityCsv(
@@ -388,9 +389,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 onPressed: _exporting
                     ? null
                     : () => _shareCsv(
-                        name: 'lab-wizard-${_kind == ItemKind.chemical ? 'chemicals' : 'apparatus'}-'
+                        name:
+                            'lab-wizard-${_kind == ItemKind.chemical ? 'chemicals' : 'apparatus'}-'
                             '${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv',
-                        title: 'Lab Wizard '
+                        title:
+                            'Lab Wizard '
                             '${_kind == ItemKind.chemical ? 'chemicals' : 'apparatus'}',
                         csv: _kind == ItemKind.chemical
                             ? chemicalsCsv(state.chemicals)
@@ -468,9 +471,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyErrorMessage(error))),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -513,8 +515,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               at: log.loggedAt,
               item: _itemName(state, log),
               action: log.action.name,
-              amount:
-                  '${formatQuantity(log.amount)} ${_unitOf(state, log)}'.trim(),
+              amount: '${formatQuantity(log.amount)} ${_unitOf(state, log)}'
+                  .trim(),
               note: log.note,
             ),
         ],

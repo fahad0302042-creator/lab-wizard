@@ -10,7 +10,10 @@ void main() {
     test('neutralises formula-looking text', () {
       expect(csvCell('=HYPERLINK("http://x")'), '"\'=HYPERLINK(""http://x"")"');
       expect(csvCell('+1234'), '"\'+1234"');
-      expect(csvCell('-2+3+cmd|\' /C calc\'!A0'), '"\'-2+3+cmd|\' /C calc\'!A0"');
+      expect(
+        csvCell('-2+3+cmd|\' /C calc\'!A0'),
+        '"\'-2+3+cmd|\' /C calc\'!A0"',
+      );
       expect(csvCell('@SUM(A1)'), '"\'@SUM(A1)"');
       expect(csvCell('\tabc'), '"\'\tabc"');
       expect(csvCell('\rabc'), '"\'\rabc"');
@@ -89,17 +92,21 @@ void main() {
     );
 
     test('activity export filters by range and kind, oldest first', () {
-      ConsumptionLog log(String id, DateTime at, {ItemKind kind = ItemKind.chemical, String note = ''}) =>
-          ConsumptionLog(
-            id: id,
-            itemId: kind == ItemKind.chemical ? 'c1' : 'a1',
-            itemType: kind,
-            action: InventoryAction.consume,
-            amount: 2.5,
-            note: note,
-            loggedAt: at,
-            createdAt: at,
-          );
+      ConsumptionLog log(
+        String id,
+        DateTime at, {
+        ItemKind kind = ItemKind.chemical,
+        String note = '',
+      }) => ConsumptionLog(
+        id: id,
+        itemId: kind == ItemKind.chemical ? 'c1' : 'a1',
+        itemType: kind,
+        action: InventoryAction.consume,
+        amount: 2.5,
+        note: note,
+        loggedAt: at,
+        createdAt: at,
+      );
       final csv = activityCsv(
         range: ReportRange.lastDays(7, today: today),
         kind: ItemKind.chemical,

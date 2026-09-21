@@ -127,43 +127,49 @@ void main() {
       addTearDown(container.dispose);
     });
 
-    test('re-authenticates, then updates, then signs out other devices', () async {
-      final auth = container.read(authProvider.notifier);
-      await auth.signIn(_email, 'right');
-      expect(container.read(authProvider).phase, AuthPhase.signedIn);
-      server.requests.clear();
+    test(
+      're-authenticates, then updates, then signs out other devices',
+      () async {
+        final auth = container.read(authProvider.notifier);
+        await auth.signIn(_email, 'right');
+        expect(container.read(authProvider).phase, AuthPhase.signedIn);
+        server.requests.clear();
 
-      expect(
-        await auth.changePassword(current: 'wrong', next: 'new-secret'),
-        'The current password is not right.',
-      );
-      expect(server.requests.map((r) => r.method), ['POST']);
-      server.requests.clear();
+        expect(
+          await auth.changePassword(current: 'wrong', next: 'new-secret'),
+          'The current password is not right.',
+        );
+        expect(server.requests.map((r) => r.method), ['POST']);
+        server.requests.clear();
 
-      expect(
-        await auth.changePassword(current: 'right', next: 'right'),
-        'Choose a password different from the current one.',
-      );
-      expect(await auth.changePassword(current: '', next: 'x'), 'Enter your current password.');
-      expect(server.requests, isEmpty);
+        expect(
+          await auth.changePassword(current: 'right', next: 'right'),
+          'Choose a password different from the current one.',
+        );
+        expect(
+          await auth.changePassword(current: '', next: 'x'),
+          'Enter your current password.',
+        );
+        expect(server.requests, isEmpty);
 
-      expect(
-        await auth.changePassword(
-          current: 'right',
-          next: 'new-secret',
-          signOutOthers: true,
-        ),
-        isNull,
-      );
-      expect(
-        server.requests.map((r) => '${r.method} ${r.url.path}').toList(),
-        ['POST /auth/v1/token', 'PUT /auth/v1/user', 'POST /auth/v1/logout'],
-      );
-      expect(server.requests.last.url.queryParameters['scope'], 'others');
-      expect(server.password, 'new-secret');
-      expect(container.read(authProvider).phase, AuthPhase.signedIn);
-      expect(container.read(authProvider).user?.email, _email);
-    });
+        expect(
+          await auth.changePassword(
+            current: 'right',
+            next: 'new-secret',
+            signOutOthers: true,
+          ),
+          isNull,
+        );
+        expect(
+          server.requests.map((r) => '${r.method} ${r.url.path}').toList(),
+          ['POST /auth/v1/token', 'PUT /auth/v1/user', 'POST /auth/v1/logout'],
+        );
+        expect(server.requests.last.url.queryParameters['scope'], 'others');
+        expect(server.password, 'new-secret');
+        expect(container.read(authProvider).phase, AuthPhase.signedIn);
+        expect(container.read(authProvider).user?.email, _email);
+      },
+    );
 
     test('needs a signed-in user', () async {
       expect(
@@ -212,16 +218,25 @@ void main() {
 
     testWidgets('validates before calling the server', (tester) async {
       final (auth, results) = await pump(tester);
-      await tester.enterText(find.byKey(const Key('current-password')), 'old-1');
+      await tester.enterText(
+        find.byKey(const Key('current-password')),
+        'old-1',
+      );
       await tester.enterText(find.byKey(const Key('new-password')), 'old-1');
-      await tester.enterText(find.byKey(const Key('confirm-password')), 'old-1');
+      await tester.enterText(
+        find.byKey(const Key('confirm-password')),
+        'old-1',
+      );
       await tester.tap(find.byKey(const Key('save-password')));
       await tester.pumpAndSettle();
       expect(
         find.text('Choose a password different from the current one.'),
         findsOneWidget,
       );
-      await tester.enterText(find.byKey(const Key('new-password')), 'new-secret');
+      await tester.enterText(
+        find.byKey(const Key('new-password')),
+        'new-secret',
+      );
       await tester.tap(find.byKey(const Key('save-password')));
       await tester.pumpAndSettle();
       expect(find.text('The passwords do not match'), findsOneWidget);
@@ -243,8 +258,14 @@ void main() {
         tester,
         error: 'The current password is not right.',
       );
-      await tester.enterText(find.byKey(const Key('current-password')), 'old-1');
-      await tester.enterText(find.byKey(const Key('new-password')), 'new-secret');
+      await tester.enterText(
+        find.byKey(const Key('current-password')),
+        'old-1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('new-password')),
+        'new-secret',
+      );
       await tester.enterText(
         find.byKey(const Key('confirm-password')),
         'new-secret',

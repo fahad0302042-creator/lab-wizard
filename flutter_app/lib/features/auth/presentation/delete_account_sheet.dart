@@ -68,9 +68,8 @@ class _DeleteAccountFormState extends ConsumerState<DeleteAccountForm> {
       if (mounted) setState(() => _exported = true);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     } finally {
       if (mounted) setState(() => _exporting = false);
     }

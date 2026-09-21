@@ -82,9 +82,8 @@ class _LabProfileCardState extends ConsumerState<LabProfileCard> {
           .setLogo(bytes, fileName: file.name);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -189,8 +188,7 @@ class _LabProfileCardState extends ConsumerState<LabProfileCard> {
                   key: const Key('profile-remove-logo'),
                   onPressed: _busy
                       ? null
-                      : () =>
-                            ref.read(labProfileProvider.notifier).clearLogo(),
+                      : () => ref.read(labProfileProvider.notifier).clearLogo(),
                   child: const Text('Remove'),
                 ),
             ],

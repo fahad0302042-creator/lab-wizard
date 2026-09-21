@@ -35,7 +35,10 @@ void main() {
       expect(LabProfile.decode(null), const LabProfile());
       expect(LabProfile.decode('{not json'), const LabProfile());
       expect(LabProfile.decode('[1,2]'), const LabProfile());
-      expect(LabProfile.decode('{"name":"X","logo_path":" "}').logoPath, isNull);
+      expect(
+        LabProfile.decode('{"name":"X","logo_path":" "}').logoPath,
+        isNull,
+      );
       expect(const LabProfile().isEmpty, isTrue);
       expect(profile.copyWith(clearLogo: true).logoPath, isNull);
       expect(profile.copyWith(name: 'Y').contact, 'lab@example.org');
@@ -57,7 +60,10 @@ void main() {
       restored.read(labProfileProvider);
       await pumpEventQueue();
       expect(restored.read(labProfileProvider).contact, '0300');
-      expect(await restored.read(labProfileProvider.notifier).logoBytes(), isNull);
+      expect(
+        await restored.read(labProfileProvider.notifier).logoBytes(),
+        isNull,
+      );
     });
   });
 
@@ -70,7 +76,9 @@ void main() {
           id: 'l$i',
           itemId: 'c1',
           itemType: ItemKind.chemical,
-          action: i % 5 == 0 ? InventoryAction.restock : InventoryAction.consume,
+          action: i % 5 == 0
+              ? InventoryAction.restock
+              : InventoryAction.consume,
           amount: 5,
           note: i % 7 == 0 ? 'Note with =formula and a long comment' : '',
           loggedAt: today.subtract(Duration(hours: i * 2)),
@@ -91,41 +99,43 @@ void main() {
       expiryDate: DateTime(2026, 9, 10),
     );
 
-    ReportPdfInput input({LabProfile profile = const LabProfile(), bool logo = false}) =>
-        ReportPdfInput(
-          profile: profile,
-          logo: logo ? _png : null,
-          kind: ItemKind.chemical,
-          range: range,
-          trend: TrendComparison.compute(
-            range,
-            logs,
-            kind: ItemKind.chemical,
-            unitOf: (_) => 'mL',
+    ReportPdfInput input({
+      LabProfile profile = const LabProfile(),
+      bool logo = false,
+    }) => ReportPdfInput(
+      profile: profile,
+      logo: logo ? _png : null,
+      kind: ItemKind.chemical,
+      range: range,
+      trend: TrendComparison.compute(
+        range,
+        logs,
+        kind: ItemKind.chemical,
+        unitOf: (_) => 'mL',
+      ),
+      logs: [
+        for (final log in logs.where((log) => range.contains(log.loggedAt)))
+          ReportPdfLog(
+            at: log.loggedAt,
+            item: 'Acetone',
+            action: log.action.name,
+            amount: '${formatQuantity(log.amount)} mL',
+            note: log.note,
           ),
-          logs: [
-            for (final log in logs.where((log) => range.contains(log.loggedAt)))
-              ReportPdfLog(
-                at: log.loggedAt,
-                item: 'Acetone',
-                action: log.action.name,
-                amount: '${formatQuantity(log.amount)} mL',
-                note: log.note,
-              ),
-          ],
-          runOut: runOutReportForChemicals([acetone], logs, now: today),
-          damage: damageReport(
-            range,
-            logs,
-            kind: ItemKind.chemical,
-            nameOf: (_) => 'Acetone',
-            unitOf: (_) => 'mL',
-          ),
-          expiry: expiryReport([acetone], now: today),
-          healthyItems: 1,
-          totalItems: 1,
-          generatedAt: today,
-        );
+      ],
+      runOut: runOutReportForChemicals([acetone], logs, now: today),
+      damage: damageReport(
+        range,
+        logs,
+        kind: ItemKind.chemical,
+        nameOf: (_) => 'Acetone',
+        unitOf: (_) => 'mL',
+      ),
+      expiry: expiryReport([acetone], now: today),
+      healthyItems: 1,
+      totalItems: 1,
+      generatedAt: today,
+    );
 
     test('produces a multi-page PDF with and without branding', () async {
       final plain = await buildReportPdf(input());
@@ -144,7 +154,8 @@ void main() {
       expect(branded.length, greaterThan(plain.length));
       // Dozens of rows spill onto a second page: the header repeats and the
       // footer numbers them.
-      final pages = RegExp(r'/Type\s*/Page\b').allMatches(latin1.decode(branded));
+      final pages = RegExp(r'/Type\s*/Page\b')
+          .allMatches(latin1.decode(branded));
       expect(pages.length, greaterThanOrEqualTo(2));
     });
 
@@ -162,9 +173,16 @@ void main() {
           ),
           logs: const [],
           runOut: const RunOutReport(estimates: [], gaps: {}),
-          damage: DamageReport(rows: const [], range: ReportRange.month(2026, 9)),
+          damage: DamageReport(
+            rows: const [],
+            range: ReportRange.month(2026, 9),
+          ),
           loans: const LoanReport(overdue: [], openLoans: 2),
-          services: const ServiceReport(due: [], openTasks: 1, completedInRange: 0),
+          services: const ServiceReport(
+            due: [],
+            openTasks: 1,
+            completedInRange: 0,
+          ),
           healthyItems: 0,
           totalItems: 0,
           generatedAt: today,
@@ -197,7 +215,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('profile-name')), 'Chem Lab 2');
+      await tester.enterText(
+        find.byKey(const Key('profile-name')),
+        'Chem Lab 2',
+      );
       await tester.enterText(
         find.byKey(const Key('profile-contact')),
         'lab@example.org',
@@ -233,7 +254,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        tester.widget<TextField>(find.byKey(const Key('profile-name'))).controller!.text,
+        tester
+            .widget<TextField>(find.byKey(const Key('profile-name')))
+            .controller!
+            .text,
         'Restored',
       );
     });

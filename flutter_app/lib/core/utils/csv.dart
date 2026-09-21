@@ -70,9 +70,7 @@ Uint8List csvBytes(String csv) => Uint8List.fromList(utf8.encode(csv));
 /// Undoes the injection guard when reading our own exports back
 /// (`'=abc` → `=abc`); other apostrophes are left alone.
 String csvUnguard(String cell) {
-  if (cell.length >= 2 &&
-      cell[0] == "'" &&
-      _dangerousStart.contains(cell[1])) {
+  if (cell.length >= 2 && cell[0] == "'" && _dangerousStart.contains(cell[1])) {
     return cell.substring(1);
   }
   return cell;

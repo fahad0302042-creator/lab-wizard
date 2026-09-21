@@ -91,9 +91,8 @@ class SettingsScreen extends ConsumerWidget {
                         onPressed: () async {
                           await ref.read(authProvider.notifier).signOut();
                           if (context.mounted) {
-                            Navigator.of(
-                              context,
-                            ).popUntil((route) => route.isFirst);
+                            Navigator.of(context)
+                                .popUntil((route) => route.isFirst);
                           }
                         },
                         icon: const Icon(Icons.logout),
@@ -340,9 +339,8 @@ class SettingsScreen extends ConsumerWidget {
                     onPressed: () async {
                       final deleted = await showDeleteAccountSheet(context);
                       if (deleted == true && context.mounted) {
-                        Navigator.of(
-                          context,
-                        ).popUntil((route) => route.isFirst);
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst);
                       }
                     },
                     style: OutlinedButton.styleFrom(
@@ -454,7 +452,6 @@ class SettingsScreen extends ConsumerWidget {
           .showSnackBar(SnackBar(content: Text('Could not export: $error')));
     }
   }
-
 }
 
 class _CardTitle extends StatelessWidget {

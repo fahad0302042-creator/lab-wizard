@@ -45,7 +45,7 @@ class _SessionsCardState extends ConsumerState<SessionsCard> {
     final ok = await _confirm(
       'Sign out other devices?',
       'Every other phone, tablet and browser will have to sign in again. '
-      'This phone stays signed in.',
+          'This phone stays signed in.',
       'Sign out others',
     );
     if (!ok || !mounted) return;
@@ -63,7 +63,7 @@ class _SessionsCardState extends ConsumerState<SessionsCard> {
     final ok = await _confirm(
       'Sign out everywhere?',
       'All sessions end, including this phone. The offline copy on this '
-      'phone is removed; your data stays in your account.',
+          'phone is removed; your data stays in your account.',
       'Sign out everywhere',
     );
     if (!ok || !mounted) return;

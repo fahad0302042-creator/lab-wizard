@@ -16,13 +16,33 @@ Future<List<String>> shareFullExport(InventoryState state) async {
   final stamp = DateFormat('yyyy-MM-dd').format(DateTime.now());
   final everything = ReportRange.custom(DateTime(2000), DateTime.now());
   String nameOf(ItemKind kind, String id) => kind == ItemKind.chemical
-      ? state.chemicals.where((item) => item.id == id).map((c) => c.name).firstOrNull ?? 'Removed chemical'
-      : state.apparatus.where((item) => item.id == id).map((a) => a.name).firstOrNull ?? 'Removed apparatus';
+      ? state.chemicals
+                .where((item) => item.id == id)
+                .map((c) => c.name)
+                .firstOrNull ??
+            'Removed chemical'
+      : state.apparatus
+                .where((item) => item.id == id)
+                .map((a) => a.name)
+                .firstOrNull ??
+            'Removed apparatus';
   String detailOf(ItemKind kind, String id) => kind == ItemKind.chemical
-      ? state.chemicals.where((item) => item.id == id).map((c) => c.formula).firstOrNull ?? ''
-      : state.apparatus.where((item) => item.id == id).map((a) => a.category).firstOrNull ?? '';
+      ? state.chemicals
+                .where((item) => item.id == id)
+                .map((c) => c.formula)
+                .firstOrNull ??
+            ''
+      : state.apparatus
+                .where((item) => item.id == id)
+                .map((a) => a.category)
+                .firstOrNull ??
+            '';
   String unitOf(String id) =>
-      state.chemicals.where((item) => item.id == id).map((c) => c.unit).firstOrNull ?? '';
+      state.chemicals
+          .where((item) => item.id == id)
+          .map((c) => c.unit)
+          .firstOrNull ??
+      '';
 
   final files = <String, String>{
     'lab-wizard-chemicals-$stamp.csv': chemicalsCsv(state.chemicals),
