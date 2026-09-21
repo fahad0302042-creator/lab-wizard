@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +18,48 @@ enum _StockFilter { all, low, critical }
 
 enum _InventorySort { name, quantity, status }
 
+enum _ShelfMenu { batchConsume, printLabels, settings }
+
+/// Letters offered by the quick navigation strip. Names that do not start
+/// with a Latin letter are grouped under `#`.
+const alphabetIndexLetters = [
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+  'G',
+  'H',
+  'I',
+  'J',
+  'K',
+  'L',
+  'M',
+  'N',
+  'O',
+  'P',
+  'Q',
+  'R',
+  'S',
+  'T',
+  'U',
+  'V',
+  'W',
+  'X',
+  'Y',
+  'Z',
+  '#',
+];
+
+/// The index letter used for an item name (UX-02).
+String indexLetterFor(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return '#';
+  final first = trimmed[0].toUpperCase();
+  return RegExp(r'^[A-Z]$').hasMatch(first) ? first : '#';
+}
+
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({required this.kind, super.key});
 
@@ -27,9 +71,16 @@ class InventoryScreen extends ConsumerStatefulWidget {
 
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _itemKeys = <String, GlobalKey>{};
   _StockFilter _filter = _StockFilter.all;
   _InventorySort _sort = _InventorySort.name;
   bool _printingLabels = false;
+  bool _headingCollapsed = false;
+  List<_InventoryView> _visibleItems = const [];
+
+  static const _detailedGap = 18.0;
+  static const _minimumItemsForIndex = 8;
 
   static const _tapes = [
     NotebookTape.yellow,
@@ -43,46 +94,23 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
+
+  bool get _isChemical => widget.kind == ItemKind.chemical;
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inventoryProvider);
+    final density = ref.watch(
+      preferencesProvider.select((value) => value.inventoryDensity),
+    );
+    final compact = density == InventoryDensity.compact;
     final query = _searchController.text.trim().toLowerCase();
-    final allItems = widget.kind == ItemKind.chemical
-        ? state.chemicals
-              .map(
-                (item) => _InventoryView(
-                  id: item.id,
-                  name: item.name,
-                  subtitle: item.formula.isEmpty
-                      ? 'no formula noted'
-                      : item.formula,
-                  searchText: '${item.name} ${item.formula} ${item.notes}',
-                  quantity: item.quantity,
-                  unit: item.unit,
-                  threshold: item.lowStockThreshold,
-                  progress: item.stockProgress,
-                  status: item.stockState,
-                ),
-              )
-              .toList()
-        : state.apparatus
-              .map(
-                (item) => _InventoryView(
-                  id: item.id,
-                  name: item.name,
-                  subtitle: item.category,
-                  searchText: '${item.name} ${item.category} ${item.notes}',
-                  quantity: item.quantity,
-                  unit: 'pcs',
-                  threshold: item.lowStockThreshold,
-                  progress: item.stockProgress,
-                  status: item.stockState,
-                ),
-              )
-              .toList();
+    final allItems = _isChemical
+        ? state.chemicals.map(_InventoryView.chemical).toList()
+        : state.apparatus.map(_InventoryView.apparatus).toList();
 
     final items = allItems.where((item) => _matches(item, query)).toList()
       ..sort(
@@ -96,14 +124,18 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ).compareTo(_statusRank(b.status)),
         },
       );
+    _visibleItems = items;
+    final showIndex = allItems.length >= _minimumItemsForIndex;
+    final availableLetters = {for (final item in items) item.letter};
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton.small(
         heroTag: 'add-${widget.kind.name}',
-        tooltip: widget.kind == ItemKind.chemical
-            ? 'Add chemical'
-            : 'Add apparatus',
+        tooltip: _isChemical ? 'Add chemical' : 'Add apparatus',
         onPressed: () => showAddItemSheet(context, ref, widget.kind),
         elevation: 2,
         backgroundColor: context.cardColor,
@@ -113,228 +145,241 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
         child: const Icon(Icons.add, size: 27),
       ),
-      body: RefreshIndicator(
-        onRefresh: ref.read(inventoryProvider.notifier).refresh,
-        child: CustomScrollView(
-          key: PageStorageKey('inventory-${widget.kind.name}'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(54, 18, 20, 8),
-              sliver: SliverList.list(
-                children: [
-                  PageHeading(
-                    widget.kind == ItemKind.chemical
-                        ? 'chemicals shelf'
-                        : 'apparatus shelf',
-                    trailing: IconButton(
-                      tooltip: 'Settings',
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SettingsScreen(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.settings_outlined),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // UX-03: the handwritten heading collapses once the list scrolls so
+          // the search, filter, and sort controls stay reachable without
+          // hiding most of the shelf.
+          AnimatedSize(
+            duration: motion,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _headingCollapsed
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(54, 18, 20, 0),
+                    child: PageHeading(
+                      _isChemical ? 'chemicals shelf' : 'apparatus shelf',
                     ),
                   ),
-                  const SizedBox(height: 7),
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (_) => setState(() {}),
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: widget.kind == ItemKind.chemical
-                          ? 'search by name, formula, note…'
-                          : 'search by name, category, note…',
-                      prefixIcon: const Icon(Icons.search, size: 22),
-                      suffixIcon: query.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear search',
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {});
-                              },
-                              icon: const Icon(Icons.close),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(54, 6, 20, 6),
+            child: _ShelfControls(
+              kind: widget.kind,
+              searchController: _searchController,
+              query: query,
+              filter: _filter,
+              sort: _sort,
+              compact: compact,
+              shown: items.length,
+              total: allItems.length,
+              printingLabels: _printingLabels,
+              onSearchChanged: () => setState(() {}),
+              onClearSearch: () {
+                _searchController.clear();
+                setState(() {});
+              },
+              onFilter: (value) => setState(() => _filter = value),
+              onSort: (value) => setState(() => _sort = value),
+              onToggleDensity: () => ref
+                  .read(preferencesProvider.notifier)
+                  .setInventoryDensity(
+                    compact
+                        ? InventoryDensity.detailed
+                        : InventoryDensity.compact,
+                  ),
+              onMenu: (value) => _handleMenu(value, state),
+            ),
+          ),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                NotificationListener<ScrollNotification>(
+                  onNotification: _handleScroll,
+                  child: RefreshIndicator(
+                    onRefresh: ref.read(inventoryProvider.notifier).refresh,
+                    child: CustomScrollView(
+                      key: PageStorageKey('inventory-${widget.kind.name}'),
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        if (state.loading && allItems.isEmpty)
+                          const SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (items.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: EmptyNotebookState(
+                              icon: _isChemical
+                                  ? Icons.science_outlined
+                                  : Icons.precision_manufacturing_outlined,
+                              title: query.isEmpty
+                                  ? 'empty shelf'
+                                  : 'nothing matches',
+                              message: query.isEmpty
+                                  ? 'Tap the circled + to add your first item.'
+                                  : 'Try another search, filter, or sort.',
+                              action: CircledNotebookButton(
+                                label: _isChemical
+                                    ? 'add reagent'
+                                    : 'add apparatus',
+                                icon: Icons.add,
+                                onPressed: () => showAddItemSheet(
+                                  context,
+                                  ref,
+                                  widget.kind,
+                                ),
+                              ),
                             ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      NotebookFilterWord(
-                        label: 'all',
-                        selected: _filter == _StockFilter.all,
-                        onTap: () => setState(() => _filter = _StockFilter.all),
-                      ),
-                      const SizedBox(width: 16),
-                      NotebookFilterWord(
-                        label: 'low',
-                        selected: _filter == _StockFilter.low,
-                        onTap: () => setState(() => _filter = _StockFilter.low),
-                      ),
-                      const SizedBox(width: 16),
-                      NotebookFilterWord(
-                        label: 'critical',
-                        selected: _filter == _StockFilter.critical,
-                        onTap: () =>
-                            setState(() => _filter = _StockFilter.critical),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${items.length} of ${allItems.length}',
-                        style: TextStyle(color: context.mutedInkColor),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 12,
-                    children: [
-                      Text(
-                        'sort:',
-                        style: TextStyle(
-                          color: context.mutedInkColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                      for (final sort in _InventorySort.values)
-                        NotebookFilterWord(
-                          label: sort.name,
-                          selected: _sort == sort,
-                          onTap: () => setState(() => _sort = sort),
-                          fontSize: 20,
-                        ),
-                    ],
-                  ),
-                  if (widget.kind == ItemKind.chemical &&
-                      state.chemicals.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 13,
-                      runSpacing: 2,
-                      children: [
-                        TextButton(
-                          onPressed: () => showBatchConsumeSheet(context, ref),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('batch consume (multiple)'),
-                        ),
-                        TextButton.icon(
-                          onPressed: _printingLabels
-                              ? null
-                              : () => _printQrLabels(state.chemicals),
-                          style: TextButton.styleFrom(
-                            foregroundColor: context.mutedInkColor,
-                            padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          icon: _printingLabels
-                              ? const SizedBox.square(
-                                  dimension: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                          )
+                        else ...[
+                          SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              54,
+                              compact ? 2 : 12,
+                              showIndex ? 34 : 20,
+                              22,
+                            ),
+                            sliver: compact
+                                ? SliverList.separated(
+                                    itemCount: items.length,
+                                    separatorBuilder: (_, _) => Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: context.ruledColor,
+                                    ),
+                                    itemBuilder: (context, index) =>
+                                        _buildCompactRow(items, index),
+                                  )
+                                : SliverList.separated(
+                                    itemCount: items.length,
+                                    separatorBuilder: (_, _) =>
+                                        const SizedBox(height: _detailedGap),
+                                    itemBuilder: (context, index) =>
+                                        _buildDetailedCard(items, index),
                                   ),
-                                )
-                              : const Icon(Icons.qr_code_2, size: 18),
-                          label: Text(
-                            _printingLabels
-                                ? 'preparing labels…'
-                                : 'print QR labels (40 per A4)',
                           ),
-                        ),
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                54,
+                                4,
+                                20,
+                                108,
+                              ),
+                              child: _AddDoodle(
+                                label: _isChemical
+                                    ? '~ add new reagent ~'
+                                    : '~ add new apparatus ~',
+                                onTap: () => showAddItemSheet(
+                                  context,
+                                  ref,
+                                  widget.kind,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ],
-                  const SizedBox(height: 12),
-                ],
-              ),
-            ),
-            if (state.loading && allItems.isEmpty)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (items.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: EmptyNotebookState(
-                  icon: widget.kind == ItemKind.chemical
-                      ? Icons.science_outlined
-                      : Icons.precision_manufacturing_outlined,
-                  title: query.isEmpty ? 'empty shelf' : 'nothing matches',
-                  message: query.isEmpty
-                      ? 'Tap the circled + to add your first item.'
-                      : 'Try another search, filter, or sort.',
-                  action: CircledNotebookButton(
-                    label: widget.kind == ItemKind.chemical
-                        ? 'add reagent'
-                        : 'add apparatus',
-                    icon: Icons.add,
-                    onPressed: () =>
-                        showAddItemSheet(context, ref, widget.kind),
                   ),
                 ),
-              )
-            else ...[
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(54, 6, 20, 22),
-                sliver: SliverList.separated(
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 18),
-                  itemBuilder: (context, index) => StaggerIn(
-                    index: index,
-                    child: _InventoryCard(
-                      item: items[index],
-                      index: index,
-                      tape: _tapes[index % _tapes.length],
-                      kind: widget.kind,
-                      onTap: () => showItemDetailSheet(
-                        context,
-                        ref,
-                        widget.kind,
-                        items[index].id,
-                      ),
-                      onConsume: () => showInventoryActionSheet(
-                        context,
-                        ref,
-                        kind: widget.kind,
-                        itemId: items[index].id,
-                        action: widget.kind == ItemKind.chemical
-                            ? InventoryAction.consume
-                            : InventoryAction.breakage,
-                      ),
-                      onRestock: () => showInventoryActionSheet(
-                        context,
-                        ref,
-                        kind: widget.kind,
-                        itemId: items[index].id,
-                        action: InventoryAction.restock,
-                      ),
+                if (showIndex && items.isNotEmpty)
+                  Positioned(
+                    top: 4,
+                    right: 0,
+                    bottom: 12,
+                    child: AlphabetIndex(
+                      available: availableLetters,
+                      onSelected: _jumpToLetter,
                     ),
                   ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(54, 4, 20, 108),
-                  child: _AddDoodle(
-                    label: widget.kind == ItemKind.chemical
-                        ? '~ add new reagent ~'
-                        : '~ add new apparatus ~',
-                    onTap: () => showAddItemSheet(context, ref, widget.kind),
-                  ),
-                ),
-              ),
-            ],
-          ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailedCard(List<_InventoryView> items, int index) {
+    final item = items[index];
+    return KeyedSubtree(
+      key: _itemKey(item.id),
+      child: StaggerIn(
+        index: index,
+        child: _InventoryCard(
+          item: item,
+          index: index,
+          tape: _tapes[index % _tapes.length],
+          kind: widget.kind,
+          onTap: () => _openDetail(item.id),
+          onConsume: () => _openAction(item.id, _primaryAction),
+          onRestock: () => _openAction(item.id, InventoryAction.restock),
         ),
       ),
     );
+  }
+
+  Widget _buildCompactRow(List<_InventoryView> items, int index) {
+    final item = items[index];
+    return KeyedSubtree(
+      key: _itemKey(item.id),
+      child: _CompactRow(
+        item: item,
+        kind: widget.kind,
+        onTap: () => _openDetail(item.id),
+        onConsume: () => _openAction(item.id, _primaryAction),
+        onRestock: () => _openAction(item.id, InventoryAction.restock),
+      ),
+    );
+  }
+
+  InventoryAction get _primaryAction =>
+      _isChemical ? InventoryAction.consume : InventoryAction.breakage;
+
+  GlobalKey _itemKey(String id) => _itemKeys.putIfAbsent(id, GlobalKey.new);
+
+  void _openDetail(String id) =>
+      showItemDetailSheet(context, ref, widget.kind, id);
+
+  void _openAction(String id, InventoryAction action) =>
+      showInventoryActionSheet(
+        context,
+        ref,
+        kind: widget.kind,
+        itemId: id,
+        action: action,
+      );
+
+  void _handleMenu(_ShelfMenu value, InventoryState state) {
+    switch (value) {
+      case _ShelfMenu.batchConsume:
+        showBatchConsumeSheet(context, ref);
+      case _ShelfMenu.printLabels:
+        _printQrLabels(state.chemicals);
+      case _ShelfMenu.settings:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+        );
+    }
+  }
+
+  bool _handleScroll(ScrollNotification notification) {
+    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    final pixels = notification.metrics.pixels;
+    final collapse = _headingCollapsed ? pixels > 12 : pixels > 40;
+    if (collapse != _headingCollapsed) {
+      setState(() => _headingCollapsed = collapse);
+    }
+    return false;
   }
 
   bool _matches(_InventoryView item, String query) {
@@ -353,7 +398,83 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     StockState.healthy => 2,
   };
 
+  // UX-02: jump to the first item whose name starts with the letter, in the
+  // current search/filter/sort order.
+  Future<void> _jumpToLetter(String letter) async {
+    final items = _visibleItems;
+    final target = items.indexWhere((item) => item.letter == letter);
+    if (target < 0) return;
+    HapticFeedback.selectionClick();
+    await _revealIndex(target, items);
+  }
+
+  /// Scrolls until [target] is at the top of the list.
+  ///
+  /// Items that are not built yet have no render object, so the position is
+  /// estimated from the items that are built (rows in a mode share one
+  /// height, which makes the estimate exact) and refined once the target
+  /// exists.
+  Future<void> _revealIndex(int target, List<_InventoryView> items) async {
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
+    for (var attempt = 0; attempt < 6; attempt++) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final targetContext = _itemKey(items[target].id).currentContext;
+      if (targetContext != null) {
+        await Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0,
+          duration: duration,
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+      final estimate = _estimateOffset(target, items);
+      if (estimate == null) return;
+      final position = _scrollController.position;
+      _scrollController.jumpTo(
+        estimate.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
+
+  double? _estimateOffset(int target, List<_InventoryView> items) {
+    RenderBox? first;
+    RenderBox? last;
+    var firstIndex = -1;
+    var lastIndex = -1;
+    for (var index = 0; index < items.length; index++) {
+      final box = _itemKeys[items[index].id]?.currentContext
+          ?.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) continue;
+      if (first == null) {
+        first = box;
+        firstIndex = index;
+      }
+      last = box;
+      lastIndex = index;
+    }
+    if (first == null || last == null) return null;
+    final viewport = RenderAbstractViewport.maybeOf(first);
+    if (viewport == null) return null;
+    final firstOffset = viewport.getOffsetToReveal(first, 0).offset;
+    final double pitch;
+    if (lastIndex != firstIndex) {
+      final lastOffset = viewport.getOffsetToReveal(last, 0).offset;
+      pitch = (lastOffset - firstOffset) / (lastIndex - firstIndex);
+    } else {
+      final compact =
+          ref.read(preferencesProvider).inventoryDensity ==
+          InventoryDensity.compact;
+      pitch = first.size.height + (compact ? 1 : _detailedGap);
+    }
+    return firstOffset + (target - firstIndex) * pitch;
+  }
+
   Future<void> _printQrLabels(List<Chemical> chemicals) async {
+    if (chemicals.isEmpty || _printingLabels) return;
     setState(() => _printingLabels = true);
     try {
       final document = pw.Document(title: 'Lab Wizard QR labels');
@@ -425,6 +546,353 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   }
 }
 
+class _ShelfControls extends StatelessWidget {
+  const _ShelfControls({
+    required this.kind,
+    required this.searchController,
+    required this.query,
+    required this.filter,
+    required this.sort,
+    required this.compact,
+    required this.shown,
+    required this.total,
+    required this.printingLabels,
+    required this.onSearchChanged,
+    required this.onClearSearch,
+    required this.onFilter,
+    required this.onSort,
+    required this.onToggleDensity,
+    required this.onMenu,
+  });
+
+  final ItemKind kind;
+  final TextEditingController searchController;
+  final String query;
+  final _StockFilter filter;
+  final _InventorySort sort;
+  final bool compact;
+  final int shown;
+  final int total;
+  final bool printingLabels;
+  final VoidCallback onSearchChanged;
+  final VoidCallback onClearSearch;
+  final ValueChanged<_StockFilter> onFilter;
+  final ValueChanged<_InventorySort> onSort;
+  final VoidCallback onToggleDensity;
+  final ValueChanged<_ShelfMenu> onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final chemical = kind == ItemKind.chemical;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: searchController,
+                onChanged: (_) => onSearchChanged(),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: chemical
+                      ? 'search by name, formula, note…'
+                      : 'search by name, category, note…',
+                  prefixIcon: const Icon(Icons.search, size: 22),
+                  suffixIcon: query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: onClearSearch,
+                          icon: const Icon(Icons.close),
+                        ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            IconButton(
+              key: const Key('inventory-density-toggle'),
+              tooltip: compact
+                  ? 'Show detailed cards'
+                  : 'Show compact rows',
+              onPressed: onToggleDensity,
+              icon: Icon(
+                compact
+                    ? Icons.view_agenda_outlined
+                    : Icons.view_list_outlined,
+              ),
+            ),
+            PopupMenuButton<_ShelfMenu>(
+              tooltip: 'Shelf actions',
+              onSelected: onMenu,
+              icon: const Icon(Icons.more_vert),
+              itemBuilder: (context) => [
+                if (chemical) ...[
+                  const PopupMenuItem(
+                    value: _ShelfMenu.batchConsume,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.playlist_add_check),
+                      title: Text('batch consume (multiple)'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ShelfMenu.printLabels,
+                    enabled: !printingLabels && total > 0,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.qr_code_2),
+                      title: Text(
+                        printingLabels
+                            ? 'preparing labels…'
+                            : 'print QR labels (40 per A4)',
+                      ),
+                    ),
+                  ),
+                ],
+                const PopupMenuItem(
+                  value: _ShelfMenu.settings,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.settings_outlined),
+                    title: Text('settings'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 14,
+          runSpacing: 2,
+          children: [
+            NotebookFilterWord(
+              label: 'all',
+              selected: filter == _StockFilter.all,
+              onTap: () => onFilter(_StockFilter.all),
+              fontSize: 20,
+            ),
+            NotebookFilterWord(
+              label: 'low',
+              selected: filter == _StockFilter.low,
+              onTap: () => onFilter(_StockFilter.low),
+              fontSize: 20,
+            ),
+            NotebookFilterWord(
+              label: 'critical',
+              selected: filter == _StockFilter.critical,
+              onTap: () => onFilter(_StockFilter.critical),
+              fontSize: 20,
+            ),
+            PopupMenuButton<_InventorySort>(
+              tooltip: 'Sort shelf',
+              initialValue: sort,
+              onSelected: onSort,
+              itemBuilder: (context) => [
+                for (final value in _InventorySort.values)
+                  CheckedPopupMenuItem(
+                    value: value,
+                    checked: value == sort,
+                    child: Text('sort by ${value.name}'),
+                  ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.sort, size: 17, color: context.mutedInkColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      'sort: ${sort.name}',
+                      style: TextStyle(
+                        color: context.mutedInkColor,
+                        fontFamily: 'Caveat',
+                        fontSize: 19,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      size: 18,
+                      color: context.mutedInkColor,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Text(
+              '$shown of $total',
+              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Vertical A–Z strip (UX-02). Letters without a matching item are visibly
+/// disabled and inert; dragging along the strip previews the letter.
+class AlphabetIndex extends StatefulWidget {
+  const AlphabetIndex({
+    required this.available,
+    required this.onSelected,
+    super.key,
+  });
+
+  final Set<String> available;
+  final ValueChanged<String> onSelected;
+
+  @override
+  State<AlphabetIndex> createState() => _AlphabetIndexState();
+}
+
+class _AlphabetIndexState extends State<AlphabetIndex> {
+  String? _active;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final letters = alphabetIndexLetters;
+        final slot = math.min(
+          18.0,
+          math.max(9.0, constraints.maxHeight / letters.length),
+        );
+        final fontSize = math.min(11.5, slot * .74);
+        final stripHeight = slot * letters.length;
+        final stripTop = math.max(0.0, (constraints.maxHeight - stripHeight) / 2);
+        final activeIndex = _active == null ? -1 : letters.indexOf(_active!);
+        return SizedBox(
+          width: 78,
+          child: Stack(
+            children: [
+              Positioned(
+                right: 4,
+                top: stripTop,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  excludeFromSemantics: true,
+                  onTapDown: (details) => _select(details.localPosition, slot),
+                  onTapUp: (_) => _clear(),
+                  onTapCancel: _clear,
+                  onVerticalDragStart: (details) =>
+                      _select(details.localPosition, slot),
+                  onVerticalDragUpdate: (details) =>
+                      _select(details.localPosition, slot),
+                  onVerticalDragEnd: (_) => _clear(),
+                  onVerticalDragCancel: _clear,
+                  child: Container(
+                    width: 22,
+                    decoration: BoxDecoration(
+                      color: context.cardColor.withValues(alpha: .82),
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                        color: context.ruledColor,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final letter in letters)
+                          Semantics(
+                            button: true,
+                            enabled: widget.available.contains(letter),
+                            label: 'jump to $letter',
+                            onTap: widget.available.contains(letter)
+                                ? () => widget.onSelected(letter)
+                                : null,
+                            child: SizedBox(
+                              height: slot,
+                              width: 22,
+                              child: Center(
+                                child: Text(
+                                  letter,
+                                  key: Key('alpha-$letter'),
+                                  style: TextStyle(
+                                    fontSize: fontSize,
+                                    height: 1,
+                                    fontWeight: FontWeight.w700,
+                                    color: widget.available.contains(letter)
+                                        ? (letter == _active
+                                              ? context.marginRedColor
+                                              : context.inkColor)
+                                        : context.mutedInkColor.withValues(
+                                            alpha: .32,
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (activeIndex >= 0 && widget.available.contains(_active))
+                Positioned(
+                  right: 32,
+                  top: (stripTop + activeIndex * slot + slot / 2 - 22).clamp(
+                    0.0,
+                    math.max(0.0, constraints.maxHeight - 44),
+                  ),
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: context.marginRedColor,
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x33000000),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _active!,
+                        style: TextStyle(
+                          color: context.cardColor,
+                          fontFamily: 'Caveat',
+                          fontSize: 26,
+                          height: 1,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _select(Offset local, double slot) {
+    final raw = (local.dy / slot).floor();
+    final index = math.max(0, math.min(alphabetIndexLetters.length - 1, raw));
+    final letter = alphabetIndexLetters[index];
+    if (letter == _active) return;
+    setState(() => _active = letter);
+    if (widget.available.contains(letter)) widget.onSelected(letter);
+  }
+
+  void _clear() {
+    if (_active != null && mounted) setState(() => _active = null);
+  }
+}
+
 class _InventoryView {
   const _InventoryView({
     required this.id,
@@ -438,6 +906,30 @@ class _InventoryView {
     required this.status,
   });
 
+  factory _InventoryView.chemical(Chemical item) => _InventoryView(
+    id: item.id,
+    name: item.name,
+    subtitle: item.formula.isEmpty ? 'no formula noted' : item.formula,
+    searchText: '${item.name} ${item.formula} ${item.notes}',
+    quantity: item.quantity,
+    unit: item.unit,
+    threshold: item.lowStockThreshold,
+    progress: item.stockProgress,
+    status: item.stockState,
+  );
+
+  factory _InventoryView.apparatus(Apparatus item) => _InventoryView(
+    id: item.id,
+    name: item.name,
+    subtitle: item.category,
+    searchText: '${item.name} ${item.category} ${item.notes}',
+    quantity: item.quantity,
+    unit: 'pcs',
+    threshold: item.lowStockThreshold,
+    progress: item.stockProgress,
+    status: item.stockState,
+  );
+
   final String id;
   final String name;
   final String subtitle;
@@ -447,6 +939,8 @@ class _InventoryView {
   final double threshold;
   final double progress;
   final StockState status;
+
+  String get letter => indexLetterFor(name);
 }
 
 class _InventoryCard extends StatelessWidget {
@@ -587,6 +1081,8 @@ class _InventoryCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           stockCaption(item.status),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: item.status == StockState.healthy
                                 ? context.inkColor
@@ -605,9 +1101,7 @@ class _InventoryCard extends StatelessWidget {
                       ),
                       _CardAction(
                         label: kind == ItemKind.chemical ? 'use' : 'damage',
-                        color: kind == ItemKind.chemical
-                            ? context.marginRedColor
-                            : context.marginRedColor,
+                        color: context.marginRedColor,
                         onTap: onConsume,
                       ),
                       const SizedBox(width: 10),
@@ -624,6 +1118,169 @@ class _InventoryCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// One-line shelf row for compact mode (UX-01). It keeps the quantity, the
+/// stock status as text and color, the detail tap target, swipe gestures, and
+/// direct use/damage and restock buttons.
+class _CompactRow extends StatelessWidget {
+  const _CompactRow({
+    required this.item,
+    required this.kind,
+    required this.onTap,
+    required this.onConsume,
+    required this.onRestock,
+  });
+
+  final _InventoryView item;
+  final ItemKind kind;
+  final VoidCallback onTap;
+  final VoidCallback onConsume;
+  final VoidCallback onRestock;
+
+  @override
+  Widget build(BuildContext context) {
+    final chemical = kind == ItemKind.chemical;
+    final statusColor = switch (item.status) {
+      StockState.healthy => context.healthyColor,
+      StockState.low => context.lowColor,
+      StockState.empty => context.marginRedColor,
+    };
+    final statusText = switch (item.status) {
+      StockState.healthy => 'in stock',
+      StockState.low => 'low',
+      StockState.empty => 'empty',
+    };
+    return Dismissible(
+      key: ValueKey('${kind.name}-${item.id}'),
+      direction: DismissDirection.horizontal,
+      confirmDismiss: (direction) async {
+        HapticFeedback.mediumImpact();
+        if (direction == DismissDirection.startToEnd) {
+          onRestock();
+        } else {
+          onConsume();
+        }
+        return false;
+      },
+      background: _SwipeBackground(
+        alignment: Alignment.centerLeft,
+        color: context.healthyColor,
+        icon: Icons.add,
+        text: 'restock',
+      ),
+      secondaryBackground: _SwipeBackground(
+        alignment: Alignment.centerRight,
+        color: chemical ? context.lowColor : context.marginRedColor,
+        icon: chemical ? Icons.remove : Icons.report_problem_outlined,
+        text: chemical ? 'use' : 'damage',
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(2, 6, 0, 6),
+            child: Row(
+              children: [
+                Semantics(
+                  label: statusText,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: item.status == StockState.healthy
+                          ? statusColor.withValues(alpha: .35)
+                          : statusColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: statusColor, width: 1.6),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'ArchitectsDaughter',
+                          fontSize: 16,
+                          height: 1.15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        item.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.mutedInkColor,
+                          fontSize: 12,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    AnimatedQuantity(
+                      item.quantity,
+                      suffix: ' ${item.unit}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        color: item.status == StockState.healthy
+                            ? context.mutedInkColor
+                            : statusColor,
+                        fontFamily: 'Caveat',
+                        fontSize: 14,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 2),
+                IconButton(
+                  tooltip: chemical ? 'Use' : 'Report damage',
+                  onPressed: onConsume,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 21,
+                  color: context.marginRedColor,
+                  icon: Icon(
+                    chemical
+                        ? Icons.remove_circle_outline
+                        : Icons.report_problem_outlined,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Restock',
+                  onPressed: onRestock,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 21,
+                  color: context.healthyColor,
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

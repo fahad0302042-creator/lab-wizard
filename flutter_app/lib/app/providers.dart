@@ -142,20 +142,35 @@ class AuthController extends Notifier<AuthState> {
   }
 }
 
+/// How the chemical and apparatus shelves lay out their rows (UX-01).
+enum InventoryDensity {
+  /// Full notebook cards with stock bars and captions.
+  detailed,
+
+  /// One-line rows that keep quantity, status, and quick actions visible.
+  compact,
+}
+
 class AppPreferences {
   const AppPreferences({
     this.themeMode = ThemeMode.system,
     this.reduceMotion = false,
+    this.inventoryDensity = InventoryDensity.detailed,
   });
 
   final ThemeMode themeMode;
   final bool reduceMotion;
+  final InventoryDensity inventoryDensity;
 
-  AppPreferences copyWith({ThemeMode? themeMode, bool? reduceMotion}) =>
-      AppPreferences(
-        themeMode: themeMode ?? this.themeMode,
-        reduceMotion: reduceMotion ?? this.reduceMotion,
-      );
+  AppPreferences copyWith({
+    ThemeMode? themeMode,
+    bool? reduceMotion,
+    InventoryDensity? inventoryDensity,
+  }) => AppPreferences(
+    themeMode: themeMode ?? this.themeMode,
+    reduceMotion: reduceMotion ?? this.reduceMotion,
+    inventoryDensity: inventoryDensity ?? this.inventoryDensity,
+  );
 }
 
 final preferencesProvider =
@@ -180,6 +195,9 @@ class PreferencesController extends Notifier<AppPreferences> {
         _ => ThemeMode.system,
       },
       reduceMotion: preferences.getBool('reduce_motion') ?? false,
+      inventoryDensity: preferences.getString('inventory_density') == 'compact'
+          ? InventoryDensity.compact
+          : InventoryDensity.detailed,
     );
   }
 
@@ -193,6 +211,12 @@ class PreferencesController extends Notifier<AppPreferences> {
     state = state.copyWith(reduceMotion: value);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('reduce_motion', value);
+  }
+
+  Future<void> setInventoryDensity(InventoryDensity value) async {
+    state = state.copyWith(inventoryDensity: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString('inventory_density', value.name);
   }
 }
 
