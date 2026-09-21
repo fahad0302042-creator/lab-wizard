@@ -12,6 +12,7 @@ import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../data/inventory_repository.dart';
 import '../domain/duplicates.dart';
+import 'apparatus_details.dart';
 import 'chemical_details.dart';
 import '../domain/models.dart';
 
@@ -142,6 +143,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   final _threshold = TextEditingController();
   final _notes = TextEditingController();
   final _details = ChemicalDetailsController();
+  final _gear = ApparatusDetailsController();
   String _unit = 'mL';
   String _category = 'glassware';
   bool _saving = false;
@@ -180,6 +182,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
       controller.addListener(_markDirty);
     }
     _details.addListener(_detailsChanged);
+    _gear.addListener(_detailsChanged);
   }
 
   void _markDirty() {
@@ -187,7 +190,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   }
 
   void _detailsChanged() {
-    if (!_details.value.isEmpty) _markDirty();
+    if (!_details.value.isEmpty || !_gear.value.isEmpty) _markDirty();
   }
 
   @override
@@ -198,6 +201,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     _threshold.dispose();
     _notes.dispose();
     _details.dispose();
+    _gear.dispose();
     super.dispose();
   }
 
@@ -331,10 +335,11 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                 hintText: 'Cabinet, supplier, safety note…',
               ),
             ),
-            if (chemical) ...[
-              const SizedBox(height: 8),
-              ChemicalDetailsFields(controller: _details),
-            ],
+            const SizedBox(height: 8),
+            if (chemical)
+              ChemicalDetailsFields(controller: _details)
+            else
+              ApparatusDetailsFields(controller: _gear),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -395,6 +400,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     if (!_formKey.currentState!.validate()) {
       // Surface problems hidden inside the collapsed details section.
       if (_details.validate() != null) _details.expanded = true;
+      if (_gear.validate() != null) _gear.expanded = true;
       return;
     }
     if (_pendingDuplicates().isNotEmpty) {
@@ -433,6 +439,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               quantity: quantity,
               threshold: threshold,
               notes: _notes.text,
+              details: _gear.value,
             );
       }
       HapticFeedback.mediumImpact();
@@ -480,6 +487,8 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   late final TextEditingController _notes;
   late final ChemicalDetailsController _details;
   late final ChemicalDetails _originalDetails;
+  late final ApparatusDetailsController _gear;
+  late final ApparatusDetails _originalGear;
   late String _unit;
   late String _category;
   bool _saving = false;
@@ -520,6 +529,10 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
         ? const ChemicalDetails()
         : ChemicalDetails.of(chemical);
     _details = ChemicalDetailsController(_originalDetails);
+    _originalGear = apparatus == null
+        ? const ApparatusDetails()
+        : ApparatusDetails.of(apparatus);
+    _gear = ApparatusDetailsController(_originalGear);
     _unit = chemical?.unit ?? 'mL';
     _category = apparatus?.category ?? 'other';
     if (!_units.contains(_unit)) _unit = 'pcs';
@@ -528,6 +541,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
       controller.addListener(_markDirty);
     }
     _details.addListener(_detailsChanged);
+    _gear.addListener(_detailsChanged);
   }
 
   void _markDirty() {
@@ -535,7 +549,10 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   }
 
   void _detailsChanged() {
-    if (!_details.value.sameAs(_originalDetails)) _markDirty();
+    if (!_details.value.sameAs(_originalDetails) ||
+        !_gear.value.sameAs(_originalGear)) {
+      _markDirty();
+    }
   }
 
   @override
@@ -545,6 +562,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     _threshold.dispose();
     _notes.dispose();
     _details.dispose();
+    _gear.dispose();
     super.dispose();
   }
 
@@ -645,10 +663,11 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
                 hintText: 'Cabinet, supplier, safety note…',
               ),
             ),
-            if (chemical) ...[
-              const SizedBox(height: 8),
-              ChemicalDetailsFields(controller: _details),
-            ],
+            const SizedBox(height: 8),
+            if (chemical)
+              ChemicalDetailsFields(controller: _details)
+            else
+              ApparatusDetailsFields(controller: _gear),
             const SizedBox(height: 22),
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -672,11 +691,13 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) {
       if (_details.validate() != null) _details.expanded = true;
+      if (_gear.validate() != null) _gear.expanded = true;
       return;
     }
     setState(() => _saving = true);
     try {
       final details = _details.value;
+      final gear = _gear.value;
       await ref
           .read(inventoryProvider.notifier)
           .updateItem(
@@ -699,6 +720,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
                     'category': _category,
                     'low_stock_threshold': double.parse(_threshold.text.trim()),
                     'notes': _notes.text.trim(),
+                    if (!gear.sameAs(_originalGear)) ...gear.toChanges(),
                   },
           );
       HapticFeedback.mediumImpact();
@@ -1325,6 +1347,7 @@ class _ItemDetail extends ConsumerWidget {
               ),
             ],
             if (chemical != null) ChemicalDetailsSummary(chemical),
+            if (apparatus != null) ApparatusDetailsSummary(apparatus),
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 24),
               const PageHeading('notes', trailing: SizedBox.shrink()),

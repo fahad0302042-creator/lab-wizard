@@ -213,6 +213,7 @@ class InventoryRepository {
     required double quantity,
     required double threshold,
     required String notes,
+    ApparatusDetails details = const ApparatusDetails(),
   }) async {
     final now = DateTime.now();
     final item = Apparatus(
@@ -224,6 +225,12 @@ class InventoryRepository {
       lowStockThreshold: threshold,
       notes: notes.trim(),
       createdAt: now,
+      serialNumber: details.serialNumber?.trim(),
+      condition: details.condition?.trim().toLowerCase(),
+      assignedTo: details.assignedTo?.trim(),
+      location: details.location?.trim(),
+      purchaseDate: details.purchaseDate,
+      warrantyUntil: details.warrantyUntil,
     );
     final payload = {...item.toMap(), 'user_id': userId};
     try {

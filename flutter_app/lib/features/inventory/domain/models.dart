@@ -291,13 +291,21 @@ String? _emptyToNull(Object? value) {
 }
 
 /// Parses `YYYY-MM-DD` (or a full timestamp) into a local calendar date.
+/// Out-of-range parts such as month 13 are rejected instead of rolling over.
 DateTime? parseDateOnly(Object? value) {
   if (value == null) return null;
   final text = value.toString().trim();
   if (text.isEmpty) return null;
-  final parsed = DateTime.tryParse(text);
-  if (parsed == null) return null;
-  return DateTime(parsed.year, parsed.month, parsed.day);
+  final match = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})').firstMatch(text);
+  if (match == null) return null;
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+  final date = DateTime(year, month, day);
+  if (date.year != year || date.month != month || date.day != day) {
+    return null;
+  }
+  return date;
 }
 
 String formatDateOnly(DateTime value) =>
@@ -351,6 +359,40 @@ bool isValidCasNumber(String value) {
   return sum % 10 == int.parse(match.group(3)!);
 }
 
+/// Optional apparatus metadata columns added by
+/// `supabase/004_apparatus_metadata.sql` (GEAR-01). All nullable.
+const apparatusMetadataColumns = {
+  'serial_number',
+  'condition',
+  'assigned_to',
+  'location',
+  'purchase_date',
+  'warranty_until',
+};
+
+/// Condition values offered by the forms; stored as plain text.
+enum ApparatusCondition {
+  good('good'),
+  fair('fair'),
+  needsRepair('needs repair'),
+  retired('retired');
+
+  const ApparatusCondition(this.label);
+
+  final String label;
+
+  static ApparatusCondition? fromLabel(String? value) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+    for (final condition in values) {
+      if (condition.label == normalized || condition.name == normalized) {
+        return condition;
+      }
+    }
+    return null;
+  }
+}
+
 class Apparatus {
   const Apparatus({
     required this.id,
@@ -361,6 +403,12 @@ class Apparatus {
     required this.lowStockThreshold,
     required this.notes,
     required this.createdAt,
+    this.serialNumber,
+    this.condition,
+    this.assignedTo,
+    this.location,
+    this.purchaseDate,
+    this.warrantyUntil,
   });
 
   final String id;
@@ -371,6 +419,29 @@ class Apparatus {
   final double lowStockThreshold;
   final String notes;
   final DateTime createdAt;
+  final String? serialNumber;
+
+  /// Free text; the forms offer [ApparatusCondition] values.
+  final String? condition;
+  final String? assignedTo;
+  final String? location;
+  final DateTime? purchaseDate;
+  final DateTime? warrantyUntil;
+
+  bool get hasMetadata =>
+      (serialNumber ?? '').isNotEmpty ||
+      (condition ?? '').isNotEmpty ||
+      (assignedTo ?? '').isNotEmpty ||
+      (location ?? '').isNotEmpty ||
+      purchaseDate != null ||
+      warrantyUntil != null;
+
+  ApparatusCondition? get conditionValue =>
+      ApparatusCondition.fromLabel(condition);
+
+  /// Warranty expiry uses the same 30 day warning window as chemicals.
+  ExpiryState warrantyState({DateTime? now}) =>
+      expiryStateFor(warrantyUntil, now: now);
 
   StockState get stockState {
     if (quantity <= 0) return StockState.empty;
@@ -396,6 +467,12 @@ class Apparatus {
     double? initialQuantity,
     double? lowStockThreshold,
     String? notes,
+    String? serialNumber,
+    String? condition,
+    String? assignedTo,
+    String? location,
+    DateTime? purchaseDate,
+    DateTime? warrantyUntil,
   }) => Apparatus(
     id: id,
     name: name ?? this.name,
@@ -405,6 +482,12 @@ class Apparatus {
     lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
     notes: notes ?? this.notes,
     createdAt: createdAt,
+    serialNumber: serialNumber ?? this.serialNumber,
+    condition: condition ?? this.condition,
+    assignedTo: assignedTo ?? this.assignedTo,
+    location: location ?? this.location,
+    purchaseDate: purchaseDate ?? this.purchaseDate,
+    warrantyUntil: warrantyUntil ?? this.warrantyUntil,
   );
 
   factory Apparatus.fromMap(Map<String, dynamic> map) => Apparatus(
@@ -418,8 +501,15 @@ class Apparatus {
     createdAt:
         DateTime.tryParse((map['created_at'] as String?) ?? '') ??
         DateTime.now(),
+    serialNumber: _emptyToNull(map['serial_number']),
+    condition: _emptyToNull(map['condition']),
+    assignedTo: _emptyToNull(map['assigned_to']),
+    location: _emptyToNull(map['location']),
+    purchaseDate: parseDateOnly(map['purchase_date']),
+    warrantyUntil: parseDateOnly(map['warranty_until']),
   );
 
+  /// Metadata keys are only present when set (see [Chemical.toMap]).
   Map<String, dynamic> toMap() => {
     'id': id,
     'name': name,
@@ -429,7 +519,77 @@ class Apparatus {
     'low_stock_threshold': lowStockThreshold,
     'notes': notes,
     'created_at': createdAt.toIso8601String(),
+    ...metadataMap(),
   };
+
+  Map<String, dynamic> metadataMap() => {
+    if ((serialNumber ?? '').isNotEmpty) 'serial_number': serialNumber,
+    if ((condition ?? '').isNotEmpty) 'condition': condition,
+    if ((assignedTo ?? '').isNotEmpty) 'assigned_to': assignedTo,
+    if ((location ?? '').isNotEmpty) 'location': location,
+    if (purchaseDate != null) 'purchase_date': formatDateOnly(purchaseDate!),
+    if (warrantyUntil != null)
+      'warranty_until': formatDateOnly(warrantyUntil!),
+  };
+}
+
+/// Optional GEAR-01 metadata captured by the apparatus forms and CSV import.
+class ApparatusDetails {
+  const ApparatusDetails({
+    this.serialNumber,
+    this.condition,
+    this.assignedTo,
+    this.location,
+    this.purchaseDate,
+    this.warrantyUntil,
+  });
+
+  factory ApparatusDetails.of(Apparatus item) => ApparatusDetails(
+    serialNumber: item.serialNumber,
+    condition: item.condition,
+    assignedTo: item.assignedTo,
+    location: item.location,
+    purchaseDate: item.purchaseDate,
+    warrantyUntil: item.warrantyUntil,
+  );
+
+  final String? serialNumber;
+  final String? condition;
+  final String? assignedTo;
+  final String? location;
+  final DateTime? purchaseDate;
+  final DateTime? warrantyUntil;
+
+  bool get isEmpty =>
+      _emptyToNull(serialNumber) == null &&
+      _emptyToNull(condition) == null &&
+      _emptyToNull(assignedTo) == null &&
+      _emptyToNull(location) == null &&
+      purchaseDate == null &&
+      warrantyUntil == null;
+
+  /// Full column map for updates; nulls clear a column on the server.
+  Map<String, dynamic> toChanges() => {
+    'serial_number': _emptyToNull(serialNumber),
+    'condition': _emptyToNull(condition?.toLowerCase()),
+    'assigned_to': _emptyToNull(assignedTo),
+    'location': _emptyToNull(location),
+    'purchase_date': purchaseDate == null
+        ? null
+        : formatDateOnly(purchaseDate!),
+    'warranty_until': warrantyUntil == null
+        ? null
+        : formatDateOnly(warrantyUntil!),
+  };
+
+  bool sameAs(ApparatusDetails other) {
+    final mine = toChanges();
+    final theirs = other.toChanges();
+    for (final key in mine.keys) {
+      if (mine[key] != theirs[key]) return false;
+    }
+    return true;
+  }
 }
 
 class ConsumptionLog {

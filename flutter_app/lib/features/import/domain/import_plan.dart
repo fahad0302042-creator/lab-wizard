@@ -33,7 +33,28 @@ enum ImportField {
     'expiry_date',
     'best before',
   ]),
-  hazards('hazards', ['hazards', 'hazard', 'ghs', 'hazard classes', 'pictograms']);
+  hazards('hazards', ['hazards', 'hazard', 'ghs', 'hazard classes', 'pictograms']),
+  serialNumber('serial number', [
+    'serial number',
+    'serial',
+    'serial no',
+    'asset tag',
+    'asset',
+  ]),
+  condition('condition', ['condition', 'state']),
+  assignedTo('assigned to', ['assigned to', 'assigned', 'assignee', 'owner']),
+  purchaseDate('purchase date', [
+    'purchase date',
+    'purchased',
+    'bought',
+    'acquired',
+  ]),
+  warrantyUntil('warranty until', [
+    'warranty until',
+    'warranty',
+    'warranty end',
+    'warranty expiry',
+  ]);
 
   const ImportField(this.label, this.aliases);
 
@@ -46,13 +67,20 @@ enum ImportField {
     ImportField.supplier ||
     ImportField.casNumber ||
     ImportField.concentration ||
-    ImportField.location ||
     ImportField.expiryDate ||
     ImportField.hazards => true,
     _ => false,
   };
 
-  bool get apparatusOnly => this == ImportField.category;
+  bool get apparatusOnly => switch (this) {
+    ImportField.category ||
+    ImportField.serialNumber ||
+    ImportField.condition ||
+    ImportField.assignedTo ||
+    ImportField.purchaseDate ||
+    ImportField.warrantyUntil => true,
+    _ => false,
+  };
 }
 
 /// Which shelf rows go to. [auto] reads it from a `type` column.
@@ -135,6 +163,7 @@ class ImportRow {
     required this.threshold,
     required this.notes,
     required this.details,
+    required this.gear,
     required this.issues,
     required this.duplicates,
   });
@@ -151,6 +180,7 @@ class ImportRow {
   final double threshold;
   final String notes;
   final ChemicalDetails details;
+  final ApparatusDetails gear;
   final List<ImportIssue> issues;
 
   /// Existing shelf items this row appears to duplicate.
@@ -280,6 +310,7 @@ List<ImportRow> buildImportRows({
     var unit = 'pcs';
     var subtitle = '';
     var details = const ChemicalDetails();
+    var gear = const ApparatusDetails();
     if (kind == ItemKind.chemical) {
       subtitle = cell(ImportField.formula);
       final unitText = cell(ImportField.unit);
@@ -376,6 +407,51 @@ List<ImportRow> buildImportRows({
           ),
         );
       }
+      final conditionText = cell(ImportField.condition);
+      final condition = ApparatusCondition.fromLabel(conditionText);
+      if (conditionText.isNotEmpty && condition == null) {
+        issues.add(
+          ImportIssue(
+            ImportIssueLevel.warning,
+            'Condition "$conditionText" kept as written (not one of '
+            'good / fair / needs repair / retired)',
+          ),
+        );
+      }
+      DateTime? purchase;
+      final purchaseText = cell(ImportField.purchaseDate);
+      if (purchaseText.isNotEmpty) {
+        purchase = parseImportDate(purchaseText);
+        if (purchase == null) {
+          issues.add(
+            ImportIssue(
+              ImportIssueLevel.error,
+              'Purchase date "$purchaseText" is not a date (use YYYY-MM-DD)',
+            ),
+          );
+        }
+      }
+      DateTime? warranty;
+      final warrantyText = cell(ImportField.warrantyUntil);
+      if (warrantyText.isNotEmpty) {
+        warranty = parseImportDate(warrantyText);
+        if (warranty == null) {
+          issues.add(
+            ImportIssue(
+              ImportIssueLevel.error,
+              'Warranty date "$warrantyText" is not a date (use YYYY-MM-DD)',
+            ),
+          );
+        }
+      }
+      gear = ApparatusDetails(
+        serialNumber: cell(ImportField.serialNumber),
+        condition: condition?.label ?? conditionText,
+        assignedTo: cell(ImportField.assignedTo),
+        location: cell(ImportField.location),
+        purchaseDate: purchase,
+        warrantyUntil: warranty,
+      );
     }
 
     final duplicates = <DuplicateMatch>[];
@@ -428,6 +504,7 @@ List<ImportRow> buildImportRows({
         threshold: threshold,
         notes: cell(ImportField.notes),
         details: details,
+        gear: gear,
         issues: issues,
         duplicates: duplicates,
       ),

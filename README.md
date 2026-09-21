@@ -52,6 +52,8 @@ Undo support on Android (UX-04) has its own optional additive migration, [`flutt
 
 Chemical metadata on Android (DATA-01) uses [`flutter_app/supabase/003_chemical_metadata.sql`](flutter_app/supabase/003_chemical_metadata.sql): six nullable columns on `chemicals` (`supplier`, `cas_number`, `concentration`, `location`, `expiry_date`, `hazard_classes`) and one partial index. Existing rows and the web app's inserts stay valid because every column is optional; the web app simply ignores the extra columns. Until the script is run, the app hides nothing but tells you the database needs the update if you try to save those details.
 
+Apparatus metadata (GEAR-01) follows the same pattern with [`flutter_app/supabase/004_apparatus_metadata.sql`](flutter_app/supabase/004_apparatus_metadata.sql): six nullable columns on `apparatus` (`serial_number`, `condition`, `assigned_to`, `location`, `purchase_date`, `warranty_until`).
+
 ## Improvement program
 
 The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.

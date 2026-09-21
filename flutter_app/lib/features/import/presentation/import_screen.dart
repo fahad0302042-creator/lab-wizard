@@ -326,6 +326,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
             quantity: row.quantity,
             threshold: row.threshold,
             notes: row.notes,
+            details: row.gear,
           );
         }
         imported++;

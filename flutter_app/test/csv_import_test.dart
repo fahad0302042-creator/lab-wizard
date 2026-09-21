@@ -41,6 +41,7 @@ class _FakeInventory extends InventoryController {
     required double quantity,
     required double threshold,
     required String notes,
+    ApparatusDetails details = const ApparatusDetails(),
   }) async {
     if (failFor.contains(name)) throw StateError('permission denied');
     addedApparatus.add((name, category, quantity));

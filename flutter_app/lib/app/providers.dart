@@ -631,6 +631,7 @@ class InventoryController extends Notifier<InventoryState> {
     required double quantity,
     required double threshold,
     required String notes,
+    ApparatusDetails details = const ApparatusDetails(),
   }) async {
     final userId = _requireUser();
     final item = await _repository.addApparatus(
@@ -640,6 +641,7 @@ class InventoryController extends Notifier<InventoryState> {
       quantity: quantity,
       threshold: threshold,
       notes: notes,
+      details: details,
     );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(

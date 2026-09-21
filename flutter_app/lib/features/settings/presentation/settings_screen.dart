@@ -308,6 +308,11 @@ class SettingsScreen extends ConsumerWidget {
           'location',
           'expiry date',
           'hazards',
+          'serial number',
+          'condition',
+          'assigned to',
+          'purchase date',
+          'warranty until',
         ],
         ...state.chemicals.map(
           (item) => [
@@ -324,6 +329,11 @@ class SettingsScreen extends ConsumerWidget {
             item.location ?? '',
             item.expiryDate == null ? '' : formatDateOnly(item.expiryDate!),
             item.hazardClasses.join(';'),
+            '',
+            '',
+            '',
+            '',
+            '',
           ],
         ),
         ...state.apparatus.map(
@@ -338,9 +348,18 @@ class SettingsScreen extends ConsumerWidget {
             '',
             '',
             '',
+            item.location ?? '',
             '',
             '',
-            '',
+            item.serialNumber ?? '',
+            item.condition ?? '',
+            item.assignedTo ?? '',
+            item.purchaseDate == null
+                ? ''
+                : formatDateOnly(item.purchaseDate!),
+            item.warrantyUntil == null
+                ? ''
+                : formatDateOnly(item.warrantyUntil!),
           ],
         ),
       ];

@@ -14,6 +14,7 @@ import '../../../core/widgets/notebook_widgets.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../domain/models.dart';
 import 'batch_sheets.dart';
+import 'apparatus_details.dart';
 import 'chemical_details.dart';
 import 'inventory_sheets.dart';
 
@@ -1084,6 +1085,7 @@ class _InventoryView {
     required this.progress,
     required this.status,
     this.chemical,
+    this.apparatus,
   });
 
   factory _InventoryView.chemical(Chemical item) => _InventoryView(
@@ -1106,12 +1108,16 @@ class _InventoryView {
     id: item.id,
     name: item.name,
     subtitle: item.category,
-    searchText: '${item.name} ${item.category} ${item.notes}',
+    searchText:
+        '${item.name} ${item.category} ${item.notes} '
+        '${item.serialNumber ?? ''} ${item.assignedTo ?? ''} '
+        '${item.location ?? ''} ${item.condition ?? ''}',
     quantity: item.quantity,
     unit: 'pcs',
     threshold: item.lowStockThreshold,
     progress: item.stockProgress,
     status: item.stockState,
+    apparatus: item,
   );
 
   final String id;
@@ -1126,6 +1132,9 @@ class _InventoryView {
 
   /// Source row for chemical shelves; carries the DATA-01 metadata.
   final Chemical? chemical;
+
+  /// Source row for apparatus shelves; carries the GEAR-01 metadata.
+  final Apparatus? apparatus;
 
   String get letter => indexLetterFor(name);
 
@@ -1145,6 +1154,8 @@ class _MetadataMarks extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final apparatus = item.apparatus;
+    if (apparatus != null) return ApparatusMarks(apparatus, compact: compact);
     final chemical = item.chemical;
     if (chemical == null) return const SizedBox.shrink();
     final hasExpiry = item.expiring;
