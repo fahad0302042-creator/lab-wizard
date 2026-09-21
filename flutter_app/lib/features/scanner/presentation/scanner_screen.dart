@@ -16,6 +16,7 @@ import '../domain/scan_resolver.dart';
 import '../scanner_providers.dart';
 import 'batch_summary_sheet.dart';
 import 'recent_scans_section.dart';
+import 'scan_action_sheet.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({this.active = true, super.key});
@@ -355,10 +356,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     return '${_batch.summaryLine} · next label';
   }
 
-  void _flash(String text) {
+  void _flash(
+    String text, {
+    Duration duration = const Duration(milliseconds: 1600),
+  }) {
     setState(() => _message = text);
     _messageTimer?.cancel();
-    _messageTimer = Timer(const Duration(milliseconds: 1600), () {
+    _messageTimer = Timer(duration, () {
       if (mounted) setState(() => _message = null);
     });
   }
@@ -441,14 +445,26 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     );
     await _scanner.stop();
     HapticFeedback.mediumImpact();
-    if (mounted) {
-      setState(() => _message = 'Found ${match.name}');
+    if (!mounted) return;
+    setState(() => _message = 'Found ${match.name}');
+    // SCAN-03: quick amount + action first; the full sheet is one tap away.
+    final result = await showScanActionSheet(
+      context,
+      kind: match.kind,
+      itemId: match.id,
+    );
+    if (!mounted) return;
+    if (result?.openDetails ?? false) {
       await showItemDetailSheet(context, ref, match.kind, match.id);
     }
-    if (mounted) {
+    if (!mounted) return;
+    final outcome = result?.message;
+    if (outcome != null) {
+      _flash(outcome, duration: const Duration(seconds: 3));
+    } else {
       setState(() => _message = null);
-      await _scanner.start();
     }
+    if (widget.active) await _scanner.start();
     _handling = false;
   }
 }
