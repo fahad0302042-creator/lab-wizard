@@ -223,10 +223,7 @@ void main() {
         existingApparatus: const [],
       );
       expect(rows[0].unit, 'mL');
-      expect(
-        rows[0].issues.single.message,
-        'Unknown unit "bucket", using mL',
-      );
+      expect(rows[0].issues.single.message, 'Unknown unit "bucket", using mL');
       expect(rows[0].hasErrors, isFalse);
       expect(
         rows[1].issues.map((issue) => issue.message),
@@ -339,9 +336,7 @@ void main() {
       );
       // "Reagent" maps to name automatically; "Container" is not understood.
       expect(find.text('Import 1 item'), findsOneWidget);
-      await tester.ensureVisible(
-        find.byKey(const Key('import-map-location')),
-      );
+      await tester.ensureVisible(find.byKey(const Key('import-map-location')));
       await tester.tap(find.byKey(const Key('import-map-location')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Container').last);

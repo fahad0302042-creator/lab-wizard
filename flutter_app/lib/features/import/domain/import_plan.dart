@@ -33,7 +33,13 @@ enum ImportField {
     'expiry_date',
     'best before',
   ]),
-  hazards('hazards', ['hazards', 'hazard', 'ghs', 'hazard classes', 'pictograms']),
+  hazards('hazards', [
+    'hazards',
+    'hazard',
+    'ghs',
+    'hazard classes',
+    'pictograms',
+  ]),
   serialNumber('serial number', [
     'serial number',
     'serial',
@@ -521,9 +527,8 @@ DateTime? parseImportDate(String text) {
   if (iso != null && RegExp(r'^\d{4}-\d{1,2}-\d{1,2}').hasMatch(trimmed)) {
     return iso;
   }
-  final match = RegExp(
-    r'^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$',
-  ).firstMatch(trimmed);
+  final match = RegExp(r'^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$')
+      .firstMatch(trimmed);
   if (match == null) return null;
   var first = int.parse(match.group(1)!);
   var second = int.parse(match.group(2)!);

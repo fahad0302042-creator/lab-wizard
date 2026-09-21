@@ -178,8 +178,8 @@ class ApparatusDetailsFields extends StatelessWidget {
                           child: Text(condition.label),
                         ),
                     ],
-                    onChanged: (value) => controller.condition =
-                        value == null || value.isEmpty
+                    onChanged: (value) =>
+                        controller.condition = value == null || value.isEmpty
                         ? null
                         : ApparatusCondition.values.byName(value),
                   ),
@@ -331,7 +331,7 @@ class ApparatusMarks extends StatelessWidget {
         runSpacing: 2,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          if (conditionMark != null) conditionMark,
+          ?conditionMark,
           if (assigned)
             _Mark(
               key: const Key('mark-assigned'),

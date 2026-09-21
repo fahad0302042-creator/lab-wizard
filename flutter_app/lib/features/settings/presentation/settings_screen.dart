@@ -354,9 +354,7 @@ class SettingsScreen extends ConsumerWidget {
             item.serialNumber ?? '',
             item.condition ?? '',
             item.assignedTo ?? '',
-            item.purchaseDate == null
-                ? ''
-                : formatDateOnly(item.purchaseDate!),
+            item.purchaseDate == null ? '' : formatDateOnly(item.purchaseDate!),
             item.warrantyUntil == null
                 ? ''
                 : formatDateOnly(item.warrantyUntil!),

@@ -151,7 +151,10 @@ void main() {
       expect(changes.keys.toSet(), apparatusMetadataColumns);
       expect(changes['condition'], 'fair');
       expect(changes['warranty_until'], isNull);
-      expect(ApparatusCondition.fromLabel('needsRepair'), ApparatusCondition.needsRepair);
+      expect(
+        ApparatusCondition.fromLabel('needsRepair'),
+        ApparatusCondition.needsRepair,
+      );
       expect(ApparatusCondition.fromLabel('broken'), isNull);
     });
   });

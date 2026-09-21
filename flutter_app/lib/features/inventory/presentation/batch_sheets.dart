@@ -861,7 +861,9 @@ class _BatchFieldFormState extends ConsumerState<_BatchFieldForm> {
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Icon(_chemical ? Icons.place_outlined : Icons.category_outlined),
+                : Icon(
+                    _chemical ? Icons.place_outlined : Icons.category_outlined,
+                  ),
             label: Text(
               _running
                   ? 'Updating $_done of $_total…'

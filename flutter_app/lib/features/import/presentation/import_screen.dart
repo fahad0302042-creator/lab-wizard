@@ -77,9 +77,9 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
 
   List<String> get _headers {
     if (_table.isEmpty) return const [];
-    final width = _table.map((row) => row.length).reduce(
-      (a, b) => a > b ? a : b,
-    );
+    final width = _table
+        .map((row) => row.length)
+        .reduce((a, b) => a > b ? a : b);
     return [
       for (var index = 0; index < width; index++)
         _hasHeader && index < _table.first.length
@@ -147,7 +147,9 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     final summary = ImportSummary.of(rows);
     final result = _result;
     final importable = rows
-        .where((row) => !row.hasErrors && (_importDuplicates || !row.isDuplicate))
+        .where(
+          (row) => !row.hasErrors && (_importDuplicates || !row.isDuplicate),
+        )
         .toList();
     return Scaffold(
       appBar: AppBar(title: const Text('import CSV')),
@@ -223,7 +225,8 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
                 itemCount: rows.length,
                 itemBuilder: (context, index) => _RowTile(
                   row: rows[index],
-                  skipped: rows[index].hasErrors ||
+                  skipped:
+                      rows[index].hasErrors ||
                       (rows[index].isDuplicate && !_importDuplicates),
                 ),
               ),
@@ -295,10 +298,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
         if (row.hasErrors)
           (row, row.issues.where((issue) => issue.isError).join('; '))
         else if (row.isDuplicate && !_importDuplicates)
-          (
-            row,
-            'skipped as duplicate of ${row.duplicates.first.name}',
-          ),
+          (row, 'skipped as duplicate of ${row.duplicates.first.name}'),
     ];
     setState(() {
       _running = true;
@@ -367,7 +367,9 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not share: ${friendlyErrorMessage(error)}')),
+        SnackBar(
+          content: Text('Could not share: ${friendlyErrorMessage(error)}'),
+        ),
       );
     }
   }
@@ -428,7 +430,9 @@ class _FileCard extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.folder_open_outlined),
-            label: Text(source == null ? 'Choose CSV file' : 'Choose another file'),
+            label: Text(
+              source == null ? 'Choose CSV file' : 'Choose another file',
+            ),
           ),
         ],
       ),
@@ -769,13 +773,19 @@ class _ReportCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text(
                       'line ${row.line}: ${row.summary} — $reason',
-                      style: TextStyle(color: context.mutedInkColor, fontSize: 13),
+                      style: TextStyle(
+                        color: context.mutedInkColor,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 if (problems.length > 50)
                   Text(
                     '…and ${problems.length - 50} more in the shared report.',
-                    style: TextStyle(color: context.mutedInkColor, fontSize: 13),
+                    style: TextStyle(
+                      color: context.mutedInkColor,
+                      fontSize: 13,
+                    ),
                   ),
               ],
               const SizedBox(height: 12),

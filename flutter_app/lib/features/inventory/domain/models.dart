@@ -528,8 +528,7 @@ class Apparatus {
     if ((assignedTo ?? '').isNotEmpty) 'assigned_to': assignedTo,
     if ((location ?? '').isNotEmpty) 'location': location,
     if (purchaseDate != null) 'purchase_date': formatDateOnly(purchaseDate!),
-    if (warrantyUntil != null)
-      'warranty_until': formatDateOnly(warrantyUntil!),
+    if (warrantyUntil != null) 'warranty_until': formatDateOnly(warrantyUntil!),
   };
 }
 
