@@ -48,6 +48,10 @@ For atomic, retry-safe inventory updates, apply the optional additive migration 
 
 The migration adds columns, constraints, an idempotency index, and an RPC function. It does not remove or rename anything used by the web app. Until it is installed, Flutter uses a compatibility flow against the existing schema.
 
+## Improvement program
+
+The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.
+
 ## Web app
 
 See [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md) for the original web setup notes. The web app source remains in `src/`.

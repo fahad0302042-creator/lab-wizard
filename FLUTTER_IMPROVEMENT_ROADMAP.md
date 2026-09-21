@@ -1,0 +1,129 @@
+# Lab Wizard Flutter Improvement Roadmap
+
+This is the authoritative checklist for the post-1.0.4 Android improvement program. Items are implemented in ID order unless a prerequisite requires otherwise. An item is only marked complete after source validation, automated tests, a successful signed GitHub APK build, and phone verification where applicable.
+
+Status legend: `TODO`, `IN PROGRESS`, `BLOCKED`, `VALIDATING`, `RELEASED`.
+
+Ground rules for every item:
+
+- The Next.js web app in `src/` and the Supabase schema it relies on are never broken. Database changes are additive only (new nullable/defaulted columns, new tables, new RPCs, new indexes) and live in numbered files under `flutter_app/supabase/`.
+- The Flutter app keeps working against the current schema when an optional migration has not been applied yet.
+- Verification runs on GitHub, not on developer machines: `.github/workflows/flutter-branch-ci.yml` formats, auto-fixes, analyzes, tests, and builds a signed APK artifact for every branch push; `android-apk.yml` publishes releases from `main`.
+
+## Milestone A — Large-inventory speed and daily usability
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| UX-01 | IN PROGRESS | Compact/detailed inventory mode | User can switch modes from either shelf; preference persists; compact rows retain quantity, status, details, use/damage and restock access. | None |
+| UX-02 | IN PROGRESS | Alphabetical quick navigation | A–Z control jumps to the first matching item; unavailable letters are visibly disabled; works after sorting/searching. | UX-01 |
+| UX-03 | TODO | Sticky search and filters | Collapsing shelf heading; search/filter/sort controls remain reachable while scrolling without hiding most of the list. | UX-01, UX-02 |
+| UX-04 | TODO | Undo inventory actions | Recent consume/restock/damage can be reversed safely; reversal is represented in the audit trail and works with offline outbox retries. | SYNC-01 |
+| BATCH-01 | TODO | Batch restock | Multi-select chemicals/apparatus, validate amounts, show progress and record separate audit entries. | None |
+| BATCH-02 | TODO | Batch threshold update | Multi-select items and set low-stock values with preview and validation. | None |
+| BATCH-03 | TODO | Batch category/location assignment | Apply supported shared fields to selected items; incompatible fields are not silently changed. | DATA-01 |
+| BATCH-04 | TODO | Safe multi-delete | Selection summary, typed confirmation for large deletions, online requirement and clear audit/export warning. | None |
+| QR-01 | TODO | Selected-item QR printing | Select specific chemicals/apparatus and print only those labels; retain 40-per-A4 option. | None |
+
+## Milestone B — Import and higher-quality data entry
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| IMPORT-01 | TODO | Android CSV import | File selection, column mapping, preview, validation, duplicate warnings, partial-error report and confirmed import. | DUP-01 |
+| DUP-01 | TODO | Duplicate detection | Normalized name/formula/category checks; view existing or explicitly add anyway. | None |
+| FORM-01 | TODO | Remember form preferences | Persist recent unit, category, action amount and preferred threshold behavior per user/device. | None |
+| DATA-01 | TODO | Additive chemical metadata | Optional supplier, CAS, concentration, location, expiry and hazard fields; old web/app rows remain valid. | Additive SQL migration |
+| DATA-02 | TODO | Expiry and hazard presentation | Shelf/detail indicators, filters and report support without overwhelming normal cards. | DATA-01 |
+
+## Milestone C — Apparatus operations
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| GEAR-01 | TODO | Serialized apparatus metadata | Serial number, condition, assigned person, purchase date and warranty expiry. | Additive SQL migration |
+| GEAR-02 | TODO | Checkout and return | Clear availability, borrower, due date, return condition and immutable history. | GEAR-01 |
+| GEAR-03 | TODO | Maintenance and calibration | Due dates, completion records, notes and status warnings. | GEAR-01 |
+| GEAR-04 | TODO | Apparatus history | Unified checkout, return, damage, maintenance and calibration timeline/report. | GEAR-02, GEAR-03 |
+
+## Milestone D — Notifications
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| NOTIFY-01 | TODO | Notification preferences | Per-type controls, permission education and Settings management. | None |
+| NOTIFY-02 | TODO | Low-stock and expiry alerts | Deduplicated local alerts with sensible timing and direct item navigation. | DATA-01, NOTIFY-01 |
+| NOTIFY-03 | TODO | Return/calibration alerts | Overdue checkout, maintenance and calibration notifications. | GEAR-02, GEAR-03, NOTIFY-01 |
+| NOTIFY-04 | TODO | Sync and weekly summary alerts | Stale outbox warning and optional weekly stock summary. | SYNC-01, NOTIFY-01 |
+
+## Milestone E — Offline and synchronization reliability
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| SYNC-01 | TODO | Sync center | List pending/failed operations, attempts, error, retry one/all, safely discard where allowed, and last successful sync. | Local DB migration |
+| SYNC-02 | TODO | Incremental synchronization | `updated_at` cursor, pagination, tombstone/deletion handling, full-resync escape hatch and per-user isolation. | Additive SQL migration |
+| SYNC-03 | TODO | Background synchronization | Connectivity/app-resume triggers and Android background scheduling without duplicate actions or battery abuse. | SYNC-01, SYNC-02 |
+| SYNC-04 | TODO | Conflict resolution | Explain server/local conflicts and offer safe resolution; never silently overwrite unrelated newer data. | SYNC-02 |
+
+## Milestone F — Scanner and QR workflow
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| QR-02 | TODO | Bulk apparatus QR labels | A4 output and selected-item support using stable apparatus identifiers. | QR-01 |
+| QR-03 | TODO | Save/share individual label | Export a clean label image/PDF from item details. | None |
+| SCAN-01 | TODO | Recent scans | Device-local, user-scoped list with direct item access and clear-history control. | None |
+| SCAN-02 | TODO | Continuous batch scanning | Scan multiple labels without reopening camera; duplicate handling and completion summary. | SCAN-01 |
+| SCAN-03 | TODO | Scan-and-act | After recognition, enter quick amount and perform consume/restock/return without unnecessary navigation. | GEAR-02 for returns |
+| SCAN-04 | TODO | External barcode support | Optional EAN/Code formats, explicit item association and no unsafe automatic matching. | DATA-01 |
+
+## Milestone G — Reports and exports
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| REPORT-01 | TODO | Flexible date ranges | 7-day, 30-day, monthly and custom inclusive ranges with correct local-day handling. | None |
+| REPORT-02 | TODO | Usage/restock trends | Separate action counts and unit-aware quantities; comparison with previous period. | REPORT-01 |
+| REPORT-03 | TODO | Run-out estimates | Explainable estimate based on adequate history; no estimate when data is insufficient. | REPORT-01 |
+| REPORT-04 | TODO | Expiry and apparatus reports | Expiry, damage, overdue checkout, maintenance and calibration views. | DATA-01, GEAR-04 |
+| REPORT-05 | TODO | CSV/Excel-friendly exports | Formula-injection-safe inventory and log exports with selected date range. | REPORT-01 |
+| REPORT-06 | TODO | Branded PDFs | Optional lab name/logo/contact fields and clean print layout. | Future organization settings or local profile |
+
+## Milestone H — Account, security and distribution
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| ACCOUNT-01 | TODO | Complete password recovery | Supabase allowlisted redirect, Android deep link, recovery screen and successful password update test. | Supabase Auth URL configuration |
+| ACCOUNT-02 | TODO | Change password | Authenticated re-entry/validation and clear success/error states. | None |
+| ACCOUNT-03 | TODO | Data export and account deletion | Export first, explicit destructive confirmation, server-side deletion path and clear retention behavior. | Secure server function |
+| ACCOUNT-04 | TODO | Active sessions/devices | Display sessions where supported and provide sign-out-all control. | Supabase/API capability review |
+| SECURITY-01 | TODO | Optional biometric/PIN app lock | Local secure storage, fallback behavior and no false claim of server-side encryption. | Secure storage dependency |
+| RELEASE-01 | BLOCKED | Private production signing | Private key in GitHub Secrets, no key in repository, documented recovery process and signed verification. | Owner-created private key/secret access |
+| RELEASE-02 | BLOCKED | Google Play distribution | Production package/signing strategy, Play App Signing, privacy/data-safety listing and tested upgrade path. | RELEASE-01, Play Console access |
+
+## Milestone I — Accessibility, device quality and observability
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| A11Y-01 | TODO | TalkBack audit | Meaningful labels/order for custom controls, charts, scanner, stock status and actions. | None |
+| A11Y-02 | TODO | Large-text support | No clipping at Android maximum practical font scale; scroll/flexible layouts where required. | None |
+| A11Y-03 | TODO | Small phone/landscape/tablet layouts | Tested widths, responsive density and no overlaps across supported orientations. | UX-01, UX-03 |
+| A11Y-04 | TODO | Contrast/color-blind support | Status never depends only on color; contrast audit; patterns and labels remain available. | None |
+| A11Y-05 | TODO | Touch and reduced-motion audit | Minimum targets, predictable focus, no essential animation and all motion respects preference. | None |
+| OBS-01 | TODO | Privacy-aware crash diagnostics | Opt-in/transparent collection, scrub sensitive inventory values and document retention. | Service selection/privacy review |
+
+## Milestone J — Automated quality gates
+
+| ID | Status | Improvement | Acceptance criteria | Dependencies |
+|---|---|---|---|---|
+| TEST-01 | TODO | Golden screenshot tests | Main screens, light/dark, compact/detailed and representative empty/loaded states. | UX-01 |
+| TEST-02 | TODO | Navigation paint regression | Automated assertion that inactive tabs are offstage and cannot paint or receive input. | None |
+| TEST-03 | TODO | Responsive/font tests | Small width, tablet, landscape and large text overflow checks. | A11Y-02, A11Y-03 |
+| TEST-04 | TODO | Offline/outbox integration tests | Add/update/action/retry/idempotency/conflict paths and per-user isolation. | SYNC-01, SYNC-02 |
+| TEST-05 | TODO | Scanner and QR tests | QR routing, malformed codes, apparatus labels, batch scanning and generated PDF structure. | QR-02, SCAN-02 |
+| TEST-06 | TODO | Large-data performance tests | 500–1,000 items, search/sort/filter/scroll and report responsiveness with budgets. | UX-01, SYNC-02 |
+
+## Future platform milestone — Multi-lab and multi-organization
+
+This remains intentionally after the current single-lab quality program: organizations, memberships, lab types, roles, tenant RLS, organization/lab-scoped offline cache, quotas, invitations and optional dedicated enterprise projects.
+
+## Status log
+
+| Date | Item | Change | Notes |
+|---|---|---|---|
+| 2026-09-21 | UX-01, UX-02 | `VALIDATING` → `IN PROGRESS` | Audit of `main` (700020e) found neither feature in `flutter_app/lib`; both are implemented as part of this program. |
+| 2026-09-21 | CI | Added `flutter-branch-ci.yml` | Branch pushes are formatted, auto-fixed, analyzed, tested and built on GitHub; APK artifacts are kept for 7 days for phone verification. Android `versionCode` is now minutes-since-epoch in both workflows so branch builds and releases install over each other as updates. |

@@ -52,12 +52,15 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      # versionCode is minutes since the epoch (always larger than the earlier
+      # run-number based codes) so releases install as updates over any branch
+      # verification build from flutter-branch-ci.yml.
       - name: Build signed universal APK
         run: >-
           flutter build apk --release
           --dart-define-from-file=config/production.json
           --build-name=1.0.${{ github.run_number }}
-          --build-number=${{ github.run_number }}
+          --build-number=$(( $(date +%s) / 60 ))
 
       - name: Name APK for download
         run: cp build/app/outputs/flutter-apk/app-release.apk "Lab-Wizard-Android-1.0.${{ github.run_number }}.apk"
