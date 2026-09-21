@@ -5,6 +5,7 @@ import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../inventory/presentation/inventory_sheets.dart';
 import '../../settings/presentation/data_export.dart';
 
 /// The word that must be typed before the account can be deleted.

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../inventory/presentation/inventory_sheets.dart';
 
 /// Change-password form (ACCOUNT-02). Resolves to true when the password
 /// was changed.
