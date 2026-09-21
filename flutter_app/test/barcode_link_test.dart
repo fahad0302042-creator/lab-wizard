@@ -138,13 +138,22 @@ void main() {
       final linked = plain.copyWith(barcode: _ean);
       expect(linked.toMap()[barcodeColumn], _ean);
       expect(Chemical.fromMap(linked.toMap()).barcode, _ean);
-      expect(Chemical.fromMap({...linked.toMap(), 'barcode': ''}).barcode, isNull);
-      expect(Chemical.fromMap({...linked.toMap(), 'barcode': null}).barcode, isNull);
+      expect(
+        Chemical.fromMap({...linked.toMap(), 'barcode': ''}).barcode,
+        isNull,
+      );
+      expect(
+        Chemical.fromMap({...linked.toMap(), 'barcode': null}).barcode,
+        isNull,
+      );
 
       final gear = _apparatus('a1', 'Beaker', barcode: 'CODE-1');
       expect(gear.toMap()[barcodeColumn], 'CODE-1');
       expect(Apparatus.fromMap(gear.toMap()).barcode, 'CODE-1');
-      expect(_apparatus('a2', 'Flask').toMap().containsKey(barcodeColumn), isFalse);
+      expect(
+        _apparatus('a2', 'Flask').toMap().containsKey(barcodeColumn),
+        isFalse,
+      );
     });
   });
 
@@ -156,7 +165,11 @@ void main() {
     final apparatus = [_apparatus('a1', 'Beaker', barcode: 'CODE-1')];
 
     test('opens only explicitly linked codes', () {
-      final chem = resolveScan(_ean, chemicals: chemicals, apparatus: apparatus);
+      final chem = resolveScan(
+        _ean,
+        chemicals: chemicals,
+        apparatus: apparatus,
+      );
       expect(chem?.id, 'c1');
       expect(chem?.viaBarcode, isTrue);
       final gear = resolveScan(
@@ -167,7 +180,11 @@ void main() {
       expect(gear?.id, 'a1');
       expect(gear?.kind, ItemKind.apparatus);
       expect(
-        resolveScan('4006381333932', chemicals: chemicals, apparatus: apparatus),
+        resolveScan(
+          '4006381333932',
+          chemicals: chemicals,
+          apparatus: apparatus,
+        ),
         isNull,
       );
       // A Lab Wizard payload never falls through to the barcode lookup.
@@ -239,9 +256,7 @@ void main() {
       expect(find.byKey(const Key('link-search')), findsNothing);
     });
 
-    testWidgets('moves a code that is already on another item', (
-      tester,
-    ) async {
+    testWidgets('moves a code that is already on another item', (tester) async {
       final results = <ScanMatch?>[];
       final fake = await _pumpLink(
         tester,
@@ -251,7 +266,10 @@ void main() {
         ),
         results: results,
       );
-      expect(find.textContaining('Currently linked to Acetone'), findsOneWidget);
+      expect(
+        find.textContaining('Currently linked to Acetone'),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('link-item-apparatus-a1')));
       await tester.pumpAndSettle();
       expect(fake.updates, [
@@ -303,10 +321,7 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('link-item-chemical-c1')));
       await tester.pumpAndSettle();
-      expect(
-        find.textContaining('missing the newest columns'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('missing the newest columns'), findsOneWidget);
       expect(results, isEmpty);
       await tester.tap(find.byKey(const Key('link-not-now')));
       await tester.pumpAndSettle();

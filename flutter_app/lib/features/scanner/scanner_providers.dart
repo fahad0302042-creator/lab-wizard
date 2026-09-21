@@ -38,9 +38,10 @@ List<RecentScan> decodeRecentScans(String? encoded) {
 
 /// Device preference (SCAN-04): also read product barcodes such as EAN-13,
 /// UPC and Code 128. Off by default so the camera only reacts to QR codes.
-final productBarcodesProvider = NotifierProvider<ProductBarcodesController, bool>(
-  ProductBarcodesController.new,
-);
+final productBarcodesProvider =
+    NotifierProvider<ProductBarcodesController, bool>(
+      ProductBarcodesController.new,
+    );
 
 class ProductBarcodesController extends Notifier<bool> {
   static const key = 'scanner.product_barcodes';

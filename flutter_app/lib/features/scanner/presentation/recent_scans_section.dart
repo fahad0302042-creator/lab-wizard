@@ -156,9 +156,8 @@ class _RecentScansSectionState extends ConsumerState<RecentScansSection> {
     await history.remove(scan);
     await history.record(RecentScan.found(linked, scan.raw, scan.scannedAt));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Linked to ${linked.name}')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Linked to ${linked.name}')));
   }
 
   Future<void> _clear(BuildContext context) async {

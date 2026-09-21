@@ -88,8 +88,7 @@ class _LinkBarcodeFormState extends ConsumerState<LinkBarcodeForm> {
         _Candidate(
           match: ScanMatch.apparatus(item, viaBarcode: true),
           linked: item.barcode,
-          haystack:
-              '${item.name} ${item.category} ${item.serialNumber ?? ''}',
+          haystack: '${item.name} ${item.category} ${item.serialNumber ?? ''}',
         ),
     ].where((candidate) => candidate.haystack.toLowerCase().contains(query));
     final shown = candidates.take(8).toList();
@@ -126,10 +125,7 @@ class _LinkBarcodeFormState extends ConsumerState<LinkBarcodeForm> {
                 child: SelectableText(
                   widget.code,
                   maxLines: 3,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
                 ),
               ),
               const SizedBox(width: 8),
@@ -177,10 +173,7 @@ class _LinkBarcodeFormState extends ConsumerState<LinkBarcodeForm> {
                 'link-item-${candidate.match.kind.name}-${candidate.match.id}',
               ),
               onTap: _busyId != null ? null : () => _link(candidate),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 11,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               child: Row(
                 children: [
                   Icon(
@@ -243,9 +236,7 @@ class _LinkBarcodeFormState extends ConsumerState<LinkBarcodeForm> {
         const SizedBox(height: 12),
         TextButton(
           key: const Key('link-not-now'),
-          onPressed: _busyId != null
-              ? null
-              : () => Navigator.of(context).pop(),
+          onPressed: _busyId != null ? null : () => Navigator.of(context).pop(),
           child: const Text('Not now'),
         ),
       ],
@@ -383,15 +374,12 @@ class _LinkedBarcodeRowState extends ConsumerState<LinkedBarcodeRow> {
             id: widget.itemId,
             changes: const {barcodeColumn: null},
           );
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Barcode unlinked')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('Barcode unlinked')));
     } catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     }
   }
 }
