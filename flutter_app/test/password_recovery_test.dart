@@ -280,12 +280,11 @@ void main() {
       expect(find.byKey(const Key('new-password-error')), findsOneWidget);
       await tester.tap(find.byKey(const Key('skip-recovery')));
       await tester.pumpAndSettle();
-      expect(tester.container().read(authProvider).phase, AuthPhase.signedIn);
+      expect(_containerOf(tester).read(authProvider).phase, AuthPhase.signedIn);
     });
   });
 }
 
-extension on WidgetTester {
-  ProviderContainer container() =>
-      ProviderScope.containerOf(element(find.byType(NewPasswordScreen)));
-}
+// Not an extension: flutter_riverpod already adds `container` to WidgetTester.
+ProviderContainer _containerOf(WidgetTester tester) =>
+    ProviderScope.containerOf(tester.element(find.byType(NewPasswordScreen)));
