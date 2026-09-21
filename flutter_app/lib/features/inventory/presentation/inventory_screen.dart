@@ -1239,12 +1239,16 @@ class _MetadataMarks extends StatelessWidget {
     final hasExpiry = item.expiring;
     final hasHazards = chemical.hazards.isNotEmpty;
     if (!hasExpiry && !hasHazards) return const SizedBox.shrink();
+    // Wraps: badge and hazard icons go on two lines when the row is narrow
+    // or the text is large instead of overflowing.
     return Padding(
       padding: EdgeInsets.only(top: compact ? 2 : 4),
-      child: Row(
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           if (hasExpiry) ExpiryBadge(chemical, compact: compact),
-          if (hasExpiry && hasHazards) const SizedBox(width: 6),
           if (hasHazards) HazardStrip(chemical, size: compact ? 13 : 15),
         ],
       ),

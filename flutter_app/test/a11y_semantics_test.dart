@@ -155,7 +155,7 @@ void main() {
 
       final benzene = _node(tester, RegExp(r'^Benzene'));
       expect(benzene.label, contains('expired'));
-      expect(benzene.label, contains('hazards: flammable, toxic'));
+      expect(benzene.label, contains('hazards: flammable, acutely toxic'));
       expect(
         _node(tester, RegExp(r'^Ethanol')).label,
         contains('out of stock'),
