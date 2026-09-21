@@ -8,6 +8,7 @@ import '../../../core/utils/errors.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
+import '../data/incremental_sync.dart';
 
 /// Lists every change waiting on this device, why it is waiting, and lets the
 /// user retry or discard it (SYNC-01).
@@ -119,6 +120,12 @@ class SyncCenterScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            _DownloadCard(
+              report: inventory.syncReport,
+              busy: inventory.refreshing,
+              onFullResync: controller.fullResync,
+            ),
             const SizedBox(height: 16),
             if (outbox.isEmpty)
               const EmptyNotebookState(
@@ -205,6 +212,108 @@ class SyncCenterScreen extends ConsumerWidget {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
     }
+  }
+}
+
+/// How the offline copy is kept up to date (SYNC-02): incremental changes
+/// when the server tracks them, otherwise full downloads, plus a way to
+/// start over.
+class _DownloadCard extends StatelessWidget {
+  const _DownloadCard({
+    required this.report,
+    required this.busy,
+    required this.onFullResync,
+  });
+
+  final SyncReport? report;
+  final bool busy;
+  final VoidCallback onFullResync;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = TextStyle(color: context.mutedInkColor, fontSize: 12.5);
+    final current = report;
+    return NotebookCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                current == null
+                    ? Icons.cloud_download_outlined
+                    : current.incrementalAvailable
+                    ? Icons.bolt_outlined
+                    : Icons.cloud_download_outlined,
+                color: context.mutedInkColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  current == null
+                      ? 'downloads'
+                      : current.mode == SyncMode.incremental
+                      ? 'downloading only changes'
+                      : 'full download',
+                  key: const Key('sync-download-title'),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (current == null)
+            Text(
+              'The first refresh downloads everything; after that only '
+              'changed rows and deletions are fetched.',
+              style: muted,
+            )
+          else ...[
+            Text(
+              'Last download: ${current.summary}',
+              key: const Key('sync-download-summary'),
+              style: muted,
+            ),
+            if (current.lastFullSyncAt != null)
+              Text(
+                'Last full download ${relativeTime(current.lastFullSyncAt!)}.',
+                style: muted,
+              ),
+            if (!current.incrementalAvailable)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'The server has no change tracking yet, so every refresh '
+                  'downloads everything. Run '
+                  'flutter_app/supabase/007_incremental_sync.sql once to '
+                  'switch to incremental downloads.',
+                  key: const Key('sync-legacy-hint'),
+                  style: TextStyle(
+                    color: context.lowColor,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+          ],
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('sync-full-resync'),
+            onPressed: busy ? null : onFullResync,
+            icon: const Icon(Icons.restart_alt),
+            label: const Text('Download everything again'),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Use this if something looks out of date. Queued changes are '
+            'sent first and are never lost.',
+            style: muted,
+          ),
+        ],
+      ),
+    );
   }
 }
 

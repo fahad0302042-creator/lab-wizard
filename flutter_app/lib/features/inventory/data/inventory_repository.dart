@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/local_database.dart';
+import '../../sync/data/incremental_sync.dart';
 import '../domain/models.dart';
 
 class InventorySnapshot {
@@ -15,6 +16,7 @@ class InventorySnapshot {
     this.checkouts = const [],
     this.services = const [],
     this.lastSyncedAt,
+    this.syncReport,
   });
 
   final List<Chemical> chemicals;
@@ -33,6 +35,9 @@ class InventorySnapshot {
   final bool fromCache;
   final DateTime? lastSyncedAt;
 
+  /// How the last download went (SYNC-02); null for cached snapshots.
+  final SyncReport? syncReport;
+
   int get pendingCount => outbox.length;
   int get failedCount => outbox.where((operation) => operation.isFailed).length;
 }
@@ -48,12 +53,24 @@ class InventoryRepository {
   bool? _reversalsTableAvailable;
   bool? _checkoutsTableAvailable;
   bool? _servicesTableAvailable;
+  SupabaseSyncSource? _source;
+  IncrementalSync? _sync;
+
+  /// Replaces the server-backed download engine (tests).
+  IncrementalSync? syncOverride;
 
   /// Whether the last server round-trip found the `apparatus_checkouts`
   /// table (null until the first refresh).
   bool? get checkoutsAvailable => _checkoutsTableAvailable;
 
-  Future<InventorySnapshot> loadCached(String userId) async {
+  Future<InventorySnapshot> loadCached(String userId) => _load(userId);
+
+  Future<InventorySnapshot> _load(
+    String userId, {
+    bool fromCache = true,
+    DateTime? syncedAt,
+    SyncReport? syncReport,
+  }) async {
     final results = await Future.wait<dynamic>([
       local.loadRecords(userId, 'chemical'),
       local.loadRecords(userId, 'apparatus'),
@@ -65,18 +82,19 @@ class InventoryRepository {
       local.loadRecords(userId, 'service'),
     ]);
     return InventorySnapshot(
-      chemicals: (results[0] as List<Map<String, dynamic>>)
-          .map(Chemical.fromMap)
-          .toList(),
-      apparatus: (results[1] as List<Map<String, dynamic>>)
-          .map(Apparatus.fromMap)
-          .toList(),
-      logs: (results[2] as List<Map<String, dynamic>>)
-          .map(ConsumptionLog.fromMap)
-          .toList(),
+      chemicals: sortedChemicals(
+        (results[0] as List<Map<String, dynamic>>).map(Chemical.fromMap),
+      ),
+      apparatus: sortedApparatus(
+        (results[1] as List<Map<String, dynamic>>).map(Apparatus.fromMap),
+      ),
+      logs: sortedLogs(
+        (results[2] as List<Map<String, dynamic>>).map(ConsumptionLog.fromMap),
+      ),
       outbox: results[3] as List<PendingOperation>,
-      fromCache: true,
-      lastSyncedAt: results[4] as DateTime?,
+      fromCache: fromCache,
+      lastSyncedAt: syncedAt ?? results[4] as DateTime?,
+      syncReport: syncReport,
       reversals: _sortedReversals(
         (results[5] as List<Map<String, dynamic>>).map(
           InventoryReversal.fromMap,
@@ -94,6 +112,21 @@ class InventoryRepository {
       ),
     );
   }
+
+  /// Newest first, the order the shelves expect regardless of how the rows
+  /// reached the offline copy.
+  static List<Chemical> sortedChemicals(Iterable<Chemical> items) =>
+      items.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  static List<Apparatus> sortedApparatus(Iterable<Apparatus> items) =>
+      items.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  /// Most recent activity first.
+  static List<ConsumptionLog> sortedLogs(Iterable<ConsumptionLog> logs) =>
+      logs.toList()..sort((a, b) {
+        final byLogged = b.loggedAt.compareTo(a.loggedAt);
+        return byLogged != 0 ? byLogged : b.createdAt.compareTo(a.createdAt);
+      });
 
   /// Open tasks first (soonest due, undated last), then completed tasks
   /// newest first.
@@ -131,152 +164,74 @@ class InventoryRepository {
     await local.getMeta(userId, LocalDatabase.lastSyncKey) ?? '',
   );
 
-  Future<InventorySnapshot> refresh(String userId) async {
-    final client = remote;
-    if (client == null) return loadCached(userId);
+  /// Downloads server changes into the offline copy and returns the fresh
+  /// snapshot (SYNC-02). Incremental when the server has migration 007,
+  /// otherwise a paged full download; [full] forces a complete download and
+  /// re-checks optional tables.
+  Future<InventorySnapshot> refresh(String userId, {bool full = false}) async {
+    final engine = _engine;
+    if (engine == null) return loadCached(userId);
+    if (full) _source?.recheck();
 
-    final responses = await Future.wait<dynamic>([
-      client.from('chemicals').select().order('created_at', ascending: false),
-      client.from('apparatus').select().order('created_at', ascending: false),
-      client
-          .from('consumption_logs')
-          .select()
-          .order('logged_at', ascending: false),
-    ]);
+    bool include(bool? available) => full || available != false;
+    final tables = <String>[
+      'chemicals',
+      'apparatus',
+      'consumption_logs',
+      if (include(_reversalsTableAvailable)) 'inventory_reversals',
+      if (include(_checkoutsTableAvailable)) 'apparatus_checkouts',
+      if (include(_servicesTableAvailable)) 'apparatus_services',
+    ];
+    final queuedIds = <String>{
+      for (final operation in await local.pendingOperations(userId))
+        if (operation.payload['id'] is String)
+          operation.payload['id'] as String,
+    };
+    final report = await engine.run(
+      userId,
+      tables: tables,
+      full: full,
+      keepLocal: (kind, record) =>
+          record['local_only'] == true || queuedIds.contains(record['id']),
+    );
+    bool? availability(String table, bool? previous) =>
+        tables.contains(table) ? !report.missingTables.contains(table) : previous;
+    _reversalsTableAvailable = availability(
+      'inventory_reversals',
+      _reversalsTableAvailable,
+    );
+    _checkoutsTableAvailable = availability(
+      'apparatus_checkouts',
+      _checkoutsTableAvailable,
+    );
+    _servicesTableAvailable = availability(
+      'apparatus_services',
+      _servicesTableAvailable,
+    );
 
-    final chemicalMaps = _mapList(responses[0]);
-    final apparatusMaps = _mapList(responses[1]);
-    final logMaps = _mapList(responses[2]);
-
-    await Future.wait([
-      local.replaceRecords(userId, 'chemical', chemicalMaps),
-      local.replaceRecords(userId, 'apparatus', apparatusMaps),
-      local.replaceRecords(userId, 'log', logMaps),
-    ]);
-    final reversalMaps = await _refreshReversals(userId, client);
-    final checkoutMaps = await _refreshCheckouts(userId, client);
-    final serviceMaps = await _refreshServices(userId, client);
     final syncedAt = DateTime.now();
     await local.setMeta(
       userId,
       LocalDatabase.lastSyncKey,
       syncedAt.toIso8601String(),
     );
-
-    return InventorySnapshot(
-      chemicals: chemicalMaps.map(Chemical.fromMap).toList(),
-      apparatus: apparatusMaps.map(Apparatus.fromMap).toList(),
-      logs: logMaps.map(ConsumptionLog.fromMap).toList(),
-      outbox: await local.pendingOperations(userId),
+    return _load(
+      userId,
       fromCache: false,
-      lastSyncedAt: syncedAt,
-      reversals: _sortedReversals(reversalMaps.map(InventoryReversal.fromMap)),
-      checkouts: _sortedCheckouts(checkoutMaps.map(ApparatusCheckout.fromMap)),
-      services: sortedServices(serviceMaps.map(ApparatusService.fromMap)),
+      syncedAt: syncedAt,
+      syncReport: report,
     );
   }
 
-  /// Downloads loans when the additive `apparatus_checkouts` table is
-  /// installed (GEAR-02). Rows that are still queued on this device are kept
-  /// so an offline checkout does not vanish from the screen after a refresh.
-  Future<List<Map<String, dynamic>>> _refreshCheckouts(
-    String userId,
-    SupabaseClient client,
-  ) => _refreshOptionalRows(
-    userId: userId,
-    client: client,
-    table: 'apparatus_checkouts',
-    kind: 'checkout',
-    queuedType: 'checkout_apparatus',
-    orderBy: 'checked_out_at',
-    available: _checkoutsTableAvailable,
-    setAvailable: (value) => _checkoutsTableAvailable = value,
-  );
-
-  /// Downloads maintenance/calibration tasks when the additive
-  /// `apparatus_services` table is installed (GEAR-03).
-  Future<List<Map<String, dynamic>>> _refreshServices(
-    String userId,
-    SupabaseClient client,
-  ) => _refreshOptionalRows(
-    userId: userId,
-    client: client,
-    table: 'apparatus_services',
-    kind: 'service',
-    queuedType: 'schedule_service',
-    orderBy: 'created_at',
-    available: _servicesTableAvailable,
-    setAvailable: (value) => _servicesTableAvailable = value,
-  );
-
-  /// Shared download for tables that only exist after an optional migration.
-  /// A missing table keeps the cached rows and remembers that the table is
-  /// absent; queued-but-unsynced rows survive the refresh.
-  Future<List<Map<String, dynamic>>> _refreshOptionalRows({
-    required String userId,
-    required SupabaseClient client,
-    required String table,
-    required String kind,
-    required String queuedType,
-    required String orderBy,
-    required bool? available,
-    required void Function(bool value) setAvailable,
-  }) async {
-    if (available != false) {
-      try {
-        final rows = _mapList(
-          await client.from(table).select().order(orderBy, ascending: false),
-        );
-        setAvailable(true);
-        final queuedIds = <String>{
-          for (final operation in await local.pendingOperations(userId))
-            if (operation.type == queuedType) operation.payload['id'] as String,
-        };
-        final serverIds = rows.map((row) => row['id']).toSet();
-        final queued = (await local.loadRecords(userId, kind)).where(
-          (record) =>
-              queuedIds.contains(record['id']) &&
-              !serverIds.contains(record['id']),
-        );
-        final merged = [...rows, ...queued];
-        await local.replaceRecords(userId, kind, merged);
-        return merged;
-      } on PostgrestException catch (error) {
-        if (!_isMissingRelation(error)) rethrow;
-        setAvailable(false);
-      }
-    }
-    return local.loadRecords(userId, kind);
-  }
-
-  /// Downloads undo records when the additive `inventory_reversals` table is
-  /// installed. Without it, reversals stay device-local.
-  Future<List<Map<String, dynamic>>> _refreshReversals(
-    String userId,
-    SupabaseClient client,
-  ) async {
-    if (_reversalsTableAvailable != false) {
-      try {
-        final rows = _mapList(
-          await client
-              .from('inventory_reversals')
-              .select()
-              .order('reversed_at', ascending: false),
-        );
-        _reversalsTableAvailable = true;
-        final localOnly = (await local.loadRecords(
-          userId,
-          'reversal',
-        )).where((record) => record['local_only'] == true);
-        final merged = [...rows, ...localOnly];
-        await local.replaceRecords(userId, 'reversal', merged);
-        return merged;
-      } on PostgrestException catch (error) {
-        if (!_isMissingRelation(error)) rethrow;
-        _reversalsTableAvailable = false;
-      }
-    }
-    return local.loadRecords(userId, 'reversal');
+  IncrementalSync? get _engine {
+    final override = syncOverride;
+    if (override != null) return override;
+    final client = remote;
+    if (client == null) return null;
+    return _sync ??= IncrementalSync(
+      local: local,
+      source: _source ??= SupabaseSyncSource(client),
+    );
   }
 
   Future<Chemical> addChemical({
@@ -1365,10 +1320,6 @@ class InventoryRepository {
     }
     await local.completeOperation(operation.id);
   }
-
-  static List<Map<String, dynamic>> _mapList(dynamic value) => (value as List)
-      .map((row) => Map<String, dynamic>.from(row as Map))
-      .toList();
 
   static double _quantityAfter(
     double current,

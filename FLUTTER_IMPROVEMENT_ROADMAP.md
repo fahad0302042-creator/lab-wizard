@@ -57,7 +57,7 @@ Ground rules for every item:
 | ID | Status | Improvement | Acceptance criteria | Dependencies |
 |---|---|---|---|---|
 | SYNC-01 | VALIDATING | Sync center | List pending/failed operations, attempts, error, retry one/all, safely discard where allowed, and last successful sync. | Local DB migration |
-| SYNC-02 | TODO | Incremental synchronization | `updated_at` cursor, pagination, tombstone/deletion handling, full-resync escape hatch and per-user isolation. | Additive SQL migration |
+| SYNC-02 | VALIDATING | Incremental synchronization | `updated_at` cursor, pagination, tombstone/deletion handling, full-resync escape hatch and per-user isolation. Migration 007 (additive: `updated_at` + triggers + `deleted_rows`); keyset paging on `(updated_at, id)` in pages of 500 with a 2-minute overlap; tombstones applied per table; automatic full download when cursors are missing or older than 120 days; **Download everything again** in the sync center; per-user cursors and a defensive `user_id` filter; paged full downloads on servers without the migration. | Additive SQL migration |
 | SYNC-03 | TODO | Background synchronization | Connectivity/app-resume triggers and Android background scheduling without duplicate actions or battery abuse. | SYNC-01, SYNC-02 |
 | SYNC-04 | TODO | Conflict resolution | Explain server/local conflicts and offer safe resolution; never silently overwrite unrelated newer data. | SYNC-02 |
 

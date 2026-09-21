@@ -10,6 +10,7 @@ import '../core/config/app_config.dart';
 import '../core/database/local_database.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/models.dart';
+import '../features/sync/data/incremental_sync.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
   return AppConfig.hasSupabase ? Supabase.instance.client : null;
@@ -398,6 +399,7 @@ class InventoryState {
     this.error,
     this.lastUpdated,
     this.lastSyncedAt,
+    this.syncReport,
   });
 
   final List<Chemical> chemicals;
@@ -423,6 +425,9 @@ class InventoryState {
 
   /// Last time the server copy was fully downloaded on this device.
   final DateTime? lastSyncedAt;
+
+  /// How the most recent download went (SYNC-02).
+  final SyncReport? syncReport;
 
   /// Every change still waiting on this device, including failed ones.
   int get pendingCount => outbox.length;
@@ -527,6 +532,7 @@ class InventoryState {
     String? error,
     DateTime? lastUpdated,
     DateTime? lastSyncedAt,
+    SyncReport? syncReport,
   }) => InventoryState(
     chemicals: chemicals ?? this.chemicals,
     apparatus: apparatus ?? this.apparatus,
@@ -541,6 +547,7 @@ class InventoryState {
     error: error,
     lastUpdated: lastUpdated ?? this.lastUpdated,
     lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+    syncReport: syncReport ?? this.syncReport,
   );
 }
 
@@ -685,7 +692,24 @@ class InventoryController extends Notifier<InventoryState> {
       fromCache: snapshot.fromCache,
       lastUpdated: DateTime.now(),
       lastSyncedAt: snapshot.lastSyncedAt ?? state.lastSyncedAt,
+      syncReport: snapshot.syncReport ?? state.syncReport,
     );
+  }
+
+  /// Downloads everything again, resetting the incremental cursors
+  /// (SYNC-02). Queued changes are sent first, as with any refresh.
+  Future<void> fullResync() async {
+    final userId = _activeUserId;
+    if (userId == null) return;
+    state = state.copyWith(refreshing: true);
+    try {
+      await _repository.syncPending(userId);
+      _applySnapshot(await _repository.refresh(userId, full: true));
+    } catch (_) {
+      await _reloadOutbox(
+        error: 'Still offline — a full download needs a connection.',
+      );
+    }
   }
 
   Future<void> addChemical({

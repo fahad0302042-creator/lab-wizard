@@ -58,6 +58,8 @@ Apparatus checkouts (GEAR-02) add one new table with [`flutter_app/supabase/005_
 
 Maintenance and calibration (GEAR-03) add [`flutter_app/supabase/006_apparatus_maintenance.sql`](flutter_app/supabase/006_apparatus_maintenance.sql): an `apparatus_services` table (kind `maintenance` / `calibration`, due and completion timestamps, performer, result, note) with the same own-rows RLS, cascade and retry-safe unique operation id. Again nothing existing changes and the web app never reads the table.
 
+Incremental sync (SYNC-02) adds [`flutter_app/supabase/007_incremental_sync.sql`](flutter_app/supabase/007_incremental_sync.sql): an `updated_at timestamptz not null default now()` column on `chemicals`, `apparatus`, `consumption_logs` and the optional Flutter tables (existing rows are back-filled with the migration time), a `before update` trigger that keeps it current, and a `deleted_rows` tombstone table (own rows only via RLS) filled by `after delete` triggers. The web app is unaffected: its inserts get the default, its updates go through the trigger and its deletes leave a tombstone without any code change. Phones then download only rows changed since their cursor plus deletions, in pages of 500; without the migration they fall back to paged full downloads.
+
 ## Improvement program
 
 The post-1.0.4 Android improvement checklist lives in [`FLUTTER_IMPROVEMENT_ROADMAP.md`](FLUTTER_IMPROVEMENT_ROADMAP.md). Feature branches are verified by [`.github/workflows/flutter-branch-ci.yml`](.github/workflows/flutter-branch-ci.yml), which formats and auto-fixes the Dart code on the runner, analyzes, tests, and uploads a signed APK artifact for phone verification.

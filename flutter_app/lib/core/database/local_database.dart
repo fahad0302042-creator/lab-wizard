@@ -11,10 +11,12 @@ import '../../features/inventory/domain/models.dart';
 /// 1. `cache_records` and `outbox`.
 /// 2. Outbox `status`, `label`, and `last_attempt_at` columns and the
 ///    `sync_meta` table used by the sync center (SYNC-01).
+/// 3. Index on `cache_records (user_id, kind)` for incremental upserts and
+///    per-kind loads (SYNC-02). Cursors live in `sync_meta`.
 class LocalDatabase {
   LocalDatabase({this._factory, this._path});
 
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
   static const lastSyncKey = 'last_sync_at';
 
   final DatabaseFactory? _factory;
@@ -35,9 +37,11 @@ class LocalDatabase {
         onCreate: (db, _) async {
           await _createVersion1(db);
           await _upgradeToVersion2(db);
+          await _upgradeToVersion3(db);
         },
         onUpgrade: (db, oldVersion, _) async {
           if (oldVersion < 2) await _upgradeToVersion2(db);
+          if (oldVersion < 3) await _upgradeToVersion3(db);
         },
       ),
     );
@@ -84,6 +88,13 @@ class LocalDatabase {
         PRIMARY KEY (user_id, key)
       )
     ''');
+  }
+
+  static Future<void> _upgradeToVersion3(DatabaseExecutor db) async {
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS cache_records_user_kind '
+      'ON cache_records(user_id, kind)',
+    );
   }
 
   Future<List<Map<String, dynamic>>> loadRecords(
@@ -144,6 +155,89 @@ class LocalDatabase {
       'body': jsonEncode(record),
       'updated_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Inserts or replaces many records of one kind in a single transaction
+  /// (incremental sync pages).
+  Future<void> upsertRecords(
+    String userId,
+    String kind,
+    Iterable<Map<String, dynamic>> records,
+  ) async {
+    if (records.isEmpty) return;
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final batch = db.batch();
+    for (final record in records) {
+      batch.insert('cache_records', {
+        'user_id': userId,
+        'kind': kind,
+        'record_id': record['id'] as String,
+        'body': jsonEncode(record),
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Removes the given records of one kind; returns how many existed.
+  Future<int> deleteRecords(
+    String userId,
+    String kind,
+    Iterable<String> ids,
+  ) async {
+    final list = ids.toList();
+    if (list.isEmpty) return 0;
+    final db = await database;
+    var removed = 0;
+    for (var start = 0; start < list.length; start += 200) {
+      final chunk = list.sublist(
+        start,
+        start + 200 > list.length ? list.length : start + 200,
+      );
+      final marks = List.filled(chunk.length, '?').join(', ');
+      removed += await db.delete(
+        'cache_records',
+        where: 'user_id = ? AND kind = ? AND record_id IN ($marks)',
+        whereArgs: [userId, kind, ...chunk],
+      );
+    }
+    return removed;
+  }
+
+  /// Number of cached records of one kind.
+  Future<int> recordCount(String userId, String kind) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS total FROM cache_records '
+      'WHERE user_id = ? AND kind = ?',
+      [userId, kind],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Every sync bookkeeping entry for the user (cursors, last full sync).
+  Future<Map<String, String>> allMeta(String userId) async {
+    final db = await database;
+    final rows = await db.query(
+      'sync_meta',
+      columns: ['key', 'value'],
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+    return {
+      for (final row in rows) row['key']! as String: row['value']! as String,
+    };
+  }
+
+  /// Drops the sync bookkeeping so the next refresh downloads everything.
+  Future<void> clearSyncMeta(String userId, {String? prefix}) async {
+    final db = await database;
+    await db.delete(
+      'sync_meta',
+      where: prefix == null ? 'user_id = ?' : 'user_id = ? AND key LIKE ?',
+      whereArgs: prefix == null ? [userId] : [userId, '$prefix%'],
+    );
   }
 
   Future<void> deleteRecord(String userId, String kind, String id) async {
