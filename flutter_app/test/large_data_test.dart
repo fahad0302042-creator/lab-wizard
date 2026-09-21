@@ -26,7 +26,8 @@ List<Chemical> _chemicals() => [
   for (var index = 0; index < _items; index++)
     Chemical(
       id: 'c$index',
-      name: 'Reagent ${index.toString().padLeft(4, '0')} '
+      name:
+          'Reagent ${index.toString().padLeft(4, '0')} '
           '${String.fromCharCode(65 + index % 26)}',
       formula: 'F$index',
       unit: index.isEven ? 'mL' : 'g',

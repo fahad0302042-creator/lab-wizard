@@ -98,7 +98,11 @@ void main() {
         'labwizard:apparatus:${'a' * 5000}',
       ];
       for (final code in malformed) {
-        expect(() => resolve(code), returnsNormally, reason: code.length.toString());
+        expect(
+          () => resolve(code),
+          returnsNormally,
+          reason: code.length.toString(),
+        );
         expect(resolve(code), isNull, reason: code.length.toString());
       }
       expect(isLabWizardCode('labwizard:'), isFalse);
@@ -123,8 +127,11 @@ void main() {
       final balance = apparatusLabels([apparatus.first]).single;
       expect(balance.data, 'labwizard:apparatus:a1');
       expect(balance.subtitle, contains('SN-1'));
-      expect(chemicalLabels([_chemical('c9', '')]), isEmpty,
-          reason: 'a chemical without a code has no label');
+      expect(
+        chemicalLabels([_chemical('c9', '')]),
+        isEmpty,
+        reason: 'a chemical without a code has no label',
+      );
     });
 
     test('sheets and single labels have the expected pages', () async {
