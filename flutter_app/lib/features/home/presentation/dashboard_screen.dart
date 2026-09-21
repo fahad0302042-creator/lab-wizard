@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
+import '../../notifications/presentation/alerts_screen.dart';
 import '../../sync/presentation/sync_center_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -144,6 +145,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
           ],
+          const RemindersCard(),
           if (inventory.attentionCount > 0) ...[
             StaggerIn(
               index: 1,

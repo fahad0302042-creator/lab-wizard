@@ -11,6 +11,7 @@ import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../import/presentation/import_screen.dart';
 import '../../inventory/domain/models.dart';
+import '../../notifications/presentation/notification_settings_card.dart';
 import '../../sync/presentation/sync_center_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -177,6 +178,8 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 13),
+            const NotificationSettingsCard(),
             const SizedBox(height: 13),
             NotebookCard(
               child: Column(

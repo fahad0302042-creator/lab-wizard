@@ -8,9 +8,13 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_screen.dart';
+import '../../inventory/presentation/inventory_sheets.dart';
+import '../../notifications/notification_providers.dart';
+import '../../notifications/presentation/alerts_screen.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../scanner/presentation/scanner_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../sync/presentation/sync_center_screen.dart';
 import 'dashboard_screen.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
@@ -28,13 +32,43 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(inventoryProvider.notifier).bootstrap(widget.user.id),
-    );
+    Future.microtask(() {
+      ref.read(inventoryProvider.notifier).bootstrap(widget.user.id);
+      ref.read(notificationCoordinatorProvider.notifier).start();
+      final pending = ref.read(notificationCoordinatorProvider).pendingTap;
+      if (pending != null && mounted) _openNotificationTarget(pending);
+    });
+  }
+
+  /// Opens whatever a tapped notification points at (NOTIFY-01).
+  void _openNotificationTarget(String payload) {
+    ref.read(notificationCoordinatorProvider.notifier).consumeTap();
+    final navigator = Navigator.of(context);
+    final parts = payload.split(':');
+    switch (parts.first) {
+      case 'chemical' when parts.length > 1:
+        showItemDetailSheet(context, ref, ItemKind.chemical, parts[1]);
+      case 'apparatus' when parts.length > 1:
+        showItemDetailSheet(context, ref, ItemKind.apparatus, parts[1]);
+      case 'sync':
+        navigator.push(
+          MaterialPageRoute<void>(builder: (_) => const SyncCenterScreen()),
+        );
+      default:
+        navigator.push(
+          MaterialPageRoute<void>(builder: (_) => const AlertsScreen()),
+        );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(
+      notificationCoordinatorProvider.select((status) => status.pendingTap),
+      (_, payload) {
+        if (payload != null) _openNotificationTarget(payload);
+      },
+    );
     final pages = <Widget>[
       DashboardScreen(
         user: widget.user,

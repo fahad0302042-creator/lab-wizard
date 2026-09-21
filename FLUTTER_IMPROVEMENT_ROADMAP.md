@@ -47,10 +47,10 @@ Ground rules for every item:
 
 | ID | Status | Improvement | Acceptance criteria | Dependencies |
 |---|---|---|---|---|
-| NOTIFY-01 | TODO | Notification preferences | Per-type controls, permission education and Settings management. | None |
-| NOTIFY-02 | TODO | Low-stock and expiry alerts | Deduplicated local alerts with sensible timing and direct item navigation. | DATA-01, NOTIFY-01 |
-| NOTIFY-03 | TODO | Return/calibration alerts | Overdue checkout, maintenance and calibration notifications. | GEAR-02, GEAR-03, NOTIFY-01 |
-| NOTIFY-04 | TODO | Sync and weekly summary alerts | Stale outbox warning and optional weekly stock summary. | SYNC-01, NOTIFY-01 |
+| NOTIFY-01 | VALIDATING | Notification preferences | Per-type controls, permission education and Settings management. Settings → *notifications*: master switch asks for the Android 13+ permission, blocked state explained with an *open system settings* button, per-topic switches, warning windows, reminder hour and a test notification; stored on the device only. | None |
+| NOTIFY-02 | VALIDATING | Low-stock and expiry alerts | Deduplicated local alerts with sensible timing and direct item navigation. Alerts fire once per day per item (persisted), more than three at once collapse into one digest, expiry reminders are scheduled ahead (N days before + expiry day) so they arrive with the app closed, and tapping opens the item sheet. | DATA-01, NOTIFY-01 |
+| NOTIFY-03 | VALIDATING | Return/calibration alerts | Overdue checkout, maintenance and calibration notifications. Loan due-time reminders, overdue-return alerts, service *due soon* / *due today* / *overdue* alerts; all open the apparatus sheet. | GEAR-02, GEAR-03, NOTIFY-01 |
+| NOTIFY-04 | VALIDATING | Sync and weekly summary alerts | Stale outbox warning and optional weekly stock summary. Failed outbox changes raise one alert that opens the sync center; the optional weekly summary repeats on a chosen weekday/hour and the *needs attention* screen shows the same digest text in the app. | SYNC-01, NOTIFY-01 |
 
 ## Milestone E — Offline and synchronization reliability
 
