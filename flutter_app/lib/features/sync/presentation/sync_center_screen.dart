@@ -444,32 +444,32 @@ class _OperationCard extends StatelessWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    conflict != null
-                        ? 'conflict'
-                        : failed
-                        ? 'needs attention'
-                        : 'waiting',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontFamily: 'Caveat',
-                      fontSize: 16,
-                      height: 1,
-                      fontWeight: FontWeight.w700,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    child: Text(
+                      conflict != null
+                          ? 'conflict'
+                          : failed
+                          ? 'needs attention'
+                          : 'waiting',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontFamily: 'Caveat',
+                        fontSize: 16,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
                 ),
               ),
             ],

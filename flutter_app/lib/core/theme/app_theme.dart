@@ -263,7 +263,9 @@ double contrastRatio(Color a, Color b) {
       ? value / 12.92
       : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
   double luminance(Color color) =>
-      0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+      0.2126 * channel(color.r) +
+      0.7152 * channel(color.g) +
+      0.0722 * channel(color.b);
   final light = math.max(luminance(a), luminance(b));
   final dark = math.min(luminance(a), luminance(b));
   return (light + 0.05) / (dark + 0.05);

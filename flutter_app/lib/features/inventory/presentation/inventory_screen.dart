@@ -997,37 +997,37 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
           },
           excludeSemantics: true,
           child: SizedBox(
-          width: 78,
-          child: Stack(
-            children: [
-              Positioned(
-                right: 4,
-                top: stripTop,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  excludeFromSemantics: true,
-                  onTapDown: (details) =>
-                      _select(details.localPosition, slot, letters),
-                  onTapUp: (_) => _clear(),
-                  onTapCancel: _clear,
-                  onVerticalDragStart: (details) =>
-                      _select(details.localPosition, slot, letters),
-                  onVerticalDragUpdate: (details) =>
-                      _select(details.localPosition, slot, letters),
-                  onVerticalDragEnd: (_) => _clear(),
-                  onVerticalDragCancel: _clear,
-                  child: Container(
-                    width: 22,
-                    decoration: BoxDecoration(
-                      color: context.cardColor.withValues(alpha: .82),
-                      borderRadius: BorderRadius.circular(11),
-                      border: Border.all(color: context.ruledColor, width: 1),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final letter in letters)
-                          SizedBox(
+            width: 78,
+            child: Stack(
+              children: [
+                Positioned(
+                  right: 4,
+                  top: stripTop,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    excludeFromSemantics: true,
+                    onTapDown: (details) =>
+                        _select(details.localPosition, slot, letters),
+                    onTapUp: (_) => _clear(),
+                    onTapCancel: _clear,
+                    onVerticalDragStart: (details) =>
+                        _select(details.localPosition, slot, letters),
+                    onVerticalDragUpdate: (details) =>
+                        _select(details.localPosition, slot, letters),
+                    onVerticalDragEnd: (_) => _clear(),
+                    onVerticalDragCancel: _clear,
+                    child: Container(
+                      width: 22,
+                      decoration: BoxDecoration(
+                        color: context.cardColor.withValues(alpha: .82),
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(color: context.ruledColor, width: 1),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final letter in letters)
+                            SizedBox(
                               height: slot,
                               width: 22,
                               child: Center(
@@ -1052,49 +1052,49 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                                 ),
                               ),
                             ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (activeIndex >= 0 && widget.available.contains(_active))
-                Positioned(
-                  right: 32,
-                  top: (stripTop + activeIndex * slot + slot / 2 - 22).clamp(
-                    0.0,
-                    math.max(0.0, constraints.maxHeight - 44),
-                  ),
-                  child: IgnorePointer(
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: context.marginRedColor,
-                        shape: BoxShape.circle,
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x33000000),
-                            blurRadius: 6,
-                            offset: Offset(0, 2),
+                if (activeIndex >= 0 && widget.available.contains(_active))
+                  Positioned(
+                    right: 32,
+                    top: (stripTop + activeIndex * slot + slot / 2 - 22).clamp(
+                      0.0,
+                      math.max(0.0, constraints.maxHeight - 44),
+                    ),
+                    child: IgnorePointer(
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: context.marginRedColor,
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x33000000),
+                              blurRadius: 6,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _active!,
+                          style: TextStyle(
+                            color: context.cardColor,
+                            fontFamily: 'Caveat',
+                            fontSize: 26,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        _active!,
-                        style: TextStyle(
-                          color: context.cardColor,
-                          fontFamily: 'Caveat',
-                          fontSize: 26,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            ),
           ),
         );
       },
@@ -1524,24 +1524,26 @@ class _InventoryCard extends StatelessWidget {
                               maxWidth: constraints.maxWidth,
                             ),
                             child: Text(
-                            stockCaption(item.status),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: item.status == StockState.healthy
-                                  ? context.inkColor
-                                  : item.status == StockState.low
-                                  ? context.lowColor
-                                  : context.marginRedColor,
-                              fontFamily: 'Caveat',
-                              fontSize: 18,
-                              height: 1,
-                              fontWeight: FontWeight.w700,
-                              backgroundColor: item.status == StockState.empty
-                                  ? LabColors.highlighter.withValues(alpha: .72)
-                                  : null,
+                              stockCaption(item.status),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: item.status == StockState.healthy
+                                    ? context.inkColor
+                                    : item.status == StockState.low
+                                    ? context.lowColor
+                                    : context.marginRedColor,
+                                fontFamily: 'Caveat',
+                                fontSize: 18,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                                backgroundColor: item.status == StockState.empty
+                                    ? LabColors.highlighter.withValues(
+                                        alpha: .72,
+                                      )
+                                    : null,
+                              ),
                             ),
-                          ),
                           ),
                           Wrap(
                             spacing: 10,
