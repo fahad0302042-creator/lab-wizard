@@ -313,6 +313,9 @@ void main() {
       expect(find.text('overdue by 5 days'), findsOneWidget);
       await tester.tap(find.text('chemicals'));
       await tester.pumpAndSettle();
+      // REPORT-05: spreadsheet exports sit next to the PDF button.
+      expect(find.byKey(const Key('export-activity-csv')), findsOneWidget);
+      expect(find.byKey(const Key('export-inventory-csv')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('report-range-custom')));
       await tester.pumpAndSettle();

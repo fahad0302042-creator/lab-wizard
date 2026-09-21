@@ -7,13 +7,18 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/csv.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../auth/presentation/change_password_sheet.dart';
+import '../../auth/presentation/delete_account_sheet.dart';
 import '../../import/presentation/import_screen.dart';
 import '../../inventory/domain/models.dart';
 import '../../notifications/presentation/notification_settings_card.dart';
 import '../../sync/presentation/background_sync_card.dart';
 import '../../sync/presentation/sync_center_screen.dart';
+import 'lab_profile_card.dart';
+import 'sessions_card.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -61,16 +66,40 @@ class SettingsScreen extends ConsumerWidget {
                     style: TextStyle(color: context.mutedInkColor),
                   ),
                   const SizedBox(height: 14),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      await ref.read(authProvider.notifier).signOut();
-                      if (context.mounted) {
-                        Navigator.of(context)
-                            .popUntil((route) => route.isFirst);
-                      }
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Sign out'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const Key('change-password'),
+                        onPressed: () async {
+                          final changed = await showChangePasswordSheet(
+                            context,
+                          );
+                          if (changed == true && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Password changed.'),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.password_outlined),
+                        label: const Text('Change password'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await ref.read(authProvider.notifier).signOut();
+                          if (context.mounted) {
+                            Navigator.of(
+                              context,
+                            ).popUntil((route) => route.isFirst);
+                          }
+                        },
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Sign out (this phone)'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -285,6 +314,46 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 13),
+            const LabProfileCard(),
+            const SizedBox(height: 13),
+            const SessionsCard(),
+            const SizedBox(height: 13),
+            NotebookCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _CardTitle(
+                    icon: Icons.warning_amber_outlined,
+                    title: 'danger zone',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Deleting the account removes all chemicals, apparatus and '
+                    'history from Lab Wizard for good. You can export '
+                    'everything first.',
+                    style: TextStyle(color: context.mutedInkColor),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('delete-account'),
+                    onPressed: () async {
+                      final deleted = await showDeleteAccountSheet(context);
+                      if (deleted == true && context.mounted) {
+                        Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst);
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.marginRedColor,
+                    ),
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: const Text('Delete account…'),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
             Text(
               'Lab Wizard for Android · modern notebook edition',
@@ -367,10 +436,11 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ];
-      final csv = rows.map((row) => row.map(_csvCell).join(',')).join('\n');
+      // REPORT-05: shared writer (formula guard, CRLF, byte-order mark).
+      final csv = csvDocument(rows.first, rows.skip(1));
       final directory = await getTemporaryDirectory();
       final file = File('${directory.path}/lab-wizard-inventory.csv');
-      await file.writeAsString(csv, flush: true);
+      await file.writeAsBytes(csvBytes(csv), flush: true);
       await SharePlus.instance.share(
         ShareParams(
           title: 'Lab Wizard inventory',
@@ -385,10 +455,6 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  String _csvCell(String value) {
-    final safe = RegExp(r'^[=+\-@]').hasMatch(value) ? "'$value" : value;
-    return '"${safe.replaceAll('"', '""')}"';
-  }
 }
 
 class _CardTitle extends StatelessWidget {

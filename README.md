@@ -62,6 +62,8 @@ Incremental sync (SYNC-02) adds [`flutter_app/supabase/007_incremental_sync.sql`
 
 External barcodes (SCAN-04) add [`flutter_app/supabase/008_external_barcodes.sql`](flutter_app/supabase/008_external_barcodes.sql): a nullable `barcode text` column on `chemicals` and `apparatus` with partial indexes per user. The web app never reads or writes it; the Flutter scanner only opens an item whose `barcode` equals a scanned product code after a person linked the two explicitly.
 
+Account deletion (ACCOUNT-03) adds [`flutter_app/supabase/009_account_deletion.sql`](flutter_app/supabase/009_account_deletion.sql): one `public.delete_my_account()` function (SECURITY DEFINER, executable by `authenticated` only) that deletes the caller's own rows in every table and then the caller's `auth.users` row. No table, policy or trigger changes; the web app is unaffected.
+
 Background sync (SYNC-03) needs no database change: it reuses the incremental download and the idempotent outbox from an Android WorkManager job.
 
 Conflict resolution (SYNC-04) needs no database change either: the phone sends only the fields it changed, as a compare-and-set on their last-seen values (plain PostgREST filters), so an edit made in the web app in the meantime is never overwritten silently — the phone shows the conflict and asks.

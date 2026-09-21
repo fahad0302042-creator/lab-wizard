@@ -32,6 +32,18 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Password-recovery deep link (ACCOUNT-01). Supabase redirects
+                 to com.labwizard.labwizard://reset-password after the email
+                 link is verified; supabase_flutter picks the session up from
+                 the URI. Keep in sync with AppConfig.passwordResetRedirect. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="com.labwizard.labwizard"
+                    android:host="reset-password" />
+            </intent-filter>
         </activity>
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"

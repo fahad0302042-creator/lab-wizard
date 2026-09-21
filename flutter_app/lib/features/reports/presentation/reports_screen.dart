@@ -1,21 +1,26 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/csv.dart';
+import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
-import '../domain/asset_reports.dart';
+import '../data/report_pdf.dart';
+import '../domain/csv_exports.dart';
 import '../domain/report_range.dart';
 import '../domain/report_stats.dart';
 import '../domain/runout.dart';
+import '../lab_profile_providers.dart';
 import 'asset_report_sections.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
@@ -336,6 +341,73 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               : const Icon(Icons.picture_as_pdf_outlined),
           label: Text(_exporting ? 'Preparing PDF…' : 'Share PDF report'),
         ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('export-activity-csv'),
+                onPressed: logs.isEmpty || _exporting
+                    ? null
+                    : () => _shareCsv(
+                        name: 'lab-wizard-activity-${_kind.name}-'
+                            '${_range.fileStem}.csv',
+                        title: 'Lab Wizard activity ${_range.dates}',
+                        csv: activityCsv(
+                          range: _range,
+                          kind: _kind,
+                          logs: state.logs,
+                          nameOf: (id) => _nameOfItem(state, _kind, id),
+                          detailOf: (id) => _kind == ItemKind.chemical
+                              ? state.chemicals
+                                        .where((item) => item.id == id)
+                                        .map((item) => item.formula)
+                                        .firstOrNull ??
+                                    ''
+                              : state.apparatus
+                                        .where((item) => item.id == id)
+                                        .map((item) => item.category)
+                                        .firstOrNull ??
+                                    '',
+                          unitOf: (id) =>
+                              state.chemicals
+                                  .where((item) => item.id == id)
+                                  .map((item) => item.unit)
+                                  .firstOrNull ??
+                              '',
+                        ),
+                      ),
+                icon: const Icon(Icons.table_chart_outlined),
+                label: const Text('Activity CSV'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('export-inventory-csv'),
+                onPressed: _exporting
+                    ? null
+                    : () => _shareCsv(
+                        name: 'lab-wizard-${_kind == ItemKind.chemical ? 'chemicals' : 'apparatus'}-'
+                            '${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv',
+                        title: 'Lab Wizard '
+                            '${_kind == ItemKind.chemical ? 'chemicals' : 'apparatus'}',
+                        csv: _kind == ItemKind.chemical
+                            ? chemicalsCsv(state.chemicals)
+                            : apparatusCsv(state.apparatus),
+                      ),
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Inventory CSV'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'CSV files open in Excel, LibreOffice and Sheets; cells that look '
+          'like formulas are written as text so nothing in a note can run.',
+          style: TextStyle(color: context.mutedInkColor, fontSize: 11),
+        ),
         const SizedBox(height: 24),
         const PageHeading('activity log'),
         if (logs.isEmpty)
@@ -375,138 +447,90 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
   }
 
+  /// REPORT-05: writes [csv] to the cache directory and hands it to the
+  /// share sheet (email, Drive, Files …).
+  Future<void> _shareCsv({
+    required String name,
+    required String title,
+    required String csv,
+  }) async {
+    setState(() => _exporting = true);
+    try {
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/$name');
+      await file.writeAsBytes(csvBytes(csv), flush: true);
+      await SharePlus.instance.share(
+        ShareParams(
+          title: title,
+          text: title,
+          files: [XFile(file.path, mimeType: 'text/csv', name: name)],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyErrorMessage(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   Future<Uint8List> _buildPdf(
     InventoryState state,
     List<ConsumptionLog> logs,
     AssetReports assets,
   ) async {
-    final day = DateFormat('d MMM yyyy');
-    pw.Widget table(
-      String title,
-      List<String> headers,
-      List<List<String>> rows,
-    ) {
-      if (rows.isEmpty) return pw.SizedBox();
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(height: 16),
-          pw.Text(
-            title,
-            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.TableHelper.fromTextArray(
-            headers: headers,
-            data: rows,
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            cellStyle: const pw.TextStyle(fontSize: 9),
-            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
-          ),
-        ],
-      );
-    }
-
-    final expiry = assets.expiry;
-    final loans = assets.loans;
-    final services = assets.services;
-    final document = pw.Document(
-      title: 'Lab Wizard report ${_range.dates}',
-      author: 'Lab Wizard',
+    // REPORT-06: branded, paginated layout built from resolved data.
+    final profileController = ref.read(labProfileProvider.notifier);
+    final profile = ref.read(labProfileProvider);
+    final logo = await profileController.logoBytes();
+    final trend = TrendComparison.compute(
+      _range,
+      state.logs,
+      kind: _kind,
+      unitOf: (itemId) =>
+          state.chemicals
+              .where((item) => item.id == itemId)
+              .map((item) => item.unit)
+              .firstOrNull ??
+          '',
     );
-    document.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (_) => [
-          pw.Text(
-            'Lab Wizard',
-            style: pw.TextStyle(fontSize: 26, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.Text(
-            '${_kind == ItemKind.chemical ? 'Chemical' : 'Apparatus'} report — '
-            '${_range.label} (${_range.dates})',
-          ),
-          pw.SizedBox(height: 20),
-          pw.TableHelper.fromTextArray(
-            headers: const ['Date', 'Item', 'Action', 'Amount', 'Note'],
-            data: logs
-                .map(
-                  (log) => [
-                    DateFormat('dd MMM yyyy').format(log.loggedAt.toLocal()),
-                    _itemName(state, log),
-                    log.action.name,
-                    formatQuantity(log.amount),
-                    log.note,
-                  ],
-                )
-                .toList(),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            cellStyle: const pw.TextStyle(fontSize: 9),
-            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
-          ),
-          if (expiry != null)
-            table(
-              'Expired and expiring chemicals',
-              const ['Chemical', 'Expiry date', 'Status'],
-              [
-                for (final row in [...expiry.expired, ...expiry.expiringSoon])
-                  [
-                    row.chemical.name,
-                    day.format(row.chemical.expiryDate!),
-                    row.state == ExpiryState.expired
-                        ? 'expired ${relativeDays(row.days)}'
-                        : relativeDays(row.days),
-                  ],
-              ],
-            ),
-          table(
-            'Damage in this range',
-            const ['Item', 'Incidents', 'Amount', 'Last'],
-            [
-              for (final row in assets.damage.rows)
-                [
-                  row.name,
-                  '${row.incidents}',
-                  '${formatQuantity(row.amount)} ${row.unit}'.trim(),
-                  day.format(row.lastAt.toLocal()),
-                ],
-            ],
-          ),
-          if (loans != null)
-            table(
-              'Overdue loans',
-              const ['Apparatus', 'Person', 'Out', 'Due', 'Overdue'],
-              [
-                for (final loan in loans.overdue)
-                  [
-                    loan.apparatusName,
-                    loan.checkout.person,
-                    formatQuantity(loan.checkout.outstanding),
-                    day.format(loan.checkout.dueAt!.toLocal()),
-                    loan.when,
-                  ],
-              ],
-            ),
-          if (services != null)
-            table(
-              'Maintenance and calibration due',
-              const ['Task', 'Apparatus', 'Kind', 'Due', 'Status'],
-              [
-                for (final row in services.due)
-                  [
-                    row.service.displayTitle,
-                    row.apparatusName,
-                    row.service.kind.label,
-                    day.format(row.service.dueAt!.toLocal()),
-                    row.when,
-                  ],
-              ],
+    final itemStates = _kind == ItemKind.chemical
+        ? state.chemicals.map((item) => item.stockState)
+        : state.apparatus.map((item) => item.stockState);
+    final sorted = [...logs]..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+    return buildReportPdf(
+      ReportPdfInput(
+        profile: profile,
+        logo: logo,
+        kind: _kind,
+        range: _range,
+        trend: trend,
+        logs: [
+          for (final log in sorted)
+            ReportPdfLog(
+              at: log.loggedAt,
+              item: _itemName(state, log),
+              action: log.action.name,
+              amount:
+                  '${formatQuantity(log.amount)} ${_unitOf(state, log)}'.trim(),
+              note: log.note,
             ),
         ],
+        runOut: _kind == ItemKind.chemical
+            ? runOutReportForChemicals(state.chemicals, state.logs)
+            : runOutReportForApparatus(state.apparatus, state.logs),
+        damage: assets.damage,
+        expiry: assets.expiry,
+        loans: assets.loans,
+        services: assets.services,
+        healthyItems: itemStates
+            .where((status) => status == StockState.healthy)
+            .length,
+        totalItems: itemStates.length,
       ),
     );
-    return document.save();
   }
 }
 
@@ -947,16 +971,28 @@ class _ReportLogRow extends StatelessWidget {
   }
 }
 
-String _itemName(InventoryState state, ConsumptionLog log) {
-  if (log.itemType == ItemKind.chemical) {
+String _itemName(InventoryState state, ConsumptionLog log) =>
+    _nameOfItem(state, log.itemType, log.itemId);
+
+String _unitOf(InventoryState state, ConsumptionLog log) {
+  if (log.itemType == ItemKind.apparatus) return 'pcs';
+  return state.chemicals
+          .where((item) => item.id == log.itemId)
+          .map((item) => item.unit)
+          .firstOrNull ??
+      '';
+}
+
+String _nameOfItem(InventoryState state, ItemKind kind, String id) {
+  if (kind == ItemKind.chemical) {
     return state.chemicals
-            .where((item) => item.id == log.itemId)
+            .where((item) => item.id == id)
             .map((item) => item.name)
             .firstOrNull ??
         'Removed chemical';
   }
   return state.apparatus
-          .where((item) => item.id == log.itemId)
+          .where((item) => item.id == id)
           .map((item) => item.name)
           .firstOrNull ??
       'Removed apparatus';

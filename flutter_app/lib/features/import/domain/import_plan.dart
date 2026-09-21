@@ -1,3 +1,4 @@
+import '../../../core/utils/csv.dart';
 import '../../inventory/domain/duplicates.dart';
 import '../../inventory/domain/models.dart';
 
@@ -234,7 +235,9 @@ List<ImportRow> buildImportRows({
     String cell(ImportField field) {
       final column = mapping[field];
       if (column == null || column < 0 || column >= cells.length) return '';
-      return cells[column].trim();
+      // Our own exports guard formula-looking text with an apostrophe
+      // (REPORT-05); take it off again on the way back in.
+      return csvUnguard(cells[column].trim());
     }
 
     final issues = <ImportIssue>[];

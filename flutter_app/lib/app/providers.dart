@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
 import '../core/database/local_database.dart';
+import '../core/utils/errors.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/models.dart';
 import '../features/sync/data/incremental_sync.dart';
@@ -36,14 +37,22 @@ enum AuthPhase {
   signingIn,
   signedIn,
   awaitingVerification,
+
+  /// A password-recovery link was opened on this phone (ACCOUNT-01): the
+  /// person is signed in through it and must choose a new password.
+  passwordRecovery,
 }
 
 class AuthState {
-  const AuthState({required this.phase, this.user, this.error});
+  const AuthState({required this.phase, this.user, this.error, this.notice});
 
   final AuthPhase phase;
   final User? user;
   final String? error;
+
+  /// Neutral one-off message for the sign-in card, e.g. after the account
+  /// was deleted (ACCOUNT-03).
+  final String? notice;
 
   bool get isBusy => phase == AuthPhase.signingIn;
 
@@ -59,6 +68,22 @@ final authProvider = NotifierProvider<AuthController, AuthState>(
   AuthController.new,
 );
 
+/// Supabase auth errors in plain words.
+String friendlyAuthMessage(AuthException error) {
+  final message = error.message;
+  final lower = message.toLowerCase();
+  if (error.statusCode == '429' || lower.contains('security purposes')) {
+    return 'Too many attempts. Wait a minute and try again.';
+  }
+  if (lower.contains('same as the old') || lower.contains('different from')) {
+    return 'Choose a password different from the current one.';
+  }
+  if (lower.contains('weak') || lower.contains('at least')) {
+    return message;
+  }
+  return message.isEmpty ? 'Something went wrong. Please try again.' : message;
+}
+
 class AuthController extends Notifier<AuthState> {
   StreamSubscription<dynamic>? _subscription;
 
@@ -72,8 +97,16 @@ class AuthController extends Notifier<AuthState> {
     _subscription = client.auth.onAuthStateChange.listen((change) {
       final nextUser = change.session?.user;
       if (nextUser == null) {
-        state = const AuthState(phase: AuthPhase.signedOut);
+        // Keep a one-off notice (e.g. "account deleted") for the sign-in card.
+        state = AuthState(phase: AuthPhase.signedOut, notice: state.notice);
         ref.read(inventoryProvider.notifier).clearMemory();
+      } else if (change.event == AuthChangeEvent.passwordRecovery) {
+        state = AuthState(phase: AuthPhase.passwordRecovery, user: nextUser);
+      } else if (state.phase == AuthPhase.passwordRecovery &&
+          change.event != AuthChangeEvent.userUpdated) {
+        // Token refreshes while the new-password form is open must not
+        // dismiss it; only the password update (userUpdated) does.
+        state = AuthState(phase: AuthPhase.passwordRecovery, user: nextUser);
       } else {
         state = AuthState(phase: AuthPhase.signedIn, user: nextUser);
       }
@@ -130,11 +163,200 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> signOut() async {
+  /// Sends the recovery email (ACCOUNT-01). Returns an error message, or
+  /// null when the request was accepted. Supabase answers the same way
+  /// whether or not the address exists, so the caller shows one neutral
+  /// confirmation either way.
+  Future<String?> requestPasswordReset(String email) async {
+    final client = ref.read(supabaseClientProvider);
+    if (client == null) return 'Supabase is not configured in this build.';
+    final address = email.trim();
+    if (!address.contains('@')) return 'Enter a valid email';
+    try {
+      await client.auth.resetPasswordForEmail(
+        address,
+        redirectTo: AppConfig.passwordResetRedirect,
+      );
+      return null;
+    } on AuthException catch (error) {
+      return friendlyAuthMessage(error);
+    } catch (_) {
+      return 'Could not connect. Check your internet and try again.';
+    }
+  }
+
+  /// Sets a new password for the signed-in (or recovering) user. Returns an
+  /// error message, or null on success; success also ends the recovery
+  /// phase.
+  Future<String?> updatePassword(String newPassword) async {
+    final client = ref.read(supabaseClientProvider);
+    if (client == null) return 'Supabase is not configured in this build.';
+    if (newPassword.length < 6) return 'Use at least 6 characters';
+    try {
+      final response = await client.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+      state = AuthState(
+        phase: AuthPhase.signedIn,
+        user: response.user ?? state.user,
+      );
+      return null;
+    } on AuthSessionMissingException {
+      return 'The reset link has expired. Request a new email and open the '
+          'link on this phone.';
+    } on AuthException catch (error) {
+      return friendlyAuthMessage(error);
+    } catch (_) {
+      return 'Could not connect. Check your internet and try again.';
+    }
+  }
+
+  /// Changes the password of the signed-in user (ACCOUNT-02) after proving
+  /// the current one: the current password is checked with a fresh sign-in
+  /// first, so a phone left unlocked cannot silently take the account over.
+  /// Returns an error message, or null on success. With [signOutOthers] the
+  /// sessions on other devices are revoked once the new password is saved.
+  Future<String?> changePassword({
+    required String current,
+    required String next,
+    bool signOutOthers = false,
+  }) async {
+    final client = ref.read(supabaseClientProvider);
+    if (client == null) return 'Supabase is not configured in this build.';
+    final email = client.auth.currentUser?.email ?? state.user?.email;
+    if (email == null || email.isEmpty) {
+      return 'Sign in again to change your password.';
+    }
+    if (current.isEmpty) return 'Enter your current password.';
+    if (next.length < 6) return 'Use at least 6 characters';
+    if (next == current) {
+      return 'Choose a password different from the current one.';
+    }
+    try {
+      await client.auth.signInWithPassword(email: email, password: current);
+    } on AuthException catch (error) {
+      final lower = error.message.toLowerCase();
+      if (lower.contains('invalid login') ||
+          lower.contains('invalid credentials') ||
+          error.code == 'invalid_credentials') {
+        return 'The current password is not right.';
+      }
+      return friendlyAuthMessage(error);
+    } catch (_) {
+      return 'Could not connect. Check your internet and try again.';
+    }
+    try {
+      final response = await client.auth.updateUser(
+        UserAttributes(password: next),
+      );
+      state = AuthState(
+        phase: AuthPhase.signedIn,
+        user: response.user ?? state.user,
+      );
+    } on AuthException catch (error) {
+      return friendlyAuthMessage(error);
+    } catch (_) {
+      return 'Could not connect. Check your internet and try again.';
+    }
+    if (signOutOthers) {
+      try {
+        await client.auth.signOut(scope: SignOutScope.others);
+      } catch (_) {
+        return 'Password changed, but other devices could not be signed '
+            'out right now. Try again from Settings later.';
+      }
+    }
+    return null;
+  }
+
+  /// Deletes the account and all its data (ACCOUNT-03): proves the password
+  /// again, calls the server-side `delete_my_account()` function, wipes the
+  /// offline copy on this phone and ends the session. Returns an error
+  /// message, or null when everything is gone.
+  Future<String?> deleteAccount({required String password}) async {
+    final client = ref.read(supabaseClientProvider);
+    if (client == null) return 'Supabase is not configured in this build.';
+    final user = client.auth.currentUser ?? state.user;
+    final email = user?.email;
+    if (user == null || email == null || email.isEmpty) {
+      return 'Sign in again to delete your account.';
+    }
+    if (password.isEmpty) return 'Enter your current password.';
+    try {
+      await client.auth.signInWithPassword(email: email, password: password);
+    } on AuthException catch (error) {
+      final lower = error.message.toLowerCase();
+      if (lower.contains('invalid login') ||
+          lower.contains('invalid credentials') ||
+          error.code == 'invalid_credentials') {
+        return 'The current password is not right.';
+      }
+      return friendlyAuthMessage(error);
+    } catch (_) {
+      return 'You need to be online to delete the account.';
+    }
+    try {
+      await client.rpc<void>('delete_my_account');
+    } catch (error) {
+      if (error is PostgrestException) {
+        final lower = error.message.toLowerCase();
+        if (error.code == 'PGRST202' ||
+            lower.contains('could not find the function')) {
+          return 'The server is missing the account-deletion function. Run '
+              'supabase/009_account_deletion.sql in the Supabase SQL editor, '
+              'then try again.';
+        }
+        if (!_looksOffline(lower)) return friendlyErrorMessage(error);
+      }
+      return 'You need to be online to delete the account.';
+    }
+    // The server side is gone; now forget everything on this phone.
+    try {
+      await ref.read(localDatabaseProvider).clearUser(user.id);
+    } catch (_) {
+      // A cache that cannot be cleared is harmless: it is unreadable without
+      // the account and overwritten on the next sign-in.
+    }
+    ref.read(inventoryProvider.notifier).clearMemory();
+    try {
+      await client.auth.signOut();
+    } catch (_) {
+      // The user no longer exists server-side; a failed sign-out call is
+      // expected. Drop the local session either way.
+    }
+    state = const AuthState(
+      phase: AuthPhase.signedOut,
+      notice: 'Your account and all its data were deleted.',
+    );
+    return null;
+  }
+
+  static bool _looksOffline(String lower) =>
+      lower.contains('socket') ||
+      lower.contains('network') ||
+      lower.contains('connection') ||
+      lower.contains('host lookup') ||
+      lower.contains('timed out');
+
+  /// Leaves the recovery form without changing the password; the recovery
+  /// session stays valid like any other sign-in.
+  void skipRecovery() {
+    if (state.phase != AuthPhase.passwordRecovery) return;
+    state = AuthState(phase: AuthPhase.signedIn, user: state.user);
+  }
+
+  /// Signs this phone out. [everywhere] also revokes every other session
+  /// of the account (ACCOUNT-04); the default only ends this device's
+  /// session so other devices and the web app keep working.
+  Future<void> signOut({bool everywhere = false}) async {
     final client = ref.read(supabaseClientProvider);
     final userId = state.user?.id;
     try {
-      await client?.auth.signOut();
+      await client?.auth.signOut(
+        scope: everywhere ? SignOutScope.global : SignOutScope.local,
+      );
+    } catch (_) {
+      // Offline or already revoked: the local session is dropped anyway.
     } finally {
       if (userId != null) {
         await ref.read(localDatabaseProvider).clearUser(userId);
@@ -143,6 +365,56 @@ class AuthController extends Notifier<AuthState> {
       state = const AuthState(phase: AuthPhase.signedOut);
     }
   }
+
+  /// Revokes the sessions on every other device and browser; this phone
+  /// stays signed in (ACCOUNT-04). Returns an error message, or null.
+  Future<String?> signOutOtherDevices() async {
+    final client = ref.read(supabaseClientProvider);
+    if (client == null) return 'Supabase is not configured in this build.';
+    if (client.auth.currentSession == null) {
+      return 'Sign in again to manage your sessions.';
+    }
+    try {
+      await client.auth.signOut(scope: SignOutScope.others);
+      return null;
+    } on AuthException catch (error) {
+      return friendlyAuthMessage(error);
+    } catch (_) {
+      return 'Could not connect. Check your internet and try again.';
+    }
+  }
+}
+
+/// What the app can tell about the signed-in session (ACCOUNT-04). Supabase
+/// does not expose a per-device session list to clients, so this describes
+/// the current device only.
+class SessionInfo {
+  const SessionInfo({
+    required this.email,
+    required this.signedInAt,
+    required this.accountCreatedAt,
+    required this.providers,
+    required this.emailConfirmed,
+  });
+
+  factory SessionInfo.fromUser(User user) {
+    final providers = user.appMetadata['providers'];
+    return SessionInfo(
+      email: user.email ?? '',
+      signedInAt: DateTime.tryParse(user.lastSignInAt ?? ''),
+      accountCreatedAt: DateTime.tryParse(user.createdAt),
+      providers: providers is List
+          ? providers.map((value) => value.toString()).toList()
+          : const [],
+      emailConfirmed: user.emailConfirmedAt != null,
+    );
+  }
+
+  final String email;
+  final DateTime? signedInAt;
+  final DateTime? accountCreatedAt;
+  final List<String> providers;
+  final bool emailConfirmed;
 }
 
 /// How the chemical and apparatus shelves lay out their rows (UX-01).

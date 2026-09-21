@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../features/auth/presentation/new_password_screen.dart';
 import '../features/home/presentation/home_shell.dart';
 import 'providers.dart';
 
@@ -43,6 +44,7 @@ class _AuthGate extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final child = switch (auth.phase) {
       AuthPhase.signedIn when auth.user != null => HomeShell(user: auth.user!),
+      AuthPhase.passwordRecovery => const NewPasswordScreen(),
       _ => const AuthScreen(),
     };
     return PageTransitionSwitcher(

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import 'forgot_password_dialog.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -147,6 +148,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             ),
                           ),
                         ],
+                        if (auth.notice != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            auth.notice!,
+                            key: const Key('auth-notice'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: context.healthyColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         FilledButton.icon(
                           onPressed: auth.isBusy ? null : _submit,
@@ -185,6 +198,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 : 'Create a new account',
                           ),
                         ),
+                        if (!_signUp)
+                          TextButton(
+                            key: const Key('forgot-password'),
+                            onPressed: auth.isBusy
+                                ? null
+                                : () => showForgotPasswordDialog(
+                                    context,
+                                    initialEmail: _email.text,
+                                  ),
+                            child: const Text('Forgot password?'),
+                          ),
                         const SizedBox(height: 4),
                         Text(
                           'Use the same account as the web app to load your existing data.',
