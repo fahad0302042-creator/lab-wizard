@@ -153,9 +153,16 @@ void main() {
         const InventoryScreen(kind: ItemKind.chemical),
         size: _sizes['small phone']!,
       );
+      // On a 320 x 568 phone only the first card fits under the controls;
+      // scroll a little so both cards are built, then compare their tops.
+      await tester.scrollUntilVisible(
+        find.textContaining('Hydrochloric'),
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
       final ethanol = tester.getTopLeft(find.text('Ethanol')).dy;
       final acid = tester.getTopLeft(find.textContaining('Hydrochloric')).dy;
-      expect((ethanol - acid).abs(), greaterThan(40));
+      expect(acid - ethanol, greaterThan(40), reason: 'one card per row');
     });
 
     testWidgets('the A–Z strip thins out when the list is short', (
