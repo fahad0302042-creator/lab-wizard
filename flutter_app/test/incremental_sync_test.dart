@@ -102,8 +102,7 @@ class _FakeSource implements SyncSource {
   }) async {
     requests++;
     if (missing.contains(table)) throw SyncTableMissing(table);
-    final rows = [...?tables[table]]
-      ..sort((a, b) => -_compare(a, b, orderBy));
+    final rows = [...?tables[table]]..sort((a, b) => -_compare(a, b, orderBy));
     if (offset >= rows.length) return const [];
     return rows.sublist(
       offset,
