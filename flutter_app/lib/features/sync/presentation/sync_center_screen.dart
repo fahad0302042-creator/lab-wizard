@@ -8,7 +8,9 @@ import '../../../core/utils/errors.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
+import '../background/background_sync_providers.dart';
 import '../data/incremental_sync.dart';
+import 'background_sync_card.dart';
 
 /// Lists every change waiting on this device, why it is waiting, and lets the
 /// user retry or discard it (SYNC-01).
@@ -159,6 +161,8 @@ class SyncCenterScreen extends ConsumerWidget {
                 style: TextStyle(color: context.mutedInkColor, fontSize: 12),
               ),
             ],
+            const SizedBox(height: 16),
+            const _BackgroundCard(),
           ],
         ),
       ),
@@ -308,6 +312,72 @@ class _DownloadCard extends StatelessWidget {
             'sent first and are never lost.',
             style: muted,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Background sync at a glance (SYNC-03); the settings card has the controls.
+class _BackgroundCard extends ConsumerWidget {
+  const _BackgroundCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preferences = ref.watch(backgroundSyncPreferencesProvider);
+    final trigger = ref.watch(
+      backgroundSyncCoordinatorProvider.select(
+        (state) => (state.lastTrigger, state.lastTriggeredAt),
+      ),
+    );
+    final muted = TextStyle(color: context.mutedInkColor, fontSize: 12.5);
+    return NotebookCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                preferences.enabled
+                    ? Icons.sync_lock_outlined
+                    : Icons.sync_disabled_outlined,
+                color: context.mutedInkColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  preferences.enabled
+                      ? 'background sync on'
+                      : 'background sync off',
+                  key: const Key('sync-background-title'),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            preferences.enabled
+                ? 'Runs about every ${preferences.everyHours == 1 ? 'hour' : '${preferences.everyHours} hours'}'
+                      '${preferences.unmeteredOnly ? ' on Wi-Fi' : ''}, plus '
+                      'when you return to the app or the connection comes '
+                      'back. Change this in settings.'
+                : 'The app only syncs while it is open: when you return to '
+                      'it, when the connection comes back, and on refresh.',
+            style: muted,
+          ),
+          const SizedBox(height: 4),
+          const BackgroundSyncSummary(),
+          if (trigger.$1 != null && trigger.$2 != null)
+            Text(
+              'Last automatic sync ${relativeTime(trigger.$2!)} '
+              '(${trigger.$1}).',
+              key: const Key('sync-background-trigger'),
+              style: muted,
+            ),
         ],
       ),
     );

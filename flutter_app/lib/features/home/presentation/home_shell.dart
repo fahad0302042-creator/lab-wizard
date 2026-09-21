@@ -14,6 +14,7 @@ import '../../notifications/presentation/alerts_screen.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../scanner/presentation/scanner_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../sync/background/background_sync_providers.dart';
 import '../../sync/presentation/sync_center_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -35,6 +36,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     Future.microtask(() {
       ref.read(inventoryProvider.notifier).bootstrap(widget.user.id);
       ref.read(notificationCoordinatorProvider.notifier).start();
+      ref.read(backgroundSyncCoordinatorProvider.notifier).start();
       final pending = ref.read(notificationCoordinatorProvider).pendingTap;
       if (pending != null && mounted) _openNotificationTarget(pending);
     });
