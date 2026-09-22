@@ -28,35 +28,38 @@ ConsumptionLog _log(String itemId, InventoryAction action, double amount) =>
     );
 
 void main() {
-  test('restock raises initial as well as final, and unused items stay out', () {
-    final rows = periodUsageRows(
-      kind: ItemKind.chemical,
-      chemicals: [
-        _chemical('used', quantity: 85),
-        _chemical('restocked', quantity: 30),
-        _chemical('idle', quantity: 40),
-      ],
-      apparatus: const [],
-      logsInRange: [
-        _log('used', InventoryAction.restock, 20),
-        _log('used', InventoryAction.consume, 15),
-        _log('restocked', InventoryAction.restock, 10),
-      ],
-    );
+  test(
+    'restock raises initial as well as final, and unused items stay out',
+    () {
+      final rows = periodUsageRows(
+        kind: ItemKind.chemical,
+        chemicals: [
+          _chemical('used', quantity: 85),
+          _chemical('restocked', quantity: 30),
+          _chemical('idle', quantity: 40),
+        ],
+        apparatus: const [],
+        logsInRange: [
+          _log('used', InventoryAction.restock, 20),
+          _log('used', InventoryAction.consume, 15),
+          _log('restocked', InventoryAction.restock, 10),
+        ],
+      );
 
-    expect(rows.map((row) => row.id), ['used', 'restocked']);
+      expect(rows.map((row) => row.id), ['used', 'restocked']);
 
-    final used = rows.first;
-    expect(used.initial, 100);
-    expect(used.restocked, 20);
-    expect(used.used, 15);
-    expect(used.finalQuantity, 85);
-    expect(used.initial - used.used, used.finalQuantity);
+      final used = rows.first;
+      expect(used.initial, 100);
+      expect(used.restocked, 20);
+      expect(used.used, 15);
+      expect(used.finalQuantity, 85);
+      expect(used.initial - used.used, used.finalQuantity);
 
-    final restocked = rows.last;
-    expect(restocked.initial, 30);
-    expect(restocked.restocked, 10);
-    expect(restocked.used, 0);
-    expect(restocked.finalQuantity, 30);
-  });
+      final restocked = rows.last;
+      expect(restocked.initial, 30);
+      expect(restocked.restocked, 10);
+      expect(restocked.used, 0);
+      expect(restocked.finalQuantity, 30);
+    },
+  );
 }

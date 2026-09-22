@@ -357,7 +357,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                               row.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             if (row.formulaOrCategory.isNotEmpty)
                               Text(
@@ -390,7 +392,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                     ),
                                   if (row.used > 0)
                                     TextSpan(
-                                      text: '  −${formatQuantity(row.used)} used',
+                                      text:
+                                          '  −${formatQuantity(row.used)} used',
                                       style: const TextStyle(
                                         color: LabColors.amber,
                                         fontWeight: FontWeight.w800,
