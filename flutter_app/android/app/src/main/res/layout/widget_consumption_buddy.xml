@@ -5,7 +5,10 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="10dp">
+    android:paddingLeft="10dp"
+    android:paddingTop="9dp"
+    android:paddingRight="10dp"
+    android:paddingBottom="9dp">
 
     <!-- Top Bar: Lab Name & Quick Action Buttons -->
     <LinearLayout
@@ -45,7 +48,7 @@
                 android:paddingBottom="3dp"
                 android:text="📷 Scan"
                 android:textColor="#1A1917"
-                android:textSize="10sp"
+                android:textSize="10.5sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -61,7 +64,7 @@
                 android:paddingBottom="3dp"
                 android:text="🔍 Search"
                 android:textColor="#1A1917"
-                android:textSize="10sp"
+                android:textSize="10.5sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -77,12 +80,12 @@
                 android:paddingBottom="3dp"
                 android:text="↩ Undo"
                 android:textColor="#1A1917"
-                android:textSize="10sp"
+                android:textSize="10.5sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Divider Line: Using ImageView because plain View is rejected by RemoteViews -->
+    <!-- Divider Line -->
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
@@ -96,13 +99,15 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <!-- Left: Today's Consumption Feed -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="68"
+            android:layout_weight="65"
+            android:gravity="center_vertical"
             android:orientation="vertical">
 
             <TextView
@@ -115,22 +120,37 @@
                 android:textStyle="bold" />
 
             <!-- Empty State Prompt -->
-            <TextView
+            <LinearLayout
                 android:id="@+id/widget_empty_view"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:text="No consumption logged today.\nTap [📷 Scan] to log."
-                android:textColor="#6A665E"
-                android:textSize="11sp"
-                android:visibility="gone" />
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Benchtop ready for work"
+                    android:textColor="#1A1917"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="No consumption logged today.\nTap [📷 Scan] above to record usage."
+                    android:textColor="#6A665E"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
             <!-- Items List Container -->
             <LinearLayout
                 android:id="@+id/widget_items_container"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:orientation="vertical">
 
                 <!-- Row 1 -->
@@ -272,7 +292,7 @@
             android:id="@+id/widget_flaskie_container"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="32"
+            android:layout_weight="35"
             android:gravity="center"
             android:orientation="vertical">
 
@@ -281,26 +301,35 @@
                 android:id="@+id/widget_flaskie_bubble"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="3dp"
+                android:layout_marginBottom="2dp"
                 android:background="@drawable/widget_speech_bubble"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:maxLines="2"
-                android:paddingLeft="5dp"
-                android:paddingTop="2dp"
-                android:paddingRight="5dp"
-                android:paddingBottom="2dp"
+                android:paddingLeft="7dp"
+                android:paddingTop="3dp"
+                android:paddingRight="7dp"
+                android:paddingBottom="3dp"
                 android:text="3 used today!"
                 android:textColor="#1A1917"
-                android:textSize="9sp"
+                android:textSize="9.5sp"
                 android:textStyle="bold" />
 
             <!-- Flaskie Buddy Character View -->
             <ImageView
                 android:id="@+id/widget_flaskie_image"
-                android:layout_width="52dp"
-                android:layout_height="58dp"
+                android:layout_width="60dp"
+                android:layout_height="66dp"
                 android:contentDescription="Flaskie" />
+
+            <TextView
+                android:id="@+id/widget_flaskie_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="Tap Flaskie ✨"
+                android:textColor="#8C867A"
+                android:textSize="8sp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

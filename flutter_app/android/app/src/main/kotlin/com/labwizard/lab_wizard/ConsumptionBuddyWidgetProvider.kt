@@ -3,11 +3,14 @@ package com.labwizard.lab_wizard
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
@@ -20,8 +23,64 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == ACTION_FLASKIE_TAP) {
+            animateFlaskieBurst(context)
+        }
+    }
+
+    private fun animateFlaskieBurst(context: Context) {
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        val ids = appWidgetManager.getAppWidgetIds(
+            ComponentName(context, ConsumptionBuddyWidgetProvider::class.java)
+        )
+        if (ids == null || ids.isEmpty()) return
+
+        val prefs = context.getSharedPreferences("LabWizardWidgetPrefs", Context.MODE_PRIVATE)
+        val baseSpeech = prefs.getString("flaskie_speech", "Ready to experiment!") ?: "Ready to experiment!"
+        val baseFrame = prefs.getInt("flaskie_frame", 0)
+        val quotes = arrayOf("Bubbles rising! ✨", "Safety goggles check! 🥽", "Pop! Ready to log! 🧪")
+
+        val pendingResult = goAsync()
+        val handler = Handler(Looper.getMainLooper())
+
+        // Frame 0: Bubble rising
+        val views0 = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
+        renderFlaskieBitmap(context, 0)?.let { views0.setImageViewBitmap(R.id.widget_flaskie_image, it) }
+        views0.setTextViewText(R.id.widget_flaskie_bubble, quotes[0])
+        for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, views0)
+
+        // Frame 1: Wink / Blink after 320ms
+        handler.postDelayed({
+            val views1 = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
+            renderFlaskieBitmap(context, 1)?.let { views1.setImageViewBitmap(R.id.widget_flaskie_image, it) }
+            views1.setTextViewText(R.id.widget_flaskie_bubble, quotes[1])
+            for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, views1)
+        }, 320)
+
+        // Frame 2: Joyful bubble pop after 640ms
+        handler.postDelayed({
+            val views2 = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
+            renderFlaskieBitmap(context, 2)?.let { views2.setImageViewBitmap(R.id.widget_flaskie_image, it) }
+            views2.setTextViewText(R.id.widget_flaskie_bubble, quotes[2])
+            for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, views2)
+        }, 640)
+
+        // Reset to lab status after 1200ms
+        handler.postDelayed({
+            val viewsRestore = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
+            renderFlaskieBitmap(context, baseFrame)?.let { viewsRestore.setImageViewBitmap(R.id.widget_flaskie_image, it) }
+            viewsRestore.setTextViewText(R.id.widget_flaskie_bubble, baseSpeech)
+            for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, viewsRestore)
+            pendingResult.finish()
+        }, 1200)
+    }
+
     companion object {
-        private fun renderFlaskieBitmap(context: Context, frameIndex: Int): Bitmap? {
+        const val ACTION_FLASKIE_TAP = "com.labwizard.lab_wizard.ACTION_FLASKIE_TAP"
+
+        fun renderFlaskieBitmap(context: Context, frameIndex: Int): Bitmap? {
             val resId = when (frameIndex % 3) {
                 0 -> R.drawable.flaskie_frame_1
                 1 -> R.drawable.flaskie_frame_2
@@ -30,8 +89,8 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
             return try {
                 val drawable = ContextCompat.getDrawable(context, resId) ?: return null
                 val density = context.resources.displayMetrics.density
-                val width = (52 * density).toInt().coerceAtLeast(1)
-                val height = (58 * density).toInt().coerceAtLeast(1)
+                val width = (60 * density).toInt().coerceAtLeast(1)
+                val height = (66 * density).toInt().coerceAtLeast(1)
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bitmap)
                 drawable.setBounds(0, 0, width, height)
@@ -93,7 +152,7 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                     if (item1Id.isNotEmpty()) {
                         views.setOnClickPendingIntent(
                             R.id.widget_item_1,
-                            createDeepLinkIntent(context, "labwizard://item?id=$item1Id", 101)
+                            createLaunchIntent(context, "labwizard://item?id=$item1Id", 101)
                         )
                     }
 
@@ -106,7 +165,7 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                         if (item2Id.isNotEmpty()) {
                             views.setOnClickPendingIntent(
                                 R.id.widget_item_2,
-                                createDeepLinkIntent(context, "labwizard://item?id=$item2Id", 102)
+                                createLaunchIntent(context, "labwizard://item?id=$item2Id", 102)
                             )
                         }
                     } else {
@@ -122,7 +181,7 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                         if (item3Id.isNotEmpty()) {
                             views.setOnClickPendingIntent(
                                 R.id.widget_item_3,
-                                createDeepLinkIntent(context, "labwizard://item?id=$item3Id", 103)
+                                createLaunchIntent(context, "labwizard://item?id=$item3Id", 103)
                             )
                         }
                     } else {
@@ -130,42 +189,60 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                     }
                 }
 
-                // Pending Intents for Action Buttons
+                // Benchtop Action Buttons
                 views.setOnClickPendingIntent(
                     R.id.btn_widget_scan,
-                    createDeepLinkIntent(context, "labwizard://scan_consume", 201)
+                    createLaunchIntent(context, "labwizard://scan_consume", 201)
                 )
                 views.setOnClickPendingIntent(
                     R.id.btn_widget_search,
-                    createDeepLinkIntent(context, "labwizard://search", 202)
+                    createLaunchIntent(context, "labwizard://search", 202)
                 )
                 views.setOnClickPendingIntent(
                     R.id.btn_widget_undo,
-                    createDeepLinkIntent(context, "labwizard://undo", 203)
+                    createLaunchIntent(context, "labwizard://undo", 203)
                 )
+
+                // Interactive Flaskie Buddy Tap Animation
                 views.setOnClickPendingIntent(
-                    R.id.widget_flaskie_container,
-                    createDeepLinkIntent(context, "labwizard://dashboard", 204)
+                    R.id.widget_flaskie_image,
+                    createFlaskieTapIntent(context)
+                )
+
+                // Speech Bubble & Card Background open app dashboard
+                views.setOnClickPendingIntent(
+                    R.id.widget_flaskie_bubble,
+                    createLaunchIntent(context, "labwizard://dashboard", 204)
                 )
                 views.setOnClickPendingIntent(
                     R.id.widget_root,
-                    createDeepLinkIntent(context, "labwizard://dashboard", 205)
+                    createLaunchIntent(context, "labwizard://dashboard", 205)
                 )
 
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             } catch (e: Throwable) {
-                // Safeguard against inflation exceptions
+                // Safeguard against unhandled exceptions
             }
         }
 
-        private fun createDeepLinkIntent(context: Context, uriString: String, requestCode: Int): PendingIntent {
-            val intent = Intent(context, MainActivity::class.java).apply {
+        private fun createLaunchIntent(context: Context, uriString: String, requestCode: Int): PendingIntent {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            val intent = (launchIntent ?: Intent(context, MainActivity::class.java)).apply {
                 action = Intent.ACTION_VIEW
                 data = Uri.parse(uriString)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("deep_link_uri", uriString)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             return PendingIntent.getActivity(context, requestCode, intent, flags)
+        }
+
+        private fun createFlaskieTapIntent(context: Context): PendingIntent {
+            val intent = Intent(context, ConsumptionBuddyWidgetProvider::class.java).apply {
+                action = ACTION_FLASKIE_TAP
+            }
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getBroadcast(context, 301, intent, flags)
         }
     }
 }

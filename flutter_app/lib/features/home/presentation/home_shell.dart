@@ -112,7 +112,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       return;
     }
     await undoRecordedAction(
-      ProviderScope.containerOf(context),
+      ref.container,
       ScaffoldMessenger.of(context),
       undoable.id,
     );

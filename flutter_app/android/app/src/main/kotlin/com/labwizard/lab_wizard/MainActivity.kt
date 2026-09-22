@@ -38,23 +38,37 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        extractUri(intent)?.let { uri ->
+            initialUri = uri
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleIntent(intent)
-    }
-
-    private fun handleIntent(intent: Intent?) {
-        val uri = intent?.data?.toString()
-        if (uri != null && uri.startsWith("labwizard://")) {
+        setIntent(intent)
+        extractUri(intent)?.let { uri ->
             initialUri = uri
             flutterEngine?.let { engine ->
-                MethodChannel(engine.dartExecutor.binaryMessenger, channelName)
-                    .invokeMethod("onDeepLink", uri)
+                try {
+                    MethodChannel(engine.dartExecutor.binaryMessenger, channelName)
+                        .invokeMethod("onDeepLink", uri)
+                } catch (e: Throwable) {
+                    // Flutter will fetch initialUri on startup
+                }
             }
         }
+    }
+
+    private fun extractUri(intent: Intent?): String? {
+        val dataUri = intent?.data?.toString()
+        if (dataUri != null && dataUri.startsWith("labwizard://")) {
+            return dataUri
+        }
+        val extraUri = intent?.getStringExtra("deep_link_uri")
+        if (extraUri != null && extraUri.startsWith("labwizard://")) {
+            return extraUri
+        }
+        return null
     }
 
     private fun saveWidgetData(data: Map<*, *>) {
