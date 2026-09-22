@@ -1,6 +1,10 @@
 -- Lab Wizard Flutter compatibility migration
 -- ADDITIVE ONLY: existing web inserts/selects continue to work unchanged.
 -- Run in the Supabase SQL editor before relying on queued/offline actions.
+--
+-- If supabase/010_multi_lab_organizations.sql has already been applied,
+-- re-run that file after this one. This script's apply_inventory_action is
+-- owner-only; 010 replaces it so a lab writer can act on a shared row.
 
 alter table public.chemicals
   add column if not exists low_stock_threshold numeric not null default 0;

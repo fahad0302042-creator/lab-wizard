@@ -11,8 +11,10 @@ import '../core/database/local_database.dart';
 import '../core/utils/errors.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/models.dart';
+import '../features/organizations/domain/active_notebook.dart';
 import '../features/sync/data/incremental_sync.dart';
 import '../features/sync/domain/sync_conflict.dart';
+import '../features/widgets/widget_gateway.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
   return AppConfig.hasSupabase ? Supabase.instance.client : null;
@@ -94,12 +96,19 @@ class AuthController extends Notifier<AuthState> {
       return const AuthState(phase: AuthPhase.setupRequired);
     }
     final user = client.auth.currentUser;
+    if (user == null) {
+      // Cold start with no session: the launcher must not keep the previous
+      // account's item names.
+      unawaited(WidgetGateway.clearWidget());
+    }
     _subscription = client.auth.onAuthStateChange.listen((change) {
       final nextUser = change.session?.user;
       if (nextUser == null) {
-        // Keep a one-off notice (e.g. "account deleted") for the sign-in card.
+        // Set signed-out before clearing memory so the home shell does not
+        // write the shelf back onto the widget as it tears down.
         state = AuthState(phase: AuthPhase.signedOut, notice: state.notice);
         ref.read(inventoryProvider.notifier).clearMemory();
+        unawaited(WidgetGateway.clearWidget());
       } else if (change.event == AuthChangeEvent.passwordRecovery) {
         state = AuthState(phase: AuthPhase.passwordRecovery, user: nextUser);
       } else if (state.phase == AuthPhase.passwordRecovery &&
@@ -318,6 +327,7 @@ class AuthController extends Notifier<AuthState> {
       // the account and overwritten on the next sign-in.
     }
     ref.read(inventoryProvider.notifier).clearMemory();
+    unawaited(WidgetGateway.clearWidget());
     try {
       await client.auth.signOut();
     } catch (_) {
@@ -363,6 +373,7 @@ class AuthController extends Notifier<AuthState> {
       }
       ref.read(inventoryProvider.notifier).clearMemory();
       state = const AuthState(phase: AuthPhase.signedOut);
+      unawaited(WidgetGateway.clearWidget());
     }
   }
 
@@ -1011,6 +1022,28 @@ class InventoryController extends Notifier<InventoryState> {
     }
   }
 
+  void _ensureCanWrite({bool deleting = false}) {
+    final notebook = ref.read(activeNotebookProvider);
+    if (notebook.pending) {
+      throw StateError('Opening your lab. Try again in a moment.');
+    }
+    if (!notebook.isShared) return;
+    final role = notebook.role;
+    final name = (notebook.name ?? '').trim().isEmpty
+        ? 'This lab'
+        : notebook.name!;
+    if (role == null ||
+        (deleting
+            ? !role.canDeleteInventory
+            : !role.canManageInventory)) {
+      throw StateError(
+        deleting
+            ? 'Only a lab manager can delete items in $name.'
+            : '$name is read-only for your role.',
+      );
+    }
+  }
+
   Future<void> addChemical({
     required String name,
     required String formula,
@@ -1021,6 +1054,8 @@ class InventoryController extends Notifier<InventoryState> {
     ChemicalDetails details = const ChemicalDetails(),
   }) async {
     final userId = _requireUser();
+    _ensureCanWrite();
+    final notebook = ref.read(activeNotebookProvider);
     final item = await _repository.addChemical(
       userId: userId,
       name: name,
@@ -1030,6 +1065,8 @@ class InventoryController extends Notifier<InventoryState> {
       threshold: threshold,
       notes: notes,
       details: details,
+      organizationId: notebook.organizationId,
+      labId: notebook.labId,
     );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(
@@ -1050,6 +1087,8 @@ class InventoryController extends Notifier<InventoryState> {
     ApparatusDetails details = const ApparatusDetails(),
   }) async {
     final userId = _requireUser();
+    _ensureCanWrite();
+    final notebook = ref.read(activeNotebookProvider);
     final item = await _repository.addApparatus(
       userId: userId,
       name: name,
@@ -1058,6 +1097,8 @@ class InventoryController extends Notifier<InventoryState> {
       threshold: threshold,
       notes: notes,
       details: details,
+      organizationId: notebook.organizationId,
+      labId: notebook.labId,
     );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(
@@ -1078,6 +1119,7 @@ class InventoryController extends Notifier<InventoryState> {
     bool force = false,
   }) async {
     final userId = _requireUser();
+    _ensureCanWrite();
     final saved = await _repository.updateItem(
       userId: userId,
       type: type,
@@ -1113,6 +1155,7 @@ class InventoryController extends Notifier<InventoryState> {
   }) async {
     if (amount <= 0) throw ArgumentError('Amount must be greater than zero.');
     final userId = _requireUser();
+    _ensureCanWrite();
     final current = itemType == ItemKind.chemical
         ? state.chemicals.firstWhere((item) => item.id == itemId).quantity
         : state.apparatus.firstWhere((item) => item.id == itemId).quantity;
@@ -1165,6 +1208,7 @@ class InventoryController extends Notifier<InventoryState> {
   /// Reverses a recorded action from the last [undoWindow] (UX-04).
   Future<UndoResult> undoAction(String logId, {String reason = ''}) async {
     final userId = _requireUser();
+    _ensureCanWrite();
     final log = state.logs.where((entry) => entry.id == logId).firstOrNull;
     if (log == null) {
       throw StateError('This entry is no longer in the history.');
@@ -1229,6 +1273,7 @@ class InventoryController extends Notifier<InventoryState> {
 
   Future<void> deleteItem(ItemKind type, String id) async {
     final userId = _requireUser();
+    _ensureCanWrite(deleting: true);
     await _repository.deleteItem(userId: userId, type: type, id: id);
     state = state.copyWith(
       chemicals: type == ItemKind.chemical
@@ -1259,6 +1304,7 @@ class InventoryController extends Notifier<InventoryState> {
     DateTime? dueAt,
   }) async {
     final userId = _requireUser();
+    _ensureCanWrite();
     final item = state.apparatus
         .where((entry) => entry.id == apparatusId)
         .firstOrNull;
@@ -1295,6 +1341,7 @@ class InventoryController extends Notifier<InventoryState> {
     DateTime? nextDueAt,
   }) async {
     final userId = _requireUser();
+    _ensureCanWrite();
     final service = state.services
         .where((entry) => entry.id == serviceId)
         .firstOrNull;
@@ -1390,6 +1437,7 @@ class InventoryController extends Notifier<InventoryState> {
     required String note,
   }) async {
     final userId = _requireUser();
+    _ensureCanWrite();
     final checkout = state.checkouts
         .where((entry) => entry.id == checkoutId)
         .firstOrNull;

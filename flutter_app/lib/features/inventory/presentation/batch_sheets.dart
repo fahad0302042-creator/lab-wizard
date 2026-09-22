@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
@@ -237,7 +238,7 @@ class _BatchRestockFormState extends ConsumerState<_BatchRestockForm> {
   @override
   Widget build(BuildContext context) {
     final items = _itemsFor(
-      ref.watch(inventoryProvider),
+      ref.watch(visibleInventoryProvider),
       widget.kind,
       widget.itemIds,
     );
@@ -518,7 +519,7 @@ class _BatchThresholdFormState extends ConsumerState<_BatchThresholdForm> {
   @override
   Widget build(BuildContext context) {
     final items = _itemsFor(
-      ref.watch(inventoryProvider),
+      ref.watch(visibleInventoryProvider),
       widget.kind,
       widget.itemIds,
     );
@@ -736,7 +737,7 @@ class _BatchFieldFormState extends ConsumerState<_BatchFieldForm> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inventoryProvider);
+    final state = ref.watch(visibleInventoryProvider);
     final items = _itemsFor(state, widget.kind, widget.itemIds);
     final target = _target;
     final changed = target == null
@@ -967,7 +968,7 @@ class _BatchDeleteFormState extends ConsumerState<_BatchDeleteForm> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inventoryProvider);
+    final state = ref.watch(visibleInventoryProvider);
     final items = _itemsFor(state, widget.kind, widget.itemIds);
     final ids = {for (final item in items) item.id};
     final logCount = state.logs.where((log) => ids.contains(log.itemId)).length;

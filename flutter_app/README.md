@@ -234,13 +234,9 @@ Off by default. Settings → *crash reports* turns on a local, opt-in log of err
 
 ## Multi-Lab & Organizations (ORG-01 … ORG-05)
 
-Run `supabase/010_multi_lab_organizations.sql` to add collaborative multi-lab support. It creates `organizations`, `labs`, `organization_members`, and `lab_members` tables, plus nullable `organization_id` and `lab_id` columns on `chemicals`, `apparatus`, and `consumption_logs`. Dual permissive RLS policies ensure existing single-user personal rows remain accessible via `user_id = auth.uid()` so the Next.js web app works without modification, while team members can collaborate in shared labs with role-based permissions (manager, researcher, viewer).
+Run `supabase/010_multi_lab_organizations.sql`, then re-run `supabase/009_account_deletion.sql`. Migration 010 creates `organizations`, `labs`, `organization_members`, and `lab_members`, plus nullable `organization_id` and `lab_id` columns on `chemicals`, `apparatus`, and `consumption_logs`. Personal rows stay accessible via `user_id = auth.uid()`, so the Next.js web app keeps working. Membership checks are `SECURITY DEFINER` helpers so policies do not query their own tables (that recursion makes PostgreSQL reject the query). Viewers can read a lab; managers and members can write. A shared item cannot be detached into a personal notebook. Deleting an account transfers organization ownership and shared rows to another member instead of cascade-deleting the organization. Stock actions on a shared item use the same `apply_inventory_action` / `undo_inventory_action` functions, which allow a lab writer as well as the row owner. Re-run 010 if an earlier copy of the script was applied: it drops and recreates the policies.
 
-In the mobile app:
-- A notebook header chip lets users switch between their **Personal Lab** and shared team labs via `showLabSwitcherSheet`.
-- Active lab selection persists in SharedPreferences per signed-in user.
-- Local SQLite database (schema version 5) scopes offline cached records by `lab_id`, ensuring team inventory and personal inventory remain strictly isolated.
-- Settings includes an **organization & labs** card displaying workspace status, user role, and lab switching shortcuts.
+The mobile shelf follows the selected lab. Personal Lab shows rows with no `lab_id`. A team lab shows only rows stamped with that lab. The scanner, reports and home-screen widget use the same view. New chemicals and apparatus are stamped with the active lab, including imports. A viewer cannot change stock; only a manager can delete. Sync keeps a teammate's shared rows and still drops another person's personal rows. Alerts, the sync center, diagnostics and the account-deletion export still see every cached row. Run migration 010 before expecting shared rows to download — without those columns a team shelf stays empty and a stamped insert fails with a missing-column message.
 
 ## Signing and Google Play Distribution (RELEASE-01, RELEASE-02)
 
@@ -250,3 +246,4 @@ The Gradle configuration (`android/app/build.gradle.kts`) and GitHub Actions wor
 2. **Production Mode (Private)**: When private credentials (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) are added to GitHub Secrets (or locally in `key.properties`), the build automatically signs with the private keystore and produces both the universal APK and the Google Play Android App Bundle (`.aab`).
 
 For complete instructions on keystore generation, key rotation/recovery, Google Play App Signing, and the Play Console Data Safety questionnaire, consult [`docs/RELEASE_AND_PLAY_STORE_GUIDE.md`](../docs/RELEASE_AND_PLAY_STORE_GUIDE.md).
+UIDE.md).

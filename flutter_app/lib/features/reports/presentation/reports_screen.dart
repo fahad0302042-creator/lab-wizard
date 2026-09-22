@@ -10,6 +10,7 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/csv.dart';
 import '../../../core/utils/errors.dart';
@@ -72,7 +73,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inventoryProvider);
+    final state = ref.watch(visibleInventoryProvider);
     final logs = state.logs
         .where((log) => log.itemType == _kind && _range.contains(log.loggedAt))
         .toList();

@@ -129,6 +129,15 @@ abstract class SyncSource {
   });
 }
 
+/// RLS already decided [row] is visible. Keep this user's rows and a
+/// teammate's shared lab row. Drop another person's personal notebook.
+bool syncRowVisibleTo(String userId, Map<String, dynamic> row) {
+  final owner = row['user_id']?.toString();
+  if (owner == null || owner.isEmpty || owner == userId) return true;
+  final lab = row['lab_id']?.toString() ?? '';
+  return lab.isNotEmpty;
+}
+
 /// Downloads server changes into the offline copy: incremental when the
 /// server tracks changes, otherwise a paged full download. All cursors and
 /// bookkeeping live in `sync_meta`, per user.
@@ -462,13 +471,13 @@ class IncrementalSync {
     return (rows: removed, pages: pages);
   }
 
-  /// Defensive per-user isolation: RLS already guarantees this, but a row
-  /// for another account must never land in this user's offline copy.
+  /// Defensive filter on top of RLS. Another account's personal rows stay
+  /// out. A shared lab row is kept so the selected shelf can show it.
   List<Map<String, dynamic>> _ownRows(
     String userId,
     List<Map<String, dynamic>> rows,
   ) => rows
-      .where((row) => row['user_id'] == null || row['user_id'] == userId)
+      .where((row) => syncRowVisibleTo(userId, row))
       .toList(growable: false);
 
   static SyncCursor? _cursorOf(Map<String, dynamic> row, String column) {

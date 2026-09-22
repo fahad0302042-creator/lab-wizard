@@ -290,7 +290,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${inventory.chemicals.length} chemicals · ${inventory.apparatus.length} apparatus · ${inventory.logs.length} log entries',
+                    '${inventory.chemicals.length} chemicals · ${inventory.apparatus.length} apparatus · ${inventory.logs.length} log entries. This backup includes every lab cached on this phone, not only the shelf you are viewing.',
                   ),
                   const SizedBox(height: 12),
                   Wrap(

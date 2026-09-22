@@ -31,6 +31,11 @@ class MainActivity : FlutterFragmentActivity() {
                     result.success(initialUri)
                     initialUri = null
                 }
+                "clearWidget" -> {
+                    clearWidgetData()
+                    updateAppWidget()
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -59,16 +64,38 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
+    /**
+     * Widget taps carry a token that only this app can put in the
+     * PendingIntent (it lives in private prefs). A browsable `labwizard://`
+     * link, or another app starting this activity, does not have it, so it
+     * cannot undo stock or open an item.
+     */
     private fun extractUri(intent: Intent?): String? {
-        val dataUri = intent?.data?.toString()
-        if (dataUri != null && dataUri.startsWith("labwizard://")) {
-            return dataUri
+        if (intent == null) return null
+        val token = intent.getStringExtra(ConsumptionBuddyWidgetProvider.LAUNCH_TOKEN)
+        val expected = getSharedPreferences(
+            ConsumptionBuddyWidgetProvider.PREFS_NAME,
+            Context.MODE_PRIVATE,
+        ).getString(ConsumptionBuddyWidgetProvider.LAUNCH_TOKEN, null)
+        if (token.isNullOrEmpty() || expected.isNullOrEmpty() || token != expected) {
+            return null
         }
-        val extraUri = intent?.getStringExtra("deep_link_uri")
+        val extraUri = intent.getStringExtra("deep_link_uri")
         if (extraUri != null && extraUri.startsWith("labwizard://")) {
             return extraUri
         }
+        val dataUri = intent.data?.toString()
+        if (dataUri != null && dataUri.startsWith("labwizard://")) {
+            return dataUri
+        }
         return null
+    }
+
+    private fun clearWidgetData() {
+        getSharedPreferences(ConsumptionBuddyWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .apply()
     }
 
     private fun saveWidgetData(data: Map<*, *>) {

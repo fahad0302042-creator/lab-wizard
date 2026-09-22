@@ -231,6 +231,18 @@ void main() {
 
       expect(handledUri?.toString(), 'labwizard://undo');
 
+      var cleared = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(WidgetGateway.channel, (call) async {
+            if (call.method == 'clearWidget') {
+              cleared = true;
+              return true;
+            }
+            return null;
+          });
+      expect(await WidgetGateway.clearWidget(), isTrue);
+      expect(cleared, isTrue);
+
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(WidgetGateway.channel, null);
     });

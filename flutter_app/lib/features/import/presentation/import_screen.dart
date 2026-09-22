@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
@@ -142,7 +143,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inventoryProvider);
+    final state = ref.watch(visibleInventoryProvider);
     final rows = _rows(state);
     final summary = ImportSummary.of(rows);
     final result = _result;
@@ -292,7 +293,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
   }
 
   Future<void> _run(List<ImportRow> rows) async {
-    final allRows = _rows(ref.read(inventoryProvider));
+    final allRows = _rows(ref.read(visibleInventoryProvider));
     final problems = <(ImportRow, String)>[
       for (final row in allRows)
         if (row.hasErrors)

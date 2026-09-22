@@ -45,13 +45,9 @@
                     android:scheme="com.labwizard.labwizard"
                     android:host="reset-password" />
             </intent-filter>
-            <!-- Home screen widget deep links (WIDGET-01) -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="labwizard" />
-            </intent-filter>
+            <!-- Widget taps use an explicit PendingIntent with a private
+                 launch token (WIDGET-01). There is no browsable labwizard://
+                 filter: any app or page could otherwise open labwizard://undo. -->
         </activity>
         <!-- Consumption Buddy Home Screen Widget Receiver -->
         <receiver
@@ -59,12 +55,16 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.labwizard.lab_wizard.ACTION_FLASKIE_TAP" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/consumption_buddy_widget_info" />
         </receiver>
+        <!-- Flaskie taps stay inside the app. A non-exported receiver cannot
+             be triggered by another package. -->
+        <receiver
+            android:name=".FlaskieTapReceiver"
+            android:exported="false" />
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />

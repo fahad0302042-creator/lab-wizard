@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
@@ -99,7 +100,7 @@ class _ScanActionFormState extends ConsumerState<ScanActionForm> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inventoryProvider);
+    final state = ref.watch(visibleInventoryProvider);
     final chemical = widget.kind == ItemKind.chemical
         ? state.chemicals.where((item) => item.id == widget.itemId).firstOrNull
         : null;
@@ -331,7 +332,7 @@ class _ScanActionFormState extends ConsumerState<ScanActionForm> {
             .read(formMemoryProvider.notifier)
             .rememberAmount(widget.kind, action, log.amount),
       );
-      final state = ref.read(inventoryProvider);
+      final state = ref.read(visibleInventoryProvider);
       final chemical = widget.kind == ItemKind.chemical
           ? state.chemicals
                 .where((item) => item.id == widget.itemId)
@@ -411,7 +412,7 @@ class _ScanActionFormState extends ConsumerState<ScanActionForm> {
       HapticFeedback.mediumImpact();
       if (!mounted) return;
       final apparatus = ref
-          .read(inventoryProvider)
+          .read(visibleInventoryProvider)
           .apparatus
           .where((item) => item.id == widget.itemId)
           .firstOrNull;

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/widgets/notebook_widgets.dart';
@@ -74,7 +75,7 @@ class _LinkBarcodeFormState extends ConsumerState<LinkBarcodeForm> {
 
   @override
   Widget build(BuildContext context) {
-    final inventory = ref.watch(inventoryProvider);
+    final inventory = ref.watch(visibleInventoryProvider);
     final muted = context.mutedInkColor;
     final query = _search.text.trim().toLowerCase();
     final candidates = [
@@ -274,7 +275,7 @@ class _LinkBarcodeFormState extends ConsumerState<LinkBarcodeForm> {
       _busyId = target.id;
       _error = null;
     });
-    final inventory = ref.read(inventoryProvider);
+    final inventory = ref.read(visibleInventoryProvider);
     final notifier = ref.read(inventoryProvider.notifier);
     try {
       // A code opens exactly one item: detach it from a previous owner first.

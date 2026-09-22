@@ -22,37 +22,49 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        // Flaskie taps go to the non-exported FlaskieTapReceiver. Ignore the
+        // action here so another app cannot poke this exported receiver.
+        if (intent.action == ACTION_FLASKIE_TAP) return
         super.onReceive(context, intent)
-        if (intent.action == ACTION_FLASKIE_TAP) {
-            cycleNextInformation(context)
-        }
-    }
-
-    private fun cycleNextInformation(context: Context) {
-        val appWidgetManager = AppWidgetManager.getInstance(context)
-        val ids = appWidgetManager.getAppWidgetIds(
-            ComponentName(context, ConsumptionBuddyWidgetProvider::class.java)
-        )
-        if (ids == null || ids.isEmpty()) return
-
-        val prefs = context.getSharedPreferences("LabWizardWidgetPrefs", Context.MODE_PRIVATE)
-        val infoCount = prefs.getInt("info_count", 5).coerceAtLeast(1)
-        val currentIndex = prefs.getInt("current_info_index", 0)
-        val nextIndex = (currentIndex + 1) % infoCount
-        prefs.edit().putInt("current_info_index", nextIndex).apply()
-
-        val nextText = prefs.getString("info_$nextIndex", null)
-            ?: prefs.getString("flaskie_speech", "Ready to experiment!") ?: "Ready to experiment!"
-
-        val views = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
-        views.setTextViewText(R.id.widget_flaskie_bubble, nextText)
-        for (id in ids) {
-            appWidgetManager.partiallyUpdateAppWidget(id, views)
-        }
     }
 
     companion object {
         const val ACTION_FLASKIE_TAP = "com.labwizard.lab_wizard.ACTION_FLASKIE_TAP"
+        const val PREFS_NAME = "LabWizardWidgetPrefs"
+        const val LAUNCH_TOKEN = "launch_token"
+
+        fun cycleNextInformation(context: Context) {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val ids = appWidgetManager.getAppWidgetIds(
+                ComponentName(context, ConsumptionBuddyWidgetProvider::class.java)
+            )
+            if (ids == null || ids.isEmpty()) return
+
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val infoCount = prefs.getInt("info_count", 5).coerceAtLeast(1)
+            val currentIndex = prefs.getInt("current_info_index", 0)
+            val nextIndex = (currentIndex + 1) % infoCount
+            prefs.edit().putInt("current_info_index", nextIndex).apply()
+
+            val nextText = prefs.getString("info_$nextIndex", null)
+                ?: prefs.getString("flaskie_speech", "Ready to experiment!") ?: "Ready to experiment!"
+
+            val views = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
+            views.setTextViewText(R.id.widget_flaskie_bubble, nextText)
+            for (id in ids) {
+                appWidgetManager.partiallyUpdateAppWidget(id, views)
+            }
+        }
+
+        /** Token only this app can read. Widget PendingIntents carry it. */
+        fun launchToken(context: Context): String {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val existing = prefs.getString(LAUNCH_TOKEN, null)
+            if (!existing.isNullOrEmpty()) return existing
+            val created = java.util.UUID.randomUUID().toString()
+            prefs.edit().putString(LAUNCH_TOKEN, created).apply()
+            return created
+        }
 
         fun renderFlaskieBitmap(context: Context, frameIndex: Int): Bitmap? {
             val resId = when (frameIndex % 3) {
@@ -78,7 +90,7 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             try {
                 val views = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
-                val prefs = context.getSharedPreferences("LabWizardWidgetPrefs", Context.MODE_PRIVATE)
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
                 val labName = prefs.getString("lab_name", "Lab Wizard") ?: "Lab Wizard"
                 views.setTextViewText(R.id.widget_lab_name, labName)
@@ -224,6 +236,7 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                 action = Intent.ACTION_VIEW
                 data = Uri.parse(uriString)
                 putExtra("deep_link_uri", uriString)
+                putExtra(LAUNCH_TOKEN, launchToken(context))
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -231,7 +244,7 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
         }
 
         private fun createFlaskieTapIntent(context: Context): PendingIntent {
-            val intent = Intent(context, ConsumptionBuddyWidgetProvider::class.java).apply {
+            val intent = Intent(context, FlaskieTapReceiver::class.java).apply {
                 action = ACTION_FLASKIE_TAP
             }
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

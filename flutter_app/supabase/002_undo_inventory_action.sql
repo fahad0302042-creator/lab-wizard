@@ -2,6 +2,10 @@
 -- ADDITIVE ONLY: one new table and one new function. Existing tables, checks,
 -- policies and the web app's queries are untouched. Safe to run repeatedly.
 --
+-- If supabase/010_multi_lab_organizations.sql has already been applied,
+-- re-run that file after this one. This script's undo is owner-only; 010
+-- replaces it so the same person can undo their own entry on a shared item.
+--
 -- Undoing an action mirrors what the web app already does (restore the
 -- quantity and delete the log entry) but additionally keeps a record of the
 -- reversal so the mobile audit trail can show "undone" entries.

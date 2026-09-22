@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
@@ -114,7 +115,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final inventory = ref.watch(inventoryProvider);
+    final inventory = ref.watch(visibleInventoryProvider);
     final query = _search.text.trim().toLowerCase();
     final results = query.isEmpty
         ? const <_ScanSearchResult>[]
@@ -448,7 +449,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     _lastRaw = raw;
     _lastRawAt = now;
     _handling = true;
-    final inventory = ref.read(inventoryProvider);
+    final inventory = ref.read(visibleInventoryProvider);
     final match = resolveScan(
       raw,
       chemicals: inventory.chemicals,

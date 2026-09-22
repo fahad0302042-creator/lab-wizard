@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../labels/domain/label_spec.dart';
@@ -123,7 +124,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inventoryProvider);
+    final state = ref.watch(visibleInventoryProvider);
     final density = ref.watch(
       preferencesProvider.select((value) => value.inventoryDensity),
     );
@@ -454,7 +455,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       case SelectionAction.field:
         await showBatchFieldSheet(context, kind: widget.kind, itemIds: ids);
       case SelectionAction.labels:
-        final inventory = ref.read(inventoryProvider);
+        final inventory = ref.read(visibleInventoryProvider);
         await _printQrLabels(
           widget.kind == ItemKind.chemical
               ? chemicalLabels(

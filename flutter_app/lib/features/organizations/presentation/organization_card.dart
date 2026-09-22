@@ -13,6 +13,17 @@ class OrganizationCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activeLab = ref.watch(activeLabProvider);
     final isPersonal = activeLab == null;
+    final access = activeLab == null
+        ? 'Your inventory is stored privately in your personal lab notebook.'
+        : activeLab.userRole.isReadOnly
+        ? 'Your role can look, not change stock.'
+        : 'New items are saved here.';
+    final summary = activeLab == null
+        ? 'Active workspace: Personal Lab\n$access'
+        : 'Active workspace: ${activeLab.name}\n'
+              'Organization: ${activeLab.organizationName.isNotEmpty ? activeLab.organizationName : 'Shared Org'}\n'
+              'Role: ${activeLab.userRole.label}\n'
+              'The shelf, scanner and reports show this lab. $access';
 
     return NotebookCard(
       child: Column(
@@ -55,9 +66,7 @@ class OrganizationCard extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            isPersonal
-                ? 'Active workspace: Personal Lab\nYour inventory is stored privately in your personal lab notebook.'
-                : 'Active workspace: ${activeLab.name}\nOrganization: ${activeLab.organizationName.isNotEmpty ? activeLab.organizationName : 'Shared Org'}\nRole: ${activeLab.userRole.label}',
+            summary,
             style: TextStyle(color: context.mutedInkColor, fontSize: 13),
           ),
           const SizedBox(height: 12),

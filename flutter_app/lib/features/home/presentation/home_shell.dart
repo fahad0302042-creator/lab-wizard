@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
@@ -14,10 +17,12 @@ import '../../notifications/presentation/alerts_screen.dart';
 import '../../organizations/presentation/organization_providers.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../scanner/presentation/scanner_screen.dart';
+import '../../security/app_lock_providers.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../sync/background/background_sync_providers.dart';
 import '../../sync/presentation/sync_center_screen.dart';
 import '../../widgets/widget_gateway.dart';
+import '../../widgets/widget_link.dart';
 import 'dashboard_screen.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
@@ -31,6 +36,8 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
+  Uri? _pendingWidgetLink;
+  bool _undoConfirmOpen = false;
 
   @override
   void initState() {
@@ -50,8 +57,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   void _syncWidget([InventoryState? state]) {
-    final InventoryState inventory = state ?? ref.read(inventoryProvider);
+    // A sign-out clears the widget itself. Writing here after the session
+    // is gone would put the empty shelf (or a late payload) back on the
+    // launcher.
+    if (ref.read(authProvider).phase != AuthPhase.signedIn) return;
     final activeLab = ref.read(activeLabProvider);
+    final inventory = scopeInventory(
+      state ?? ref.read(visibleInventoryProvider),
+      labId: activeLab?.id,
+    );
     final labName = activeLab?.name ?? 'Lab Wizard';
     WidgetGateway.updateWidget(
       labName: labName,
@@ -61,34 +75,49 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     );
   }
 
+  bool get _widgetLinkMayRun => widgetLinkMayRun(
+    signedIn: ref.read(authProvider).phase == AuthPhase.signedIn,
+    lockReady: ref.read(appLockProvider).ready,
+    locked: ref.read(appLockProvider).locked,
+  );
+
+  /// Holds the link while the lock cover is up, including the cold-start
+  /// moment before the stored PIN settings have been read.
   void _handleWidgetDeepLink(Uri uri) {
     if (!mounted) return;
-    final host = uri.host;
-    final path = uri.path;
-    final action = host.isNotEmpty
-        ? host
-        : (path.startsWith('/') ? path.substring(1) : path);
+    if (!_widgetLinkMayRun) {
+      _pendingWidgetLink = uri;
+      return;
+    }
+    _pendingWidgetLink = null;
+    _dispatchWidgetLink(uri);
+  }
 
-    switch (action) {
-      case 'scan_consume':
+  void _flushPendingWidgetLink() {
+    final uri = _pendingWidgetLink;
+    if (uri == null || !_widgetLinkMayRun) return;
+    _handleWidgetDeepLink(uri);
+  }
+
+  void _dispatchWidgetLink(Uri uri) {
+    if (!mounted) return;
+    switch (parseWidgetLink(uri).action) {
+      case WidgetLinkAction.scan:
         _selectTab(2);
-      case 'search':
+      case WidgetLinkAction.search:
         _selectTab(1);
-      case 'undo':
-        _handleUndoAction();
-      case 'item':
-        final id = uri.queryParameters['id'];
-        if (id != null && id.isNotEmpty) {
-          _openItemById(id);
-        }
-      case 'dashboard':
-      default:
+      case WidgetLinkAction.undo:
+        unawaited(_confirmAndUndo());
+      case WidgetLinkAction.item:
+        final id = parseWidgetLink(uri).itemId;
+        if (id != null) _openItemById(id);
+      case WidgetLinkAction.dashboard:
         _selectTab(0);
     }
   }
 
   void _openItemById(String id) {
-    final inventory = ref.read(inventoryProvider);
+    final inventory = ref.read(visibleInventoryProvider);
     final isChem = inventory.chemicals.any((c) => c.id == id);
     if (isChem) {
       showItemDetailSheet(context, ref, ItemKind.chemical, id);
@@ -101,16 +130,42 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     }
   }
 
-  Future<void> _handleUndoAction() async {
-    final inventory = ref.read(inventoryProvider);
-    final undoable = inventory.logs.where((l) => isUndoable(l)).firstOrNull;
+  Future<void> _confirmAndUndo() async {
+    if (_undoConfirmOpen || !mounted || !_widgetLinkMayRun) return;
+    final inventory = ref.read(visibleInventoryProvider);
+    final undoable = inventory.logs.where((log) => isUndoable(log)).firstOrNull;
     if (undoable == null) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No recent action to undo.')),
       );
       return;
     }
+    _undoConfirmOpen = true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('widget-undo-dialog'),
+        title: const Text('Undo the last change?'),
+        content: const Text(
+          'This puts the quantity back and removes that history entry. '
+          'Nothing changes until you confirm.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('widget-undo-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            key: const Key('widget-undo-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Undo'),
+          ),
+        ],
+      ),
+    );
+    _undoConfirmOpen = false;
+    if (confirmed != true || !mounted || !_widgetLinkMayRun) return;
     await undoRecordedAction(
       ref.container,
       ScaffoldMessenger.of(context),
@@ -147,8 +202,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         if (payload != null) _openNotificationTarget(payload);
       },
     );
-    ref.listen(inventoryProvider, (_, next) => _syncWidget(next));
+    ref.listen(visibleInventoryProvider, (_, next) => _syncWidget(next));
     ref.listen(activeLabProvider, (_, _) => _syncWidget());
+    ref.listen(appLockProvider, (_, _) => _flushPendingWidgetLink());
     final pages = <Widget>[
       DashboardScreen(
         user: widget.user,

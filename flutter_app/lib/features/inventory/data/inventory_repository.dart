@@ -245,6 +245,8 @@ class InventoryRepository {
     required double threshold,
     required String notes,
     ChemicalDetails details = const ChemicalDetails(),
+    String? organizationId,
+    String? labId,
   }) async {
     final now = DateTime.now();
     final chemical = Chemical(
@@ -264,6 +266,8 @@ class InventoryRepository {
       location: details.location?.trim(),
       expiryDate: details.expiryDate,
       hazardClasses: parseHazardList(details.hazardClasses),
+      organizationId: organizationId,
+      labId: labId,
     );
     final payload = {...chemical.toMap(), 'user_id': userId};
     try {
@@ -302,6 +306,8 @@ class InventoryRepository {
     required double threshold,
     required String notes,
     ApparatusDetails details = const ApparatusDetails(),
+    String? organizationId,
+    String? labId,
   }) async {
     final now = DateTime.now();
     final item = Apparatus(
@@ -319,6 +325,8 @@ class InventoryRepository {
       location: details.location?.trim(),
       purchaseDate: details.purchaseDate,
       warrantyUntil: details.warrantyUntil,
+      organizationId: organizationId,
+      labId: labId,
     );
     final payload = {...item.toMap(), 'user_id': userId};
     try {

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
@@ -28,7 +29,7 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inventory = ref.watch(inventoryProvider);
+    final inventory = ref.watch(visibleInventoryProvider);
     final firstName = _firstName(user);
     final now = DateTime.now();
     final weekStart = DateTime(
@@ -291,7 +292,7 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   void _showGlobalSearch(BuildContext context, WidgetRef ref) {
-    final inventory = ref.read(inventoryProvider);
+    final inventory = ref.read(visibleInventoryProvider);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -327,7 +328,7 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   void _showAttentionSheet(BuildContext context, WidgetRef ref) {
-    final inventory = ref.read(inventoryProvider);
+    final inventory = ref.read(visibleInventoryProvider);
     final results = [
       ...inventory.chemicals
           .where((item) => item.stockState != StockState.healthy)

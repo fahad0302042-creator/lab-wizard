@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/errors.dart';
 import '../../../core/utils/time.dart';
@@ -386,7 +387,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
 
   /// Existing items that look like this one and have not been waved through.
   List<DuplicateMatch> _pendingDuplicates() {
-    final state = ref.read(inventoryProvider);
+    final state = ref.read(visibleInventoryProvider);
     final matches = widget.kind == ItemKind.chemical
         ? findChemicalDuplicates(
             existing: state.chemicals,
@@ -859,7 +860,7 @@ class _BatchConsumeFormState extends ConsumerState<_BatchConsumeForm> {
   Widget build(BuildContext context) {
     final chemicals =
         ref
-            .watch(inventoryProvider)
+            .watch(visibleInventoryProvider)
             .chemicals
             .where((item) => item.quantity > 0)
             .toList()
@@ -989,7 +990,7 @@ class _BatchConsumeFormState extends ConsumerState<_BatchConsumeForm> {
   }
 
   Future<void> _save() async {
-    final state = ref.read(inventoryProvider);
+    final state = ref.read(visibleInventoryProvider);
     final selectedItems = state.chemicals
         .where((item) => _selected.contains(item.id))
         .toList();

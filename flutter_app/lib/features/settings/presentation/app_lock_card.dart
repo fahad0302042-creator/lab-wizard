@@ -129,7 +129,10 @@ class AppLockCard extends ConsumerWidget {
             'The lock only hides the app on this phone. It does not encrypt '
             'the offline copy of your inventory or change how your data is '
             'stored in Supabase, and the app switcher may still show the '
-            'last screen. Forgot the PIN? The lock screen can sign you out; '
+            'last screen. The home-screen widget can still show item names '
+            'while you are signed in; signing out clears it. Widget buttons '
+            'wait until the app is unlocked, and Undo asks before it changes '
+            'stock. Forgot the PIN? The lock screen can sign you out; '
             'the account password gets you back in.',
             style: muted,
           ),

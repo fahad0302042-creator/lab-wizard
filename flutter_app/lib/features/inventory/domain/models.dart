@@ -94,6 +94,8 @@ class Chemical {
     this.expiryDate,
     this.hazardClasses = const [],
     this.barcode,
+    this.organizationId,
+    this.labId,
   });
 
   final String id;
@@ -117,6 +119,10 @@ class Chemical {
 
   /// Explicitly linked external barcode (SCAN-04); never guessed.
   final String? barcode;
+
+  /// Set only for a shared-lab row (ORG-01). Null means the personal notebook.
+  final String? organizationId;
+  final String? labId;
 
   bool get hasMetadata =>
       (supplier ?? '').isNotEmpty ||
@@ -166,6 +172,8 @@ class Chemical {
     DateTime? expiryDate,
     List<String>? hazardClasses,
     String? barcode,
+    String? organizationId,
+    String? labId,
   }) => Chemical(
     id: id,
     name: name ?? this.name,
@@ -184,6 +192,8 @@ class Chemical {
     expiryDate: expiryDate ?? this.expiryDate,
     hazardClasses: hazardClasses ?? this.hazardClasses,
     barcode: barcode ?? this.barcode,
+    organizationId: organizationId ?? this.organizationId,
+    labId: labId ?? this.labId,
   );
 
   factory Chemical.fromMap(Map<String, dynamic> map) => Chemical(
@@ -206,6 +216,8 @@ class Chemical {
     expiryDate: parseDateOnly(map['expiry_date']),
     hazardClasses: parseHazardList(map['hazard_classes']),
     barcode: _emptyToNull(map[barcodeColumn]),
+    organizationId: _emptyToNull(map['organization_id']),
+    labId: _emptyToNull(map['lab_id']),
   );
 
   /// Row shape shared with the server. Metadata keys are only present when
@@ -222,6 +234,8 @@ class Chemical {
     'qr_code': qrCode,
     'created_at': createdAt.toIso8601String(),
     ...metadataMap(),
+    if ((organizationId ?? '').isNotEmpty) 'organization_id': organizationId,
+    if ((labId ?? '').isNotEmpty) 'lab_id': labId,
   };
 
   /// Only the DATA-01 columns, null-free, for inserts and updates.
@@ -431,6 +445,8 @@ class Apparatus {
     this.purchaseDate,
     this.warrantyUntil,
     this.barcode,
+    this.organizationId,
+    this.labId,
   });
 
   final String id;
@@ -452,6 +468,10 @@ class Apparatus {
 
   /// Explicitly linked external barcode (SCAN-04); never guessed.
   final String? barcode;
+
+  /// Set only for a shared-lab row (ORG-01). Null means the personal notebook.
+  final String? organizationId;
+  final String? labId;
 
   bool get hasMetadata =>
       (serialNumber ?? '').isNotEmpty ||
@@ -499,6 +519,8 @@ class Apparatus {
     DateTime? purchaseDate,
     DateTime? warrantyUntil,
     String? barcode,
+    String? organizationId,
+    String? labId,
   }) => Apparatus(
     id: id,
     name: name ?? this.name,
@@ -515,6 +537,8 @@ class Apparatus {
     purchaseDate: purchaseDate ?? this.purchaseDate,
     warrantyUntil: warrantyUntil ?? this.warrantyUntil,
     barcode: barcode ?? this.barcode,
+    organizationId: organizationId ?? this.organizationId,
+    labId: labId ?? this.labId,
   );
 
   factory Apparatus.fromMap(Map<String, dynamic> map) => Apparatus(
@@ -535,6 +559,8 @@ class Apparatus {
     purchaseDate: parseDateOnly(map['purchase_date']),
     warrantyUntil: parseDateOnly(map['warranty_until']),
     barcode: _emptyToNull(map[barcodeColumn]),
+    organizationId: _emptyToNull(map['organization_id']),
+    labId: _emptyToNull(map['lab_id']),
   );
 
   /// Metadata keys are only present when set (see [Chemical.toMap]).
@@ -548,6 +574,8 @@ class Apparatus {
     'notes': notes,
     'created_at': createdAt.toIso8601String(),
     ...metadataMap(),
+    if ((organizationId ?? '').isNotEmpty) 'organization_id': organizationId,
+    if ((labId ?? '').isNotEmpty) 'lab_id': labId,
   };
 
   Map<String, dynamic> metadataMap() => {
@@ -631,6 +659,8 @@ class ConsumptionLog {
     required this.loggedAt,
     required this.createdAt,
     this.operationId,
+    this.organizationId,
+    this.labId,
   });
 
   final String id;
@@ -642,6 +672,8 @@ class ConsumptionLog {
   final DateTime loggedAt;
   final DateTime createdAt;
   final String? operationId;
+  final String? organizationId;
+  final String? labId;
 
   factory ConsumptionLog.fromMap(Map<String, dynamic> map) => ConsumptionLog(
     id: map['id'] as String,
@@ -662,6 +694,8 @@ class ConsumptionLog {
         DateTime.tryParse((map['created_at'] as String?) ?? '') ??
         DateTime.now(),
     operationId: map['operation_id'] as String?,
+    organizationId: _emptyToNull(map['organization_id']),
+    labId: _emptyToNull(map['lab_id']),
   );
 
   Map<String, dynamic> toMap() => {
@@ -674,6 +708,8 @@ class ConsumptionLog {
     'logged_at': loggedAt.toIso8601String(),
     'created_at': createdAt.toIso8601String(),
     if (operationId != null) 'operation_id': operationId,
+    if ((organizationId ?? '').isNotEmpty) 'organization_id': organizationId,
+    if ((labId ?? '').isNotEmpty) 'lab_id': labId,
   };
 }
 

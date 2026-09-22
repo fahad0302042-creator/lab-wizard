@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../inventory/domain/lab_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
@@ -31,7 +32,7 @@ class _RecentScansSectionState extends ConsumerState<RecentScansSection> {
   Widget build(BuildContext context) {
     final scans = ref.watch(recentScansProvider);
     if (scans.isEmpty) return const SizedBox.shrink();
-    final inventory = ref.watch(inventoryProvider);
+    final inventory = ref.watch(visibleInventoryProvider);
     final visible = _expanded ? scans : scans.take(widget.collapsedCount);
     final hidden = scans.length - widget.collapsedCount;
 

@@ -38,6 +38,17 @@ class WidgetGateway {
     return null;
   }
 
+  /// Wipes launcher text. Called on sign-out and on a signed-out cold start
+  /// so the previous account's item names do not stay on the home screen.
+  static Future<bool> clearWidget() async {
+    try {
+      final success = await channel.invokeMethod<bool>('clearWidget');
+      return success ?? true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Sends the latest inventory and consumption stats to the Android widget.
   static Future<bool> updateWidget({
     required String labName,

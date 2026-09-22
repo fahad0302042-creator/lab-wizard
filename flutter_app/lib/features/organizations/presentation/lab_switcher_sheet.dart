@@ -51,7 +51,9 @@ class _LabSwitcherContent extends ConsumerWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Select which lab notebook to view and manage. Personal items remain private.',
+          'The shelf, scanner, reports and home-screen widget follow this '
+          'choice. Personal items stay in Personal Lab. A viewer can look, '
+          'not change stock.',
           style: TextStyle(color: context.mutedInkColor, fontSize: 13),
         ),
         const SizedBox(height: 16),
@@ -209,6 +211,15 @@ class _LabSwitcherContent extends ConsumerWidget {
                     SnackBar(content: Text('Created organization "$name"')),
                   );
                 }
+              } else if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Could not create the organization. Check the name, '
+                      'your connection, and that migration 010 has been run.',
+                    ),
+                  ),
+                );
               }
             },
             child: const Text('Create'),
