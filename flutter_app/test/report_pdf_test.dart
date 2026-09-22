@@ -114,19 +114,21 @@ void main() {
         kind: ItemKind.chemical,
         unitOf: (_) => 'mL',
       ),
-      usageRows: usageRows ?? [
-        for (var i = 0; i < 40; i++)
-          ReportPdfUsageRow(
-            name: 'Chemical $i',
-            formulaOrCategory: 'Formula $i',
-            unit: 'mL',
-            startStock: 100,
-            used: 10,
-            added: 0,
-            left: 90,
-            pct: 90,
-          ),
-      ],
+      usageRows:
+          usageRows ??
+          [
+            for (var i = 0; i < 40; i++)
+              ReportPdfUsageRow(
+                name: 'Chemical $i',
+                formulaOrCategory: 'Formula $i',
+                unit: 'mL',
+                startStock: 100,
+                used: 10,
+                added: 0,
+                left: 90,
+                pct: 90,
+              ),
+          ],
       logs: [
         for (final log in logs.where((log) => range.contains(log.loggedAt)))
           ReportPdfLog(
