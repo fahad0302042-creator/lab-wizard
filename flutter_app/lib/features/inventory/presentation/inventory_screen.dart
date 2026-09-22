@@ -846,7 +846,7 @@ class _ShelfControls extends StatelessWidget {
                                       alpha: 0.15,
                                     ),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: BorderSide(
+                                    border: Border.all(
                                       color: context.marginRedColor.withValues(
                                         alpha: 0.4,
                                       ),
