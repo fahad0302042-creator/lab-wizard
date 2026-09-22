@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../inventory/presentation/inventory_sheets.dart';
 import 'organization_providers.dart';
 
 Future<void> showLabSwitcherSheet(BuildContext context) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    showDragHandle: true,
-    builder: (context) => const _LabSwitcherContent(),
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => const NotebookSheetFrame(
+      maxHeightFactor: 0.85,
+      child: _LabSwitcherContent(),
+    ),
   );
 }
 
@@ -21,118 +26,110 @@ class _LabSwitcherContent extends ConsumerWidget {
     final activeLab = ref.watch(activeLabProvider);
     final labsAsync = ref.watch(userLabsProvider);
 
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.75,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'switch active lab',
-                style: TextStyle(
-                  fontFamily: 'Caveat',
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Select which lab notebook to view and manage. Personal items remain private.',
-                style: TextStyle(color: context.mutedInkColor, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    // 1. Personal Lab option (always available)
-                    _LabListTile(
-                      title: 'Personal Lab',
-                      subtitle: 'Your private inventory notebook',
-                      icon: Icons.person_pin_outlined,
-                      isSelected: activeLab == null,
-                      onTap: () async {
-                        await ref
-                            .read(activeLabProvider.notifier)
-                            .selectLab(null);
-                        if (context.mounted) {
-                          Navigator.of(context).pop();
-                        }
-                      },
-                    ),
-                    const Divider(height: 24),
-                    labsAsync.when(
-                      loading: () => const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                      error: (err, _) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          'Cloud organization features require migration 010.',
-                          style: TextStyle(
-                            color: context.mutedInkColor,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      data: (labs) {
-                        if (labs.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'No team organizations found. You are working in your private lab.',
-                              style: TextStyle(
-                                color: context.mutedInkColor,
-                                fontSize: 13,
-                              ),
-                            ),
-                          );
-                        }
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final lab in labs)
-                              _LabListTile(
-                                title: lab.name,
-                                subtitle:
-                                    '${lab.organizationName.isNotEmpty ? '${lab.organizationName} · ' : ''}${lab.userRole.label}${lab.roomNumber.isNotEmpty ? ' · Room ${lab.roomNumber}' : ''}',
-                                icon: lab.labType.icon,
-                                isSelected: activeLab?.id == lab.id,
-                                badgeText: lab.userRole.label,
-                                onTap: () async {
-                                  await ref
-                                      .read(activeLabProvider.notifier)
-                                      .selectLab(lab);
-                                  if (context.mounted) {
-                                    Navigator.of(context).pop();
-                                  }
-                                },
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => _showCreateOrgDialog(context, ref),
-                icon: const Icon(Icons.add_business_outlined),
-                label: const Text('Create new organization…'),
-              ),
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 38,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: context.mutedInkColor.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
         ),
-      ),
+        const Text(
+          'switch active lab',
+          style: TextStyle(
+            fontFamily: 'Caveat',
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Select which lab notebook to view and manage. Personal items remain private.',
+          style: TextStyle(color: context.mutedInkColor, fontSize: 13),
+        ),
+        const SizedBox(height: 16),
+        // 1. Personal Lab option (always available)
+        _LabListTile(
+          title: 'Personal Lab',
+          subtitle: 'Your private inventory notebook',
+          icon: Icons.person_pin_outlined,
+          isSelected: activeLab == null,
+          onTap: () async {
+            await ref.read(activeLabProvider.notifier).selectLab(null);
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        const Divider(height: 24),
+        labsAsync.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (err, _) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Cloud organization features require migration 010.',
+              style: TextStyle(
+                color: context.mutedInkColor,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          data: (labs) {
+            if (labs.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'No team organizations found. You are working in your private lab.',
+                  style: TextStyle(
+                    color: context.mutedInkColor,
+                    fontSize: 13,
+                  ),
+                ),
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final lab in labs)
+                  _LabListTile(
+                    title: lab.name,
+                    subtitle:
+                        '${lab.organizationName.isNotEmpty ? '${lab.organizationName} · ' : ''}${lab.userRole.label}${lab.roomNumber.isNotEmpty ? ' · Room ${lab.roomNumber}' : ''}',
+                    icon: lab.labType.icon,
+                    isSelected: activeLab?.id == lab.id,
+                    badgeText: lab.userRole.label,
+                    onTap: () async {
+                      await ref
+                          .read(activeLabProvider.notifier)
+                          .selectLab(lab);
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: () => _showCreateOrgDialog(context, ref),
+          icon: const Icon(Icons.add_business_outlined),
+          label: const Text('Create new organization…'),
+        ),
+      ],
     );
   }
 
@@ -144,6 +141,11 @@ class _LabSwitcherContent extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
+        backgroundColor: context.paperColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: context.inkColor.withValues(alpha: 0.2)),
+        ),
         title: const Text('Create organization'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -256,15 +258,14 @@ class _LabListTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
         color: isSelected
-            ? Theme.of(context).colorScheme.primaryContainer
-                  .withValues(alpha: 0.3)
-            : Colors.transparent,
+            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35)
+            : context.cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.transparent,
+                : context.inkColor.withValues(alpha: 0.15),
           ),
         ),
         child: ListTile(

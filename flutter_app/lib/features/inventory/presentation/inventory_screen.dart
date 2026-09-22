@@ -92,7 +92,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   final _selected = <String>{};
   List<_InventoryView> _visibleItems = const [];
 
-  static const _detailedGap = 18.0;
+  static const _detailedGap = 8.0;
   static const _minimumItemsForIndex = 8;
 
   static const _tapes = [
@@ -242,6 +242,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           filter: _filter,
                           sort: _sort,
                           compact: compact,
+                          collapsed: _headingCollapsed,
                           shown: items.length,
                           total: allItems.length,
                           printingLabels: _printingLabels,
@@ -587,9 +588,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       return false;
     }
     final pixels = notification.metrics.pixels;
-    final collapse = _headingCollapsed ? pixels > 12 : pixels > 40;
-    if (collapse != _headingCollapsed) {
-      setState(() => _headingCollapsed = collapse);
+    if (pixels <= 15) {
+      if (_headingCollapsed) setState(() => _headingCollapsed = false);
+      return false;
+    }
+    if (notification is UserScrollNotification) {
+      if (notification.direction == ScrollDirection.reverse && pixels > 30) {
+        if (!_headingCollapsed) setState(() => _headingCollapsed = true);
+      } else if (notification.direction == ScrollDirection.forward) {
+        if (_headingCollapsed) setState(() => _headingCollapsed = false);
+      }
+    } else {
+      final collapse = _headingCollapsed ? pixels > 15 : pixels > 40;
+      if (collapse != _headingCollapsed) {
+        setState(() => _headingCollapsed = collapse);
+      }
     }
     return false;
   }
@@ -719,6 +732,7 @@ class _ShelfControls extends StatelessWidget {
     required this.selectionMode,
     required this.selectedCount,
     required this.allVisibleSelected,
+    required this.collapsed,
     required this.onExitSelection,
     required this.onSelectAllVisible,
     required this.onSearchChanged,
@@ -741,6 +755,7 @@ class _ShelfControls extends StatelessWidget {
   final bool selectionMode;
   final int selectedCount;
   final bool allVisibleSelected;
+  final bool collapsed;
   final VoidCallback onExitSelection;
   final VoidCallback onSelectAllVisible;
   final VoidCallback onSearchChanged;
@@ -753,6 +768,10 @@ class _ShelfControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chemical = kind == ItemKind.chemical;
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -805,13 +824,64 @@ class _ShelfControls extends StatelessWidget {
                         ? 'search by name, formula, note…'
                         : 'search by name, category, note…',
                     prefixIcon: const Icon(Icons.search, size: 22),
-                    suffixIcon: query.isEmpty
-                        ? null
-                        : IconButton(
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (filter != _StockFilter.all && collapsed)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Tooltip(
+                              message: 'Filtered by: ${filter.name}. Tap to clear',
+                              child: InkWell(
+                                onTap: () => onFilter(_StockFilter.all),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: context.marginRedColor.withValues(
+                                      alpha: 0.15,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: BorderSide(
+                                      color: context.marginRedColor.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        filter.name,
+                                        style: TextStyle(
+                                          color: context.marginRedColor,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Icon(
+                                        Icons.close,
+                                        size: 12,
+                                        color: context.marginRedColor,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (query.isNotEmpty)
+                          IconButton(
                             tooltip: 'Clear search',
                             onPressed: onClearSearch,
                             icon: const Icon(Icons.close),
                           ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -875,86 +945,113 @@ class _ShelfControls extends StatelessWidget {
               ),
             ],
           ),
-        const SizedBox(height: 4),
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 14,
-          runSpacing: 2,
-          children: [
-            NotebookFilterWord(
-              label: 'all',
-              selected: filter == _StockFilter.all,
-              onTap: () => onFilter(_StockFilter.all),
-              fontSize: 20,
-            ),
-            NotebookFilterWord(
-              label: 'low',
-              selected: filter == _StockFilter.low,
-              onTap: () => onFilter(_StockFilter.low),
-              fontSize: 20,
-            ),
-            NotebookFilterWord(
-              label: 'critical',
-              selected: filter == _StockFilter.critical,
-              onTap: () => onFilter(_StockFilter.critical),
-              fontSize: 20,
-            ),
-            if (kind == ItemKind.chemical)
-              NotebookFilterWord(
-                key: const Key('filter-expiring'),
-                label: 'expiring',
-                selected: filter == _StockFilter.expiring,
-                onTap: () => onFilter(_StockFilter.expiring),
-                fontSize: 20,
-              ),
-            PopupMenuButton<_InventorySort>(
-              tooltip: 'Sort shelf',
-              initialValue: sort,
-              onSelected: onSort,
-              itemBuilder: (context) => [
-                for (final value in _InventorySort.values)
-                  CheckedPopupMenuItem(
-                    value: value,
-                    checked: value == sort,
-                    child: Text('sort by ${value.name}'),
-                  ),
-              ],
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 48),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.sort, size: 17, color: context.mutedInkColor),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        'sort: ${sort.name}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.mutedInkColor,
-                          fontFamily: 'Caveat',
+        AnimatedSize(
+          duration: motion,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: collapsed
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        NotebookFilterWord(
+                          label: 'all',
+                          selected: filter == _StockFilter.all,
+                          onTap: () => onFilter(_StockFilter.all),
                           fontSize: 19,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        NotebookFilterWord(
+                          label: 'low',
+                          selected: filter == _StockFilter.low,
+                          onTap: () => onFilter(_StockFilter.low),
+                          fontSize: 19,
+                        ),
+                        const SizedBox(width: 8),
+                        NotebookFilterWord(
+                          label: 'critical',
+                          selected: filter == _StockFilter.critical,
+                          onTap: () => onFilter(_StockFilter.critical),
+                          fontSize: 19,
+                        ),
+                        if (kind == ItemKind.chemical) ...[
+                          const SizedBox(width: 8),
+                          NotebookFilterWord(
+                            key: const Key('filter-expiring'),
+                            label: 'expiring',
+                            selected: filter == _StockFilter.expiring,
+                            onTap: () => onFilter(_StockFilter.expiring),
+                            fontSize: 19,
+                          ),
+                        ],
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 1,
+                          height: 16,
+                          color: context.ruledColor,
+                        ),
+                        const SizedBox(width: 6),
+                        PopupMenuButton<_InventorySort>(
+                          tooltip: 'Sort shelf',
+                          initialValue: sort,
+                          onSelected: onSort,
+                          itemBuilder: (context) => [
+                            for (final value in _InventorySort.values)
+                              CheckedPopupMenuItem(
+                                value: value,
+                                checked: value == sort,
+                                child: Text('sort by ${value.name}'),
+                              ),
+                          ],
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 4,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.sort,
+                                  size: 16,
+                                  color: context.mutedInkColor,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'sort: ${sort.name}',
+                                  style: TextStyle(
+                                    color: context.mutedInkColor,
+                                    fontFamily: 'Caveat',
+                                    fontSize: 18,
+                                    height: 1,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 16,
+                                  color: context.mutedInkColor,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$shown of $total',
+                          style: TextStyle(
+                            color: context.mutedInkColor,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
-                    Icon(
-                      Icons.arrow_drop_down,
-                      size: 18,
-                      color: context.mutedInkColor,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            Text(
-              '$shown of $total',
-              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-            ),
-          ],
         ),
       ],
     );
@@ -1461,7 +1558,7 @@ class _InventoryCard extends StatelessWidget {
                 paperclip: item.status == StockState.empty,
                 alternate: index.isOdd,
                 rotation: index.isEven ? -.008 : .009,
-                padding: const EdgeInsets.fromLTRB(15, 17, 15, 12),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
                 child: Column(
                   children: [
                     Row(
@@ -1485,7 +1582,7 @@ class _InventoryCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontFamily: 'ArchitectsDaughter',
-                                  fontSize: 21,
+                                  fontSize: 18,
                                   height: 1.1,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1497,7 +1594,7 @@ class _InventoryCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: context.mutedInkColor,
-                                  fontSize: 15,
+                                  fontSize: 13,
                                 ),
                               ),
                               _MetadataMarks(item),
@@ -1520,7 +1617,7 @@ class _InventoryCard extends StatelessWidget {
                                   item.quantity,
                                   suffix: ' ${item.unit}',
                                   style: const TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     height: 1.1,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -1540,63 +1637,49 @@ class _InventoryCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     StockBar(progress: item.progress, status: item.status),
-                    const SizedBox(height: 5),
-                    // Caption left, actions right; on a narrow card or with
-                    // large text the actions drop to their own line.
-                    LayoutBuilder(
-                      builder: (context, constraints) => Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        children: [
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth,
-                            ),
-                            child: Text(
-                              stockCaption(item.status),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: item.status == StockState.healthy
-                                    ? context.inkColor
-                                    : item.status == StockState.low
-                                    ? context.lowColor
-                                    : context.marginRedColor,
-                                fontFamily: 'Caveat',
-                                fontSize: 18,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                                backgroundColor: item.status == StockState.empty
-                                    ? LabColors.highlighter.withValues(
-                                        alpha: .72,
-                                      )
-                                    : null,
-                              ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            stockCaption(item.status),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: item.status == StockState.healthy
+                                  ? context.inkColor
+                                  : item.status == StockState.low
+                                  ? context.lowColor
+                                  : context.marginRedColor,
+                              fontFamily: 'Caveat',
+                              fontSize: 16,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                              backgroundColor: item.status == StockState.empty
+                                  ? LabColors.highlighter.withValues(
+                                      alpha: .72,
+                                    )
+                                  : null,
                             ),
                           ),
-                          Wrap(
-                            spacing: 10,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              _CardAction(
-                                label: kind == ItemKind.chemical
-                                    ? 'use'
-                                    : 'damage',
-                                color: context.marginRedColor,
-                                onTap: selecting ? onTap : onConsume,
-                              ),
-                              _CardAction(
-                                label: '+ stock',
-                                color: context.healthyColor,
-                                onTap: selecting ? onTap : onRestock,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        _CardAction(
+                          label: kind == ItemKind.chemical
+                              ? 'use'
+                              : 'damage',
+                          color: context.marginRedColor,
+                          onTap: selecting ? onTap : onConsume,
+                        ),
+                        const SizedBox(width: 8),
+                        _CardAction(
+                          label: '+ stock',
+                          color: context.healthyColor,
+                          onTap: selecting ? onTap : onRestock,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1993,11 +2076,9 @@ class _CardAction extends StatelessWidget {
       button: true,
       child: InkWell(
         onTap: onTap,
-        // 48 dp target around the underlined word (A11Y-05).
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           child: Text(
             label,
             style: TextStyle(

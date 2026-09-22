@@ -437,10 +437,16 @@ class AnimatedQuantity extends StatelessWidget {
 }
 
 class StockBar extends StatelessWidget {
-  const StockBar({required this.progress, required this.status, super.key});
+  const StockBar({
+    required this.progress,
+    required this.status,
+    this.height = 9,
+    super.key,
+  });
 
   final double progress;
   final StockState status;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -461,7 +467,7 @@ class StockBar extends StatelessWidget {
         curve: Curves.easeOutCubic,
         tween: Tween(end: progress.clamp(0, 1)),
         builder: (_, value, _) => SizedBox(
-          height: 17,
+          height: height,
           width: double.infinity,
           child: CustomPaint(
             painter: _HatchedBarPainter(
@@ -628,7 +634,7 @@ class NotebookFilterWord extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.fontSize = 22,
+    this.fontSize = 20,
     super.key,
   });
 
@@ -645,28 +651,27 @@ class NotebookFilterWord extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
-        // 48 dp touch target around a hand-written word (A11Y-05).
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          // Scales down rather than overflowing when a word is wider than
-          // the space it gets (very large text on a narrow screen).
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selected
-                    ? context.marginRedColor
-                    : context.mutedInkColor,
-                fontFamily: 'Caveat',
-                fontSize: fontSize,
-                height: 1,
-                fontWeight: FontWeight.w700,
-                decoration: selected ? TextDecoration.underline : null,
-                decorationColor: context.marginRedColor,
-                decorationThickness: 2,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 38, minWidth: 32),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Center(
+              widthFactor: 1.0,
+              heightFactor: 1.0,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected
+                      ? context.marginRedColor
+                      : context.mutedInkColor,
+                  fontFamily: 'Caveat',
+                  fontSize: fontSize,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  decoration: selected ? TextDecoration.underline : null,
+                  decorationColor: context.marginRedColor,
+                  decorationThickness: 2,
+                ),
               ),
             ),
           ),

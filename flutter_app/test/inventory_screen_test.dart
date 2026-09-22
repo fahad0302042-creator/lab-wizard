@@ -203,13 +203,15 @@ void main() {
 
       expect(find.text('chemicals shelf'), findsNothing);
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('all'), findsOneWidget);
-      expect(find.text('critical'), findsOneWidget);
-      expect(find.textContaining('sort:'), findsOneWidget);
+      // Filter row collapses while scrolling down to maximize visible inventory cards
+      expect(find.text('all'), findsNothing);
 
       await tester.drag(find.byType(CustomScrollView), const Offset(0, 900));
       await tester.pumpAndSettle();
       expect(find.text('chemicals shelf'), findsOneWidget);
+      expect(find.text('all'), findsOneWidget);
+      expect(find.text('critical'), findsOneWidget);
+      expect(find.textContaining('sort:'), findsOneWidget);
     });
   });
 }
