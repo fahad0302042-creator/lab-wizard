@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_name">Lab Wizard Consumption Buddy</string>
+    <string name="widget_description">Quickly log benchtop consumption and watch Flaskie track today\'s chemicals and apparatus.</string>
+</resources>

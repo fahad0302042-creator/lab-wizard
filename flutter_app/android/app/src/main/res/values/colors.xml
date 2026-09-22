@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FBF7EC</color>
+    <color name="widget_background">#FFFDF7</color>
+    <color name="widget_border">#2B2925</color>
+    <color name="widget_text_ink">#1A1917</color>
+    <color name="widget_text_muted">#6A665E</color>
+    <color name="widget_accent_amber">#B86B14</color>
+    <color name="widget_accent_green">#3F6F3B</color>
+    <color name="widget_accent_red">#B23A2E</color>
+    <color name="widget_button_bg">#F2EFE5</color>
+    <color name="widget_divider">#E5DFC9</color>
 </resources>

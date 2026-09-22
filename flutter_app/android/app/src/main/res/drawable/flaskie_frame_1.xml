@@ -1,0 +1,82 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="72dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Flask Glass Body Outline & Back Fill -->
+    <path
+        android:fillColor="#EAF2E8"
+        android:strokeColor="#1A1917"
+        android:strokeWidth="3.5"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M 38,14 L 62,14 M 42,14 L 42,32 L 20,80 C 19,83 22,86 26,86 L 74,86 C 78,86 81,83 80,80 L 58,32 L 58,14" />
+
+    <!-- Liquid Fill in bottom half -->
+    <path
+        android:fillColor="#5E8C5A"
+        android:pathData="M 27,65 Q 50,62 73,65 L 75,79 C 76,82 74,84 71,84 L 29,84 C 26,84 24,82 25,79 Z" />
+
+    <!-- Liquid surface meniscus line -->
+    <path
+        android:strokeColor="#3F6F3B"
+        android:strokeWidth="2"
+        android:pathData="M 27,65 Q 50,62 73,65" />
+
+    <!-- Bubble 1: Forming near bottom -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#3F6F3B"
+        android:strokeWidth="1.2"
+        android:pathData="M 47,75 A 3,3 0 1,1 47,74.9 Z" />
+
+    <!-- Safety Goggles Strap -->
+    <path
+        android:strokeColor="#1A1917"
+        android:strokeWidth="3"
+        android:pathData="M 30,46 L 70,46" />
+
+    <!-- Goggles Left Lens Outer -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#1A1917"
+        android:strokeWidth="2.8"
+        android:pathData="M 32,46 A 9,9 0 1,1 50,46 A 9,9 0 1,1 32,46 Z" />
+
+    <!-- Goggles Right Lens Outer -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#1A1917"
+        android:strokeWidth="2.8"
+        android:pathData="M 50,46 A 9,9 0 1,1 68,46 A 9,9 0 1,1 50,46 Z" />
+
+    <!-- Eyes (Frame 1: Looking forward) -->
+    <path
+        android:fillColor="#1A1917"
+        android:pathData="M 40,46 A 3.5,3.5 0 1,1 40,45.9 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 39,45 A 1.2,1.2 0 1,1 39,44.9 Z" />
+
+    <path
+        android:fillColor="#1A1917"
+        android:pathData="M 58,46 A 3.5,3.5 0 1,1 58,45.9 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 57,45 A 1.2,1.2 0 1,1 57,44.9 Z" />
+
+    <!-- Goggles reflection glint -->
+    <path
+        android:strokeColor="#D4E6F1"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M 36,41 L 40,41 M 54,41 L 58,41" />
+
+    <!-- Gentle smile mouth -->
+    <path
+        android:strokeColor="#1A1917"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M 46,55 Q 50,58 54,55" />
+</vector>

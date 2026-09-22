@@ -11,11 +11,13 @@ import '../../inventory/presentation/inventory_screen.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
 import '../../notifications/notification_providers.dart';
 import '../../notifications/presentation/alerts_screen.dart';
+import '../../organizations/presentation/organization_providers.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../scanner/presentation/scanner_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../sync/background/background_sync_providers.dart';
 import '../../sync/presentation/sync_center_screen.dart';
+import '../../widgets/widget_gateway.dart';
 import 'dashboard_screen.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
@@ -37,9 +39,83 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ref.read(inventoryProvider.notifier).bootstrap(widget.user.id);
       ref.read(notificationCoordinatorProvider.notifier).start();
       ref.read(backgroundSyncCoordinatorProvider.notifier).start();
+      WidgetGateway.registerDeepLinkHandler(_handleWidgetDeepLink);
+      WidgetGateway.getInitialUri().then((uri) {
+        if (uri != null && mounted) _handleWidgetDeepLink(uri);
+      });
       final pending = ref.read(notificationCoordinatorProvider).pendingTap;
       if (pending != null && mounted) _openNotificationTarget(pending);
+      _syncWidget();
     });
+  }
+
+  void _syncWidget([InventoryState? state]) {
+    final inventory = state ?? ref.read(inventoryProvider);
+    final activeLab = ref.read(activeLabProvider);
+    final labName = activeLab?.name ?? 'Lab Wizard';
+    WidgetGateway.updateWidget(
+      labName: labName,
+      chemicals: inventory.chemicals,
+      apparatus: inventory.apparatus,
+      logs: inventory.logs,
+    );
+  }
+
+  void _handleWidgetDeepLink(Uri uri) {
+    if (!mounted) return;
+    final host = uri.host;
+    final path = uri.path;
+    final action = host.isNotEmpty
+        ? host
+        : (path.startsWith('/') ? path.substring(1) : path);
+
+    switch (action) {
+      case 'scan_consume':
+        _selectTab(2);
+      case 'search':
+        _selectTab(1);
+      case 'undo':
+        _handleUndoAction();
+      case 'item':
+        final id = uri.queryParameters['id'];
+        if (id != null && id.isNotEmpty) {
+          _openItemById(id);
+        }
+      case 'dashboard':
+      default:
+        _selectTab(0);
+    }
+  }
+
+  void _openItemById(String id) {
+    final inventory = ref.read(inventoryProvider);
+    final isChem = inventory.chemicals.any((c) => c.id == id);
+    if (isChem) {
+      showItemDetailSheet(context, ref, ItemKind.chemical, id);
+      return;
+    }
+    final isApp = inventory.apparatus.any((a) => a.id == id);
+    if (isApp) {
+      showItemDetailSheet(context, ref, ItemKind.apparatus, id);
+      return;
+    }
+  }
+
+  Future<void> _handleUndoAction() async {
+    final inventory = ref.read(inventoryProvider);
+    final undoable = inventory.logs.where((l) => canUndo(l)).firstOrNull;
+    if (undoable == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No recent action to undo.')),
+      );
+      return;
+    }
+    await undoRecordedAction(
+      ProviderScope.containerOf(context),
+      ScaffoldMessenger.of(context),
+      undoable.id,
+    );
   }
 
   /// Opens whatever a tapped notification points at (NOTIFY-01).
@@ -71,6 +147,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         if (payload != null) _openNotificationTarget(payload);
       },
     );
+    ref.listen(inventoryProvider, (_, next) => _syncWidget(next));
+    ref.listen(activeLabProvider, (_, __) => _syncWidget());
     final pages = <Widget>[
       DashboardScreen(
         user: widget.user,

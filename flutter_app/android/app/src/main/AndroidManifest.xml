@@ -46,7 +46,25 @@
                     android:scheme="com.labwizard.labwizard"
                     android:host="reset-password" />
             </intent-filter>
+            <!-- Home screen widget deep links (WIDGET-01) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="labwizard" />
+            </intent-filter>
         </activity>
+        <!-- Consumption Buddy Home Screen Widget Receiver -->
+        <receiver
+            android:name=".ConsumptionBuddyWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/consumption_buddy_widget_info" />
+        </receiver>
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />
