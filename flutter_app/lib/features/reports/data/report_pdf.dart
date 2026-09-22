@@ -29,6 +29,29 @@ class ReportPdfLog {
   final String note;
 }
 
+/// One summary usage row for the main usage table (matching the web app report format).
+class ReportPdfUsageRow {
+  const ReportPdfUsageRow({
+    required this.name,
+    required this.formulaOrCategory,
+    required this.unit,
+    required this.startStock,
+    required this.used,
+    required this.added,
+    required this.left,
+    required this.pct,
+  });
+
+  final String name;
+  final String formulaOrCategory;
+  final String unit;
+  final double startStock;
+  final double used;
+  final double added;
+  final double left;
+  final double pct;
+}
+
 /// Everything the branded report needs (REPORT-06).
 class ReportPdfInput {
   const ReportPdfInput({
@@ -41,6 +64,10 @@ class ReportPdfInput {
     required this.damage,
     required this.healthyItems,
     required this.totalItems,
+    this.usageRows = const [],
+    this.itemsUsedCount,
+    this.restockedCount,
+    this.criticalCount,
     this.logo,
     this.expiry,
     this.loans,
@@ -54,6 +81,10 @@ class ReportPdfInput {
   final ReportRange range;
   final TrendComparison trend;
   final List<ReportPdfLog> logs;
+  final List<ReportPdfUsageRow> usageRows;
+  final int? itemsUsedCount;
+  final int? restockedCount;
+  final int? criticalCount;
   final RunOutReport runOut;
   final DamageReport damage;
   final ExpiryReport? expiry;
@@ -66,18 +97,21 @@ class ReportPdfInput {
   final DateTime? generatedAt;
 
   String get title =>
-      '${kind == ItemKind.chemical ? 'Chemical' : 'Apparatus'} report';
+      '${kind == ItemKind.chemical ? 'Chemicals' : 'Apparatus'} Usage Report';
 }
 
-const _ink = PdfColor.fromInt(0xFF1F2933);
-const _muted = PdfColor.fromInt(0xFF6B7280);
-const _rule = PdfColor.fromInt(0xFFD1D5DB);
-const _band = PdfColor.fromInt(0xFFF3F4F6);
-const _accent = PdfColor.fromInt(0xFFB91C1C);
+const _ink = PdfColor.fromInt(0xFF1A1A1A);
+const _muted = PdfColor.fromInt(0xFF666666);
+const _lightMuted = PdfColor.fromInt(0xFF888888);
+const _rule = PdfColor.fromInt(0xFFE0E0E0);
+const _band = PdfColor.fromInt(0xFFF9FAFB);
+const _green = PdfColor.fromInt(0xFF5E8C5A);
+const _red = PdfColor.fromInt(0xFFB23A2E);
+const _amber = PdfColor.fromInt(0xFFD89A3E);
 
-/// Builds the A4 report: branded header on every page, summary cards, the
-/// activity table, run-out estimates and the attention views, page numbers
-/// and a generation stamp in the footer.
+/// Builds the A4 report: matching the web app's clean Usage Report format
+/// (header, 3 KPI boxes, Name/Stock/−Used/=Left table, * and ** indicators,
+/// and optional activity breakdown).
 Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final generated = input.generatedAt ?? DateTime.now();
   final profile = input.profile;
@@ -95,11 +129,14 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
         .where((line) => line.isNotEmpty),
   ];
 
+  // Header matching the web app report format
   pw.Widget header(pw.Context context) => pw.Container(
-    padding: const pw.EdgeInsets.only(bottom: 8),
-    margin: const pw.EdgeInsets.only(bottom: 14),
+    padding: const pw.EdgeInsets.only(bottom: 12),
+    margin: const pw.EdgeInsets.only(bottom: 16),
     decoration: const pw.BoxDecoration(
-      border: pw.Border(bottom: pw.BorderSide(color: _rule, width: 0.8)),
+      border: pw.Border(
+        bottom: pw.BorderSide(color: _ink, width: 2.0),
+      ),
     ),
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -108,7 +145,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           pw.Container(
             height: 42,
             width: 42,
-            margin: const pw.EdgeInsets.only(right: 10),
+            margin: const pw.EdgeInsets.only(right: 12),
             child: pw.Image(logo, fit: pw.BoxFit.contain),
           ),
         pw.Expanded(
@@ -118,16 +155,21 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
               pw.Text(
                 labName,
                 style: pw.TextStyle(
-                  fontSize: 15,
+                  fontSize: 20,
                   fontWeight: pw.FontWeight.bold,
                   color: _ink,
                 ),
               ),
-              for (final line in contactLines)
-                pw.Text(
-                  line,
-                  style: const pw.TextStyle(fontSize: 8.5, color: _muted),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                contactLines.isNotEmpty
+                    ? contactLines.join(' · ')
+                    : 'bench inventory',
+                style: const pw.TextStyle(
+                  fontSize: 11,
+                  color: _muted,
                 ),
+              ),
             ],
           ),
         ),
@@ -137,18 +179,18 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             pw.Text(
               input.title,
               style: pw.TextStyle(
-                fontSize: 12,
+                fontSize: 15,
                 fontWeight: pw.FontWeight.bold,
                 color: _ink,
               ),
             ),
+            pw.SizedBox(height: 3),
             pw.Text(
-              input.range.label,
-              style: const pw.TextStyle(fontSize: 9, color: _ink),
-            ),
-            pw.Text(
-              input.range.dates,
-              style: const pw.TextStyle(fontSize: 8.5, color: _muted),
+              'Period: ${input.range.label}  ·  Generated: ${stamp.format(generated)}',
+              style: const pw.TextStyle(
+                fontSize: 10,
+                color: _muted,
+              ),
             ),
           ],
         ),
@@ -156,33 +198,58 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
     ),
   );
 
+  // Footer with legend and page number
   pw.Widget footer(pw.Context context) => pw.Container(
-    padding: const pw.EdgeInsets.only(top: 6),
-    margin: const pw.EdgeInsets.only(top: 12),
+    padding: const pw.EdgeInsets.only(top: 8),
+    margin: const pw.EdgeInsets.only(top: 14),
     decoration: const pw.BoxDecoration(
-      border: pw.Border(top: pw.BorderSide(color: _rule, width: 0.5)),
+      border: pw.Border(top: pw.BorderSide(color: _rule, width: 0.8)),
     ),
     child: pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Text(
-          'Generated by Lab Wizard · ${stamp.format(generated)}',
-          style: const pw.TextStyle(fontSize: 8, color: _muted),
+        pw.Row(
+          children: [
+            pw.Text(
+              '* ',
+              style: pw.TextStyle(
+                fontSize: 8.5,
+                fontWeight: pw.FontWeight.bold,
+                color: _red,
+              ),
+            ),
+            pw.Text(
+              'below 50% remaining    ',
+              style: const pw.TextStyle(fontSize: 8.5, color: _muted),
+            ),
+            pw.Text(
+              '** ',
+              style: pw.TextStyle(
+                fontSize: 8.5,
+                fontWeight: pw.FontWeight.bold,
+                color: _red,
+              ),
+            ),
+            pw.Text(
+              'below 20% remaining — reorder',
+              style: const pw.TextStyle(fontSize: 8.5, color: _muted),
+            ),
+          ],
         ),
         pw.Text(
           'Page ${context.pageNumber} of ${context.pagesCount}',
-          style: const pw.TextStyle(fontSize: 8, color: _muted),
+          style: const pw.TextStyle(fontSize: 8.5, color: _muted),
         ),
       ],
     ),
   );
 
   pw.Widget heading(String text) => pw.Padding(
-    padding: const pw.EdgeInsets.only(top: 14, bottom: 5),
+    padding: const pw.EdgeInsets.only(top: 16, bottom: 6),
     child: pw.Text(
       text,
       style: pw.TextStyle(
-        fontSize: 11.5,
+        fontSize: 12,
         fontWeight: pw.FontWeight.bold,
         color: _ink,
       ),
@@ -191,6 +258,42 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
 
   pw.Widget note(String text) =>
       pw.Text(text, style: const pw.TextStyle(fontSize: 9, color: _muted));
+
+  // KPI Box matching web app's KpiBox
+  pw.Widget kpiBox(String value, String label, PdfColor color) => pw.Expanded(
+    child: pw.Container(
+      margin: const pw.EdgeInsets.symmetric(horizontal: 4),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _ink, width: 1.5),
+        borderRadius: pw.BorderRadius.circular(4),
+        color: PdfColors.white,
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 24,
+              fontWeight: pw.FontWeight.bold,
+              color: color,
+            ),
+          ),
+          pw.SizedBox(height: 3),
+          pw.Text(
+            label.toUpperCase(),
+            style: const pw.TextStyle(
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+              color: _muted,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   pw.Widget table(
     List<String> headers,
@@ -208,94 +311,270 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
     headerAlignment: pw.Alignment.centerLeft,
     headerDecoration: const pw.BoxDecoration(color: _band),
     rowDecoration: const pw.BoxDecoration(
-      border: pw.Border(bottom: pw.BorderSide(color: _rule, width: 0.3)),
+      border: pw.Border(bottom: pw.BorderSide(color: _rule, width: 0.5)),
     ),
     border: null,
     cellAlignments: alignments ?? const {},
-    cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+    cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3.5),
     headerPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
   );
-
-  pw.Widget metric(String label, InventoryAction action) {
-    final totals = input.trend.current.of(action);
-    return pw.Expanded(
-      child: pw.Container(
-        margin: const pw.EdgeInsets.only(right: 8),
-        padding: const pw.EdgeInsets.all(8),
-        decoration: pw.BoxDecoration(
-          color: _band,
-          borderRadius: pw.BorderRadius.circular(4),
-        ),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              '${totals.count}',
-              style: pw.TextStyle(
-                fontSize: 18,
-                fontWeight: pw.FontWeight.bold,
-                color: _accent,
-              ),
-            ),
-            pw.Text(label, style: const pw.TextStyle(fontSize: 9, color: _ink)),
-            if (totals.quantityLabel.isNotEmpty)
-              pw.Text(
-                totals.quantityLabel,
-                style: pw.TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: pw.FontWeight.bold,
-                  color: _ink,
-                ),
-              ),
-            pw.Text(
-              input.trend.describe(action),
-              style: const pw.TextStyle(fontSize: 8, color: _muted),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   final expiry = input.expiry;
   final loans = input.loans;
   final services = input.services;
   final estimates = input.runOut.estimates.take(10).toList();
 
+  // Usage stats for KPI boxes
+  final usageRows = input.usageRows;
+  final itemsUsedCount = input.itemsUsedCount ??
+      usageRows.where((r) => r.used > 0).length;
+  final restockedCount = input.restockedCount ??
+      usageRows.where((r) => r.added > 0).length;
+  final criticalCount = input.criticalCount ??
+      (input.totalItems - input.healthyItems);
+
   final document = pw.Document(
     title: '${input.title} — ${input.range.dates}',
     author: labName,
     creator: 'Lab Wizard',
   );
+
   document.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(36, 30, 36, 28),
+      margin: const pw.EdgeInsets.fromLTRB(36, 32, 36, 28),
       header: header,
       footer: footer,
       build: (context) => [
-        heading('Summary'),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            metric('usage actions', InventoryAction.consume),
-            metric('restocks', InventoryAction.restock),
-            metric('damage', InventoryAction.breakage),
-          ],
+        // 1. KPI Boxes Row
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 20),
+          child: pw.Row(
+            children: [
+              kpiBox('$itemsUsedCount', 'Items used', _ink),
+              kpiBox('$restockedCount', 'Restocked', _green),
+              kpiBox('$criticalCount', 'Critical', _red),
+            ],
+          ),
         ),
-        pw.SizedBox(height: 6),
-        note(
-          input.totalItems == 0
-              ? 'No items on this shelf.'
-              : '${input.healthyItems} of ${input.totalItems} items are '
-                    'comfortably stocked. Changes are against the '
-                    '${input.trend.previousLabel} '
-                    '(${input.trend.previous.range.dates}).',
-        ),
-        heading('Activity (${input.logs.length})'),
-        if (input.logs.isEmpty)
-          note('No activity in this range.')
+
+        // 2. Primary Usage Report Table (matches web app format)
+        if (usageRows.isEmpty)
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 20),
+            child: pw.Center(
+              child: note(
+                'No ${input.kind == ItemKind.chemical ? 'chemical' : 'apparatus'} usage logged for ${input.range.label}.',
+              ),
+            ),
+          )
         else
+          pw.Table(
+            columnWidths: const {
+              0: pw.FlexColumnWidth(3.8),
+              1: pw.FlexColumnWidth(1.6),
+              2: pw.FlexColumnWidth(1.6),
+              3: pw.FlexColumnWidth(2.0),
+            },
+            children: [
+              // Header
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(
+                  border: pw.Border(
+                    bottom: pw.BorderSide(color: _ink, width: 2.0),
+                  ),
+                ),
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 4,
+                    ),
+                    child: pw.Text(
+                      'NAME',
+                      style: pw.TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: pw.FontWeight.bold,
+                        color: _muted,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 4,
+                    ),
+                    child: pw.Align(
+                      alignment: pw.Alignment.centerRight,
+                      child: pw.Text(
+                        'STOCK',
+                        style: pw.TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: pw.FontWeight.bold,
+                          color: _muted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 4,
+                    ),
+                    child: pw.Align(
+                      alignment: pw.Alignment.centerRight,
+                      child: pw.Text(
+                        '− USED',
+                        style: pw.TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: pw.FontWeight.bold,
+                          color: _muted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 4,
+                    ),
+                    child: pw.Align(
+                      alignment: pw.Alignment.centerRight,
+                      child: pw.Text(
+                        '= LEFT',
+                        style: pw.TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: pw.FontWeight.bold,
+                          color: _muted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              // Item rows
+              for (final row in usageRows)
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(
+                      bottom: pw.BorderSide(color: _rule, width: 0.6),
+                    ),
+                  ),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 4,
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            row.name,
+                            style: pw.TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: _ink,
+                            ),
+                          ),
+                          if (row.formulaOrCategory.isNotEmpty) ...[
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              row.formulaOrCategory,
+                              style: const pw.TextStyle(
+                                fontSize: 8.5,
+                                color: _lightMuted,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 4,
+                      ),
+                      child: pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(
+                          '${formatQuantity(row.startStock)} ${row.unit}',
+                          style: const pw.TextStyle(
+                            fontSize: 9.5,
+                            color: _muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 4,
+                      ),
+                      child: pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(
+                          row.used > 0 ? '−${formatQuantity(row.used)}' : '—',
+                          style: pw.TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: pw.FontWeight.bold,
+                            color: row.used > 0 ? _amber : _muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 4,
+                      ),
+                      child: pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Row(
+                          mainAxisSize: pw.MainAxisSize.min,
+                          children: [
+                            pw.Text(
+                              '${formatQuantity(row.left)} ${row.unit}',
+                              style: pw.TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: _ink,
+                              ),
+                            ),
+                            if (row.pct < 20)
+                              pw.Text(
+                                ' **',
+                                style: pw.TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _red,
+                                ),
+                              )
+                            else if (row.pct < 50)
+                              pw.Text(
+                                ' *',
+                                style: pw.TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _red,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+
+        // 3. Activity Log Table
+        if (input.logs.isNotEmpty) ...[
+          heading('Activity Log (${input.logs.length})'),
           table(
             const ['Date', 'Item', 'Action', 'Amount', 'Note'],
             [
@@ -310,14 +589,11 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             ],
             alignments: const {3: pw.Alignment.centerRight},
           ),
-        heading('Run-out estimates'),
-        if (estimates.isEmpty)
-          note(
-            'No estimates yet: each needs $runOutMinEntries+ uses over '
-            '$runOutMinSpanDays+ days within the last $runOutLookbackDays '
-            'days.',
-          )
-        else ...[
+        ],
+
+        // 4. Run-out estimates
+        if (estimates.isNotEmpty) ...[
+          heading('Run-out estimates'),
           table(
             const ['Item', 'Left', 'Runs out', 'Basis'],
             [
@@ -337,29 +613,28 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             note(input.runOut.gapSummary),
           ],
         ],
-        if (expiry != null) ...[
+
+        // 5. Expiry
+        if (expiry != null && expiry.isNotEmpty) ...[
           heading('Expiry'),
-          if (expiry.isEmpty)
-            note('Nothing expired or expiring in the next 30 days.')
-          else
-            table(
-              const ['Chemical', 'Expiry date', 'Status'],
-              [
-                for (final row in [...expiry.expired, ...expiry.expiringSoon])
-                  [
-                    row.chemical.name,
-                    day.format(row.chemical.expiryDate!),
-                    row.state == ExpiryState.expired
-                        ? 'expired ${relativeDays(row.days)}'
-                        : relativeDays(row.days),
-                  ],
-              ],
-            ),
+          table(
+            const ['Chemical', 'Expiry date', 'Status'],
+            [
+              for (final row in [...expiry.expired, ...expiry.expiringSoon])
+                [
+                  row.chemical.name,
+                  day.format(row.chemical.expiryDate!),
+                  row.state == ExpiryState.expired
+                      ? 'expired ${relativeDays(row.days)}'
+                      : relativeDays(row.days),
+                ],
+            ],
+          ),
         ],
-        heading('Damage in this range'),
-        if (input.damage.isEmpty)
-          note('No damage recorded in this range.')
-        else
+
+        // 6. Damage in this range
+        if (input.damage.isNotEmpty) ...[
+          heading('Damage in this range'),
           table(
             const ['Item', 'Incidents', 'Amount', 'Last'],
             [
@@ -376,47 +651,42 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
               2: pw.Alignment.centerRight,
             },
           ),
-        if (loans != null) ...[
-          heading('Overdue loans'),
-          if (loans.isEmpty)
-            note(
-              loans.openLoans == 0
-                  ? 'Nothing is out on loan.'
-                  : 'Nothing overdue; ${loans.openLoans} open loans.',
-            )
-          else
-            table(
-              const ['Apparatus', 'Person', 'Out', 'Due', 'Overdue'],
-              [
-                for (final loan in loans.overdue)
-                  [
-                    loan.apparatusName,
-                    loan.checkout.person,
-                    formatQuantity(loan.checkout.outstanding),
-                    day.format(loan.checkout.dueAt!.toLocal()),
-                    loan.when,
-                  ],
-              ],
-            ),
         ],
-        if (services != null) ...[
+
+        // 7. Overdue loans
+        if (loans != null && loans.isNotEmpty) ...[
+          heading('Overdue loans'),
+          table(
+            const ['Apparatus', 'Person', 'Out', 'Due', 'Overdue'],
+            [
+              for (final loan in loans.overdue)
+                [
+                  loan.apparatusName,
+                  loan.checkout.person,
+                  formatQuantity(loan.checkout.outstanding),
+                  day.format(loan.checkout.dueAt!.toLocal()),
+                  loan.when,
+                ],
+            ],
+          ),
+        ],
+
+        // 8. Maintenance and calibration
+        if (services != null && services.isNotEmpty) ...[
           heading('Maintenance and calibration'),
-          if (services.isEmpty)
-            note('Nothing overdue or due in the next 14 days.')
-          else
-            table(
-              const ['Task', 'Apparatus', 'Kind', 'Due', 'Status'],
-              [
-                for (final row in services.due)
-                  [
-                    row.service.displayTitle,
-                    row.apparatusName,
-                    row.service.kind.label,
-                    day.format(row.service.dueAt!.toLocal()),
-                    row.when,
-                  ],
-              ],
-            ),
+          table(
+            const ['Task', 'Apparatus', 'Kind', 'Due', 'Status'],
+            [
+              for (final row in services.due)
+                [
+                  row.service.displayTitle,
+                  row.apparatusName,
+                  row.service.kind.label,
+                  day.format(row.service.dueAt!.toLocal()),
+                  row.when,
+                ],
+            ],
+          ),
           pw.SizedBox(height: 4),
           note(
             '${services.openTasks} open tasks · ${services.completedInRange} '

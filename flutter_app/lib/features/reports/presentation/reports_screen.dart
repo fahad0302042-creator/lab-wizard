@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
@@ -470,9 +471,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     setState(() => _exporting = true);
     try {
       final bytes = await _buildPdf(state, logs, assets);
+      final kindTitle = _kind == ItemKind.chemical ? 'Chemicals' : 'Apparatus';
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'lab-wizard-${_kind.name}-${_range.fileStem}.pdf',
+        filename: 'Lab Wizard — $kindTitle Report — ${_range.label}.pdf',
       );
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -531,6 +533,74 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ? state.chemicals.map((item) => item.stockState)
         : state.apparatus.map((item) => item.stockState);
     final sorted = [...logs]..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+
+    // Web app format usage rows: Name, Stock, - Used, = Left, * / **
+    final usageRows = <ReportPdfUsageRow>[];
+    if (_kind == ItemKind.chemical) {
+      for (final chem in state.chemicals) {
+        final itemLogs = logs.where((l) => l.itemId == chem.id).toList();
+        final used = itemLogs
+            .where((l) =>
+                l.action == InventoryAction.consume ||
+                l.action == InventoryAction.breakage)
+            .fold<double>(0.0, (sum, l) => sum + l.amount);
+        final added = itemLogs
+            .where((l) => l.action == InventoryAction.restock)
+            .fold<double>(0.0, (sum, l) => sum + l.amount);
+        final left = chem.quantity;
+        final startStock = math.max(0.0, left + used - added);
+        final pct = chem.initialQuantity > 0
+            ? (left / chem.initialQuantity * 100)
+            : (startStock > 0 ? (left / startStock * 100) : 100.0);
+        usageRows.add(
+          ReportPdfUsageRow(
+            name: chem.name,
+            formulaOrCategory: chem.formula,
+            unit: chem.unit,
+            startStock: startStock,
+            used: used,
+            added: added,
+            left: left,
+            pct: pct,
+          ),
+        );
+      }
+    } else {
+      for (final app in state.apparatus) {
+        final itemLogs = logs.where((l) => l.itemId == app.id).toList();
+        final used = itemLogs
+            .where((l) =>
+                l.action == InventoryAction.breakage ||
+                l.action == InventoryAction.consume)
+            .fold<double>(0.0, (sum, l) => sum + l.amount);
+        final added = itemLogs
+            .where((l) => l.action == InventoryAction.restock)
+            .fold<double>(0.0, (sum, l) => sum + l.amount);
+        final left = app.quantity.toDouble();
+        final startStock = math.max(0.0, left + used - added);
+        final pct = app.initialQuantity > 0
+            ? (left / app.initialQuantity * 100)
+            : (startStock > 0 ? (left / startStock * 100) : 100.0);
+        usageRows.add(
+          ReportPdfUsageRow(
+            name: app.name,
+            formulaOrCategory: app.category,
+            unit: 'pcs',
+            startStock: startStock,
+            used: used,
+            added: added,
+            left: left,
+            pct: pct,
+          ),
+        );
+      }
+    }
+    usageRows.sort((a, b) {
+      if (b.used != a.used) return b.used.compareTo(a.used);
+      if (b.added != a.added) return b.added.compareTo(a.added);
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+
     return buildReportPdf(
       ReportPdfInput(
         profile: profile,
@@ -538,6 +608,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         kind: _kind,
         range: _range,
         trend: trend,
+        usageRows: usageRows,
         logs: [
           for (final log in sorted)
             ReportPdfLog(
