@@ -78,7 +78,9 @@ class ActiveLabNotifier extends Notifier<Lab?> {
 
   void _remember(Lab? lab) {
     state = lab;
-    ref.read(activeNotebookProvider.notifier).select(ActiveNotebook.fromLab(lab));
+    ref
+        .read(activeNotebookProvider.notifier)
+        .select(ActiveNotebook.fromLab(lab));
   }
 
   Future<void> selectLab(Lab? lab) async {

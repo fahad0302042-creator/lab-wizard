@@ -1033,9 +1033,7 @@ class InventoryController extends Notifier<InventoryState> {
         ? 'This lab'
         : notebook.name!;
     if (role == null ||
-        (deleting
-            ? !role.canDeleteInventory
-            : !role.canManageInventory)) {
+        (deleting ? !role.canDeleteInventory : !role.canManageInventory)) {
       throw StateError(
         deleting
             ? 'Only a lab manager can delete items in $name.'

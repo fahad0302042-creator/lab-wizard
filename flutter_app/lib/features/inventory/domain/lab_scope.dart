@@ -53,7 +53,10 @@ InventoryState scopeInventory(InventoryState inventory, {String? labId}) {
     return rowBelongsToLab(log.labId, labId);
   }
 
-  final logs = [for (final log in inventory.logs) if (logInScope(log)) log];
+  final logs = [
+    for (final log in inventory.logs)
+      if (logInScope(log)) log,
+  ];
   final checkouts = [
     for (final checkout in inventory.checkouts)
       if (apparatusIds.contains(checkout.apparatusId)) checkout,

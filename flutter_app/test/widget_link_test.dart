@@ -21,9 +21,7 @@ void main() {
         WidgetLinkAction.dashboard,
       );
 
-      final item = parseWidgetLink(
-        Uri.parse('labwizard://item?id=chem-1'),
-      );
+      final item = parseWidgetLink(Uri.parse('labwizard://item?id=chem-1'));
       expect(item.action, WidgetLinkAction.item);
       expect(item.itemId, 'chem-1');
       expect(item.mutatesInventory, isFalse);
@@ -34,14 +32,8 @@ void main() {
         parseWidgetLink(Uri.parse('labwizard://nope')).action,
         WidgetLinkAction.dashboard,
       );
-      expect(
-        parseWidgetLink(Uri.parse('labwizard://item')).itemId,
-        isNull,
-      );
-      expect(
-        parseWidgetLink(Uri.parse('labwizard://item?id=')).itemId,
-        isNull,
-      );
+      expect(parseWidgetLink(Uri.parse('labwizard://item')).itemId, isNull);
+      expect(parseWidgetLink(Uri.parse('labwizard://item?id=')).itemId, isNull);
     });
   });
 
