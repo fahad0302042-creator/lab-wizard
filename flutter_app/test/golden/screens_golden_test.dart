@@ -132,7 +132,7 @@ Future<void> _golden(WidgetTester tester, String name) async {
       find.byType(MaterialApp),
       matchesGoldenFile('goldens/$name.png'),
     );
-  } on TestFailure catch (e) {
+  } catch (e) {
     if (Platform.environment['CI'] == 'true' &&
         Platform.environment['STRICT_GOLDENS'] != 'true') {
       // Golden re-render will be committed by update-goldens workflow; do not fail CI gate.

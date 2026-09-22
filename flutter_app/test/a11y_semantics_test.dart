@@ -209,7 +209,7 @@ void main() {
       final handle = tester.ensureSemantics();
       // The strip only appears once a shelf is long enough to need it.
       final many = [
-        for (var index = 0; index < 12; index++)
+        for (var index = 0; index < 24; index++)
           _chemical('m$index', '${String.fromCharCode(65 + index)}-reagent'),
       ];
       await _pumpShelf(tester, state: InventoryState(chemicals: many));

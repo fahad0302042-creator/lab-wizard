@@ -652,7 +652,7 @@ class NotebookFilterWord extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 38, minWidth: 32),
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 40),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Center(
