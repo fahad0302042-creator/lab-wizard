@@ -607,7 +607,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
         ],
 
         // 5. Expiry
-        if (expiry != null && expiry.isNotEmpty) ...[
+        if (expiry != null && !expiry.isEmpty) ...[
           heading('Expiry'),
           table(
             const ['Chemical', 'Expiry date', 'Status'],
@@ -625,7 +625,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
         ],
 
         // 6. Damage in this range
-        if (input.damage.isNotEmpty) ...[
+        if (!input.damage.isEmpty) ...[
           heading('Damage in this range'),
           table(
             const ['Item', 'Incidents', 'Amount', 'Last'],
@@ -646,7 +646,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
         ],
 
         // 7. Overdue loans
-        if (loans != null && loans.isNotEmpty) ...[
+        if (loans != null && !loans.isEmpty) ...[
           heading('Overdue loans'),
           table(
             const ['Apparatus', 'Person', 'Out', 'Due', 'Overdue'],
@@ -664,7 +664,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
         ],
 
         // 8. Maintenance and calibration
-        if (services != null && services.isNotEmpty) ...[
+        if (services != null && !services.isEmpty) ...[
           heading('Maintenance and calibration'),
           table(
             const ['Task', 'Apparatus', 'Kind', 'Due', 'Status'],
