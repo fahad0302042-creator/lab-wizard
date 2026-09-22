@@ -134,9 +134,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
     padding: const pw.EdgeInsets.only(bottom: 12),
     margin: const pw.EdgeInsets.only(bottom: 16),
     decoration: const pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: _ink, width: 2.0),
-      ),
+      border: pw.Border(bottom: pw.BorderSide(color: _ink, width: 2.0)),
     ),
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -165,10 +163,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                 contactLines.isNotEmpty
                     ? contactLines.join(' · ')
                     : 'bench inventory',
-                style: const pw.TextStyle(
-                  fontSize: 11,
-                  color: _muted,
-                ),
+                style: const pw.TextStyle(fontSize: 11, color: _muted),
               ),
             ],
           ),
@@ -187,10 +182,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             pw.SizedBox(height: 3),
             pw.Text(
               'Period: ${input.range.label}  ·  Generated: ${stamp.format(generated)}',
-              style: const pw.TextStyle(
-                fontSize: 10,
-                color: _muted,
-              ),
+              style: const pw.TextStyle(fontSize: 10, color: _muted),
             ),
           ],
         ),
@@ -326,12 +318,12 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
 
   // Usage stats for KPI boxes
   final usageRows = input.usageRows;
-  final itemsUsedCount = input.itemsUsedCount ??
-      usageRows.where((r) => r.used > 0).length;
-  final restockedCount = input.restockedCount ??
-      usageRows.where((r) => r.added > 0).length;
-  final criticalCount = input.criticalCount ??
-      (input.totalItems - input.healthyItems);
+  final itemsUsedCount =
+      input.itemsUsedCount ?? usageRows.where((r) => r.used > 0).length;
+  final restockedCount =
+      input.restockedCount ?? usageRows.where((r) => r.added > 0).length;
+  final criticalCount =
+      input.criticalCount ?? (input.totalItems - input.healthyItems);
 
   final document = pw.Document(
     title: '${input.title} — ${input.range.dates}',

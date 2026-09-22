@@ -540,9 +540,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       for (final chem in state.chemicals) {
         final itemLogs = logs.where((l) => l.itemId == chem.id).toList();
         final used = itemLogs
-            .where((l) =>
-                l.action == InventoryAction.consume ||
-                l.action == InventoryAction.breakage)
+            .where(
+              (l) =>
+                  l.action == InventoryAction.consume ||
+                  l.action == InventoryAction.breakage,
+            )
             .fold<double>(0.0, (sum, l) => sum + l.amount);
         final added = itemLogs
             .where((l) => l.action == InventoryAction.restock)
@@ -569,9 +571,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       for (final app in state.apparatus) {
         final itemLogs = logs.where((l) => l.itemId == app.id).toList();
         final used = itemLogs
-            .where((l) =>
-                l.action == InventoryAction.breakage ||
-                l.action == InventoryAction.consume)
+            .where(
+              (l) =>
+                  l.action == InventoryAction.breakage ||
+                  l.action == InventoryAction.consume,
+            )
             .fold<double>(0.0, (sum, l) => sum + l.amount);
         final added = itemLogs
             .where((l) => l.action == InventoryAction.restock)
