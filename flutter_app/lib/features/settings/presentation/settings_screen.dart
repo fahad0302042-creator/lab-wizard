@@ -7,8 +7,21 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/csv.dart';
+import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../auth/presentation/change_password_sheet.dart';
+import '../../auth/presentation/delete_account_sheet.dart';
+import '../../import/presentation/import_screen.dart';
 import '../../inventory/domain/models.dart';
+import '../../notifications/presentation/notification_settings_card.dart';
+import '../../sync/presentation/background_sync_card.dart';
+import '../../sync/presentation/sync_center_screen.dart';
+import 'app_lock_card.dart';
+import 'diagnostics_card.dart';
+import 'lab_profile_card.dart';
+import '../../organizations/presentation/organization_card.dart';
+import 'sessions_card.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -18,6 +31,7 @@ class SettingsScreen extends ConsumerWidget {
     final preferences = ref.watch(preferencesProvider);
     final auth = ref.watch(authProvider);
     final inventory = ref.watch(inventoryProvider);
+    final formMemory = ref.watch(formMemoryProvider);
     return Scaffold(
       body: NotebookPage(
         child: ListView(
@@ -26,6 +40,7 @@ class SettingsScreen extends ConsumerWidget {
             Row(
               children: [
                 IconButton(
+                  tooltip: 'Back',
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.arrow_back),
                 ),
@@ -55,16 +70,39 @@ class SettingsScreen extends ConsumerWidget {
                     style: TextStyle(color: context.mutedInkColor),
                   ),
                   const SizedBox(height: 14),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      await ref.read(authProvider.notifier).signOut();
-                      if (context.mounted) {
-                        Navigator.of(context)
-                            .popUntil((route) => route.isFirst);
-                      }
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Sign out'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const Key('change-password'),
+                        onPressed: () async {
+                          final changed = await showChangePasswordSheet(
+                            context,
+                          );
+                          if (changed == true && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Password changed.'),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.password_outlined),
+                        label: const Text('Change password'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await ref.read(authProvider.notifier).signOut();
+                          if (context.mounted) {
+                            Navigator.of(context)
+                                .popUntil((route) => route.isFirst);
+                          }
+                        },
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Sign out (this phone)'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -125,6 +163,62 @@ class SettingsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const _CardTitle(
+                    icon: Icons.history_edu_outlined,
+                    title: 'form memory',
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'The add and record sheets start from the unit, category, '
+                    'low-stock level and amounts you used last. Kept on this '
+                    'device for your account only.',
+                    style: TextStyle(
+                      color: context.mutedInkColor,
+                      fontSize: 13,
+                    ),
+                  ),
+                  SwitchListTile(
+                    key: const Key('prefill-threshold'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Prefill low-stock level'),
+                    value: formMemory.prefillThreshold,
+                    onChanged: ref
+                        .read(formMemoryProvider.notifier)
+                        .setPrefillThreshold,
+                  ),
+                  SwitchListTile(
+                    key: const Key('prefill-amount'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Prefill last amount'),
+                    subtitle: const Text(
+                      'Per action: use, restock and damage each remember their own.',
+                    ),
+                    value: formMemory.prefillActionAmount,
+                    onChanged: ref
+                        .read(formMemoryProvider.notifier)
+                        .setPrefillActionAmount,
+                  ),
+                  TextButton.icon(
+                    key: const Key('forget-form-memory'),
+                    onPressed: formMemory.isEmpty
+                        ? null
+                        : ref.read(formMemoryProvider.notifier).forget,
+                    icon: const Icon(
+                      Icons.cleaning_services_outlined,
+                      size: 18,
+                    ),
+                    label: const Text('Forget remembered values'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 13),
+            const NotificationSettingsCard(),
+            const SizedBox(height: 13),
+            NotebookCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _CardTitle(
                     icon: Icons.cloud_sync_outlined,
                     title: 'sync & offline copy',
                   ),
@@ -132,24 +226,59 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     inventory.pendingCount == 0
                         ? 'Everything is synced. A private offline copy is kept on this device while you are signed in.'
+                        : inventory.failedCount > 0
+                        ? '${inventory.failedCount} change${inventory.failedCount == 1 ? '' : 's'} need${inventory.failedCount == 1 ? 's' : ''} attention in the sync center.'
                         : '${inventory.pendingCount} change${inventory.pendingCount == 1 ? '' : 's'} waiting for a connection.',
                   ),
+                  if (inventory.lastSyncedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Last successful sync ${relativeTime(inventory.lastSyncedAt!)}.',
+                      style: TextStyle(
+                        color: context.mutedInkColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: inventory.refreshing
-                        ? null
-                        : ref.read(inventoryProvider.notifier).refresh,
-                    icon: inventory.refreshing
-                        ? const SizedBox.square(
-                            dimension: 17,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.sync),
-                    label: const Text('Sync now'),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: inventory.refreshing
+                            ? null
+                            : ref.read(inventoryProvider.notifier).refresh,
+                        icon: inventory.refreshing
+                            ? const SizedBox.square(
+                                dimension: 17,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.sync),
+                        label: const Text('Sync now'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SyncCenterScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.list_alt_outlined),
+                        label: Text(
+                          inventory.pendingCount == 0
+                              ? 'Open sync center'
+                              : 'Sync center (${inventory.pendingCount})',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 13),
+            const BackgroundSyncCard(),
             const SizedBox(height: 13),
             NotebookCard(
               child: Column(
@@ -157,17 +286,78 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   const _CardTitle(
                     icon: Icons.download_outlined,
-                    title: 'export a backup',
+                    title: 'backup & import',
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '${inventory.chemicals.length} chemicals · ${inventory.apparatus.length} apparatus · ${inventory.logs.length} log entries',
                   ),
                   const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _exportCsv(context, inventory),
+                        icon: const Icon(Icons.share_outlined),
+                        label: const Text('Share inventory CSV'),
+                      ),
+                      OutlinedButton.icon(
+                        key: const Key('open-import'),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const ImportScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('Import CSV'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 13),
+            const OrganizationCard(),
+            const SizedBox(height: 13),
+            const LabProfileCard(),
+            const SizedBox(height: 13),
+            const SessionsCard(),
+            const SizedBox(height: 13),
+            const AppLockCard(),
+            const SizedBox(height: 13),
+            const DiagnosticsCard(),
+            const SizedBox(height: 13),
+            NotebookCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _CardTitle(
+                    icon: Icons.warning_amber_outlined,
+                    title: 'danger zone',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Deleting the account removes all chemicals, apparatus and '
+                    'history from Lab Wizard for good. You can export '
+                    'everything first.',
+                    style: TextStyle(color: context.mutedInkColor),
+                  ),
+                  const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: () => _exportCsv(context, inventory),
-                    icon: const Icon(Icons.share_outlined),
-                    label: const Text('Share inventory CSV'),
+                    key: const Key('delete-account'),
+                    onPressed: () async {
+                      final deleted = await showDeleteAccountSheet(context);
+                      if (deleted == true && context.mounted) {
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst);
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.marginRedColor,
+                    ),
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: const Text('Delete account…'),
                   ),
                 ],
               ),
@@ -195,6 +385,17 @@ class SettingsScreen extends ConsumerWidget {
           'unit',
           'low stock level',
           'notes',
+          'supplier',
+          'cas number',
+          'concentration',
+          'location',
+          'expiry date',
+          'hazards',
+          'serial number',
+          'condition',
+          'assigned to',
+          'purchase date',
+          'warranty until',
         ],
         ...state.chemicals.map(
           (item) => [
@@ -205,6 +406,17 @@ class SettingsScreen extends ConsumerWidget {
             item.unit,
             formatQuantity(item.lowStockThreshold),
             item.notes,
+            item.supplier ?? '',
+            item.casNumber ?? '',
+            item.concentration ?? '',
+            item.location ?? '',
+            item.expiryDate == null ? '' : formatDateOnly(item.expiryDate!),
+            item.hazardClasses.join(';'),
+            '',
+            '',
+            '',
+            '',
+            '',
           ],
         ),
         ...state.apparatus.map(
@@ -216,13 +428,27 @@ class SettingsScreen extends ConsumerWidget {
             'pcs',
             formatQuantity(item.lowStockThreshold),
             item.notes,
+            '',
+            '',
+            '',
+            item.location ?? '',
+            '',
+            '',
+            item.serialNumber ?? '',
+            item.condition ?? '',
+            item.assignedTo ?? '',
+            item.purchaseDate == null ? '' : formatDateOnly(item.purchaseDate!),
+            item.warrantyUntil == null
+                ? ''
+                : formatDateOnly(item.warrantyUntil!),
           ],
         ),
       ];
-      final csv = rows.map((row) => row.map(_csvCell).join(',')).join('\n');
+      // REPORT-05: shared writer (formula guard, CRLF, byte-order mark).
+      final csv = csvDocument(rows.first, rows.skip(1));
       final directory = await getTemporaryDirectory();
       final file = File('${directory.path}/lab-wizard-inventory.csv');
-      await file.writeAsString(csv, flush: true);
+      await file.writeAsBytes(csvBytes(csv), flush: true);
       await SharePlus.instance.share(
         ShareParams(
           title: 'Lab Wizard inventory',
@@ -235,11 +461,6 @@ class SettingsScreen extends ConsumerWidget {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Could not export: $error')));
     }
-  }
-
-  String _csvCell(String value) {
-    final safe = RegExp(r'^[=+\-@]').hasMatch(value) ? "'$value" : value;
-    return '"${safe.replaceAll('"', '""')}"';
   }
 }
 

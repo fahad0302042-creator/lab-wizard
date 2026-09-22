@@ -1,12 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/errors.dart';
+import '../../../core/utils/time.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import '../../labels/domain/label_spec.dart';
+import '../../labels/presentation/label_actions.dart';
+import '../../scanner/presentation/link_barcode_sheet.dart';
+import '../../sync/domain/sync_conflict.dart';
+import '../data/inventory_repository.dart';
+import '../domain/apparatus_history.dart';
+import '../domain/duplicates.dart';
 import '../domain/models.dart';
+import 'apparatus_details.dart';
+import 'apparatus_history_screen.dart';
+import 'checkout_sheets.dart';
+import 'chemical_details.dart';
+import 'service_sheets.dart';
 
 Future<void> showAddItemSheet(
   BuildContext context,
@@ -17,7 +32,7 @@ Future<void> showAddItemSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(child: _AddItemForm(kind: kind)),
+    builder: (_) => NotebookSheetFrame(child: _AddItemForm(kind: kind)),
   );
 }
 
@@ -31,7 +46,7 @@ Future<void> showEditItemSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(
+    builder: (_) => NotebookSheetFrame(
       child: _EditItemForm(kind: kind, itemId: itemId),
     ),
   );
@@ -48,7 +63,7 @@ Future<void> showInventoryActionSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(
+    builder: (_) => NotebookSheetFrame(
       child: _ActionForm(kind: kind, itemId: itemId, action: action),
     ),
   );
@@ -64,7 +79,7 @@ Future<void> showItemDetailSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _SheetFrame(
+    builder: (_) => NotebookSheetFrame(
       maxHeightFactor: .9,
       child: _ItemDetail(kind: kind, itemId: itemId),
     ),
@@ -76,13 +91,21 @@ Future<void> showBatchConsumeSheet(BuildContext context, WidgetRef _) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) =>
-        const _SheetFrame(maxHeightFactor: .92, child: _BatchConsumeForm()),
+    builder: (_) => const NotebookSheetFrame(
+      maxHeightFactor: .92,
+      child: _BatchConsumeForm(),
+    ),
   );
 }
 
-class _SheetFrame extends StatelessWidget {
-  const _SheetFrame({required this.child, this.maxHeightFactor = .94});
+/// Paper-coloured bottom-sheet body that scrolls and keeps clear of the
+/// keyboard. Shared by every form sheet in the app.
+class NotebookSheetFrame extends StatelessWidget {
+  const NotebookSheetFrame({
+    required this.child,
+    this.maxHeightFactor = .94,
+    super.key,
+  });
 
   final Widget child;
   final double maxHeightFactor;
@@ -95,11 +118,13 @@ class _SheetFrame extends StatelessWidget {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * maxHeightFactor,
         ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: context.paperColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
+        // A Material rather than a DecoratedBox: list tiles and ink
+        // splashes inside the sheet paint on the nearest Material, and a
+        // coloured box in between would hide them (Flutter asserts on it).
+        child: Material(
+          color: context.paperColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
             child: child,
@@ -126,10 +151,15 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   final _quantity = TextEditingController();
   final _threshold = TextEditingController();
   final _notes = TextEditingController();
+  final _details = ChemicalDetailsController();
+  final _gear = ApparatusDetailsController();
   String _unit = 'mL';
   String _category = 'glassware';
   bool _saving = false;
   bool _dirty = false;
+
+  /// Duplicate set the user explicitly chose to add anyway (DUP-01).
+  String _acknowledgedDuplicates = '';
 
   static const _units = ['mL', 'g', 'mg', 'L', 'kg', 'drops', 'pcs'];
   static const _categories = [
@@ -143,6 +173,14 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   @override
   void initState() {
     super.initState();
+    // FORM-01: start from what this user chose last time on this device.
+    final memory = ref.read(formMemoryProvider);
+    if (_units.contains(memory.lastUnit)) _unit = memory.lastUnit!;
+    if (_categories.contains(memory.lastCategory)) {
+      _category = memory.lastCategory!;
+    }
+    final threshold = memory.thresholdFor(widget.kind);
+    if (threshold != null) _threshold.text = formatQuantity(threshold);
     for (final controller in [
       _name,
       _subtitle,
@@ -152,10 +190,16 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     ]) {
       controller.addListener(_markDirty);
     }
+    _details.addListener(_detailsChanged);
+    _gear.addListener(_detailsChanged);
   }
 
   void _markDirty() {
     if (!_dirty && mounted) setState(() => _dirty = true);
+  }
+
+  void _detailsChanged() {
+    if (!_details.value.isEmpty || !_gear.value.isEmpty) _markDirty();
   }
 
   @override
@@ -165,6 +209,8 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     _quantity.dispose();
     _threshold.dispose();
     _notes.dispose();
+    _details.dispose();
+    _gear.dispose();
     super.dispose();
   }
 
@@ -186,6 +232,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               controller: _name,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: chemical ? 'Chemical name' : 'Apparatus name',
               ),
@@ -195,6 +242,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
             if (chemical)
               TextFormField(
                 controller: _subtitle,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: 'Formula',
                   hintText: 'e.g. HCl',
@@ -202,6 +250,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               )
             else
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: _categories
@@ -215,6 +264,24 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                   _dirty = true;
                 }),
               ),
+            if (_pendingDuplicates().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _DuplicateWarning(
+                matches: _pendingDuplicates(),
+                onView: (match) =>
+                    showItemDetailSheet(context, ref, match.kind, match.id),
+                onAddAnyway: _saving
+                    ? null
+                    : () {
+                        setState(
+                          () => _acknowledgedDuplicates = _duplicateKey(
+                            _pendingDuplicates(),
+                          ),
+                        );
+                        _save();
+                      },
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,6 +303,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                   SizedBox(
                     width: 105,
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _unit,
                       decoration: const InputDecoration(labelText: 'Unit'),
                       items: _units
@@ -278,6 +346,11 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                 hintText: 'Cabinet, supplier, safety note…',
               ),
             ),
+            const SizedBox(height: 8),
+            if (chemical)
+              ChemicalDetailsFields(controller: _details)
+            else
+              ApparatusDetailsFields(controller: _gear),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -311,8 +384,47 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     return _nonNegativeNumber(value);
   }
 
+  /// Existing items that look like this one and have not been waved through.
+  List<DuplicateMatch> _pendingDuplicates() {
+    final state = ref.read(inventoryProvider);
+    final matches = widget.kind == ItemKind.chemical
+        ? findChemicalDuplicates(
+            existing: state.chemicals,
+            name: _name.text,
+            formula: _subtitle.text,
+          )
+        : findApparatusDuplicates(
+            existing: state.apparatus,
+            name: _name.text,
+            category: _category,
+          );
+    if (matches.isEmpty || _duplicateKey(matches) == _acknowledgedDuplicates) {
+      return const [];
+    }
+    return matches;
+  }
+
+  static String _duplicateKey(List<DuplicateMatch> matches) =>
+      (matches.map((match) => match.id).toList()..sort()).join(',');
+
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      // Surface problems hidden inside the collapsed details section.
+      if (_details.validate() != null) _details.expanded = true;
+      if (_gear.validate() != null) _gear.expanded = true;
+      return;
+    }
+    if (_pendingDuplicates().isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This looks like a duplicate. View the existing item or choose '
+            '"add anyway".',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       final quantity = double.parse(_quantity.text);
@@ -327,6 +439,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               quantity: quantity,
               threshold: threshold,
               notes: _notes.text,
+              details: _details.value,
             );
       } else {
         await ref
@@ -337,10 +450,21 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
               quantity: quantity,
               threshold: threshold,
               notes: _notes.text,
+              details: _gear.value,
             );
       }
       HapticFeedback.mediumImpact();
       if (!mounted) return;
+      unawaited(
+        ref
+            .read(formMemoryProvider.notifier)
+            .rememberAdd(
+              kind: widget.kind,
+              unit: widget.kind == ItemKind.chemical ? _unit : null,
+              category: widget.kind == ItemKind.apparatus ? _category : null,
+              threshold: threshold,
+            ),
+      );
       _dirty = false;
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
@@ -372,6 +496,10 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
   late final TextEditingController _subtitle;
   late final TextEditingController _threshold;
   late final TextEditingController _notes;
+  late final ChemicalDetailsController _details;
+  late final ChemicalDetails _originalDetails;
+  late final ApparatusDetailsController _gear;
+  late final ApparatusDetails _originalGear;
   late String _unit;
   late String _category;
   bool _saving = false;
@@ -408,6 +536,14 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     _notes = TextEditingController(
       text: chemical?.notes ?? apparatus?.notes ?? '',
     );
+    _originalDetails = chemical == null
+        ? const ChemicalDetails()
+        : ChemicalDetails.of(chemical);
+    _details = ChemicalDetailsController(_originalDetails);
+    _originalGear = apparatus == null
+        ? const ApparatusDetails()
+        : ApparatusDetails.of(apparatus);
+    _gear = ApparatusDetailsController(_originalGear);
     _unit = chemical?.unit ?? 'mL';
     _category = apparatus?.category ?? 'other';
     if (!_units.contains(_unit)) _unit = 'pcs';
@@ -415,10 +551,19 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     for (final controller in [_name, _subtitle, _threshold, _notes]) {
       controller.addListener(_markDirty);
     }
+    _details.addListener(_detailsChanged);
+    _gear.addListener(_detailsChanged);
   }
 
   void _markDirty() {
     if (!_dirty && mounted) setState(() => _dirty = true);
+  }
+
+  void _detailsChanged() {
+    if (!_details.value.sameAs(_originalDetails) ||
+        !_gear.value.sameAs(_originalGear)) {
+      _markDirty();
+    }
   }
 
   @override
@@ -427,6 +572,8 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     _subtitle.dispose();
     _threshold.dispose();
     _notes.dispose();
+    _details.dispose();
+    _gear.dispose();
     super.dispose();
   }
 
@@ -468,6 +615,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
                   SizedBox(
                     width: 100,
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _unit,
                       decoration: const InputDecoration(labelText: 'Unit'),
                       items: _units
@@ -488,6 +636,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
               )
             else
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: _categories
@@ -527,6 +676,11 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
                 hintText: 'Cabinet, supplier, safety note…',
               ),
             ),
+            const SizedBox(height: 8),
+            if (chemical)
+              ChemicalDetailsFields(controller: _details)
+            else
+              ApparatusDetailsFields(controller: _gear),
             const SizedBox(height: 22),
             FilledButton.icon(
               onPressed: _saving ? null : _save,
@@ -547,8 +701,35 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
     );
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  Map<String, dynamic> _changes() {
+    final details = _details.value;
+    final gear = _gear.value;
+    return widget.kind == ItemKind.chemical
+        ? {
+            'name': _name.text.trim(),
+            'formula': _subtitle.text.trim(),
+            'unit': _unit,
+            'low_stock_threshold': double.parse(_threshold.text.trim()),
+            'notes': _notes.text.trim(),
+            // Metadata columns are only sent when they changed, so
+            // databases without migration 003 keep working.
+            if (!details.sameAs(_originalDetails)) ...details.toChanges(),
+          }
+        : {
+            'name': _name.text.trim(),
+            'category': _category,
+            'low_stock_threshold': double.parse(_threshold.text.trim()),
+            'notes': _notes.text.trim(),
+            if (!gear.sameAs(_originalGear)) ...gear.toChanges(),
+          };
+  }
+
+  Future<void> _save({bool force = false}) async {
+    if (!_formKey.currentState!.validate()) {
+      if (_details.validate() != null) _details.expanded = true;
+      if (_gear.validate() != null) _gear.expanded = true;
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ref
@@ -556,20 +737,8 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
           .updateItem(
             type: widget.kind,
             id: widget.itemId,
-            changes: widget.kind == ItemKind.chemical
-                ? {
-                    'name': _name.text.trim(),
-                    'formula': _subtitle.text.trim(),
-                    'unit': _unit,
-                    'low_stock_threshold': double.parse(_threshold.text.trim()),
-                    'notes': _notes.text.trim(),
-                  }
-                : {
-                    'name': _name.text.trim(),
-                    'category': _category,
-                    'low_stock_threshold': double.parse(_threshold.text.trim()),
-                    'notes': _notes.text.trim(),
-                  },
+            changes: _changes(),
+            force: force,
           );
       HapticFeedback.mediumImpact();
       if (!mounted) return;
@@ -577,11 +746,91 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       messenger.showSnackBar(const SnackBar(content: Text('Item updated')));
+    } on ItemConflictException catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      await _resolveConflict(error.conflict);
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    }
+  }
+
+  /// The same fields changed on the server while this form was open
+  /// (SYNC-04): let the user pick a side instead of overwriting silently.
+  Future<void> _resolveConflict(SyncConflict conflict) async {
+    if (conflict.kind == ConflictKind.deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This item was deleted on the server.')),
+      );
+      unawaited(ref.read(inventoryProvider.notifier).refresh());
+      return;
+    }
+    final choice = await showDialog<ConflictResolution>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Changed on the server'),
+        content: Text(
+          '${conflict.explanation}\n\nKeep the server values (your other '
+          'edits are still saved) or overwrite them with yours?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const Key('conflict-use-server'),
+            onPressed: () =>
+                Navigator.pop(context, ConflictResolution.useServer),
+            child: const Text('Keep server values'),
+          ),
+          FilledButton(
+            key: const Key('conflict-keep-mine'),
+            onPressed: () =>
+                Navigator.pop(context, ConflictResolution.keepMine),
+            child: const Text('Overwrite with mine'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case ConflictResolution.keepMine:
+        await _save(force: true);
+      case ConflictResolution.useServer:
+        // Fetch the server's copy, then send only the non-conflicting edits.
+        await ref.read(inventoryProvider.notifier).refresh();
+        if (!mounted) return;
+        final conflicting = conflict.fields.map((f) => f.field).toSet();
+        final changes = _changes()
+          ..removeWhere((key, _) => conflicting.contains(key));
+        setState(() => _saving = true);
+        try {
+          await ref
+              .read(inventoryProvider.notifier)
+              .updateItem(
+                type: widget.kind,
+                id: widget.itemId,
+                changes: changes,
+              );
+          if (!mounted) return;
+          _dirty = false;
+          final messenger = ScaffoldMessenger.of(context);
+          Navigator.pop(context);
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Saved with the server values')),
+          );
+        } catch (error) {
+          if (!mounted) return;
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+        }
+      case ConflictResolution.useAvailable || ConflictResolution.discard:
+        break;
     }
   }
 }
@@ -808,6 +1057,16 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    // FORM-01: the last amount recorded for this kind of action.
+    final remembered = ref
+        .read(formMemoryProvider)
+        .amountFor(widget.kind, widget.action);
+    if (remembered != null) _amount.text = formatQuantity(remembered);
+  }
+
+  @override
   void dispose() {
     _amount.dispose();
     _note.dispose();
@@ -996,7 +1255,7 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await ref
+      final log = await ref
           .read(inventoryProvider.notifier)
           .applyAction(
             itemId: widget.itemId,
@@ -1008,10 +1267,23 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
           );
       HapticFeedback.mediumImpact();
       if (!mounted) return;
+      unawaited(
+        ref
+            .read(formMemoryProvider.notifier)
+            .rememberAmount(widget.kind, widget.action, log.amount),
+      );
       final messenger = ScaffoldMessenger.of(context);
+      final container = ProviderScope.containerOf(context, listen: false);
       Navigator.pop(context);
       messenger.showSnackBar(
-        SnackBar(content: Text('${widget.action.name} recorded')),
+        SnackBar(
+          content: Text('${widget.action.name} recorded'),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => undoRecordedAction(container, messenger, log.id),
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -1053,10 +1325,7 @@ class _ItemDetail extends ConsumerWidget {
     final notes = chemical?.notes ?? apparatus!.notes;
     final status = chemical?.stockState ?? apparatus!.stockState;
     final progress = chemical?.stockProgress ?? apparatus!.stockProgress;
-    final itemLogs = state.logs
-        .where((log) => log.itemId == itemId)
-        .take(8)
-        .toList();
+    final history = _historyFor(state, itemId, apparatus: apparatus != null);
 
     return Hero(
       tag: '${kind.name}-$itemId',
@@ -1080,17 +1349,19 @@ class _ItemDetail extends ConsumerWidget {
                 style: TextStyle(color: context.mutedInkColor, fontSize: 17),
               ),
             const SizedBox(height: 18),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            // Badge sits beside the amount, or under it with large text.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: 12,
+              runSpacing: 6,
               children: [
-                Expanded(
-                  child: AnimatedQuantity(
-                    quantity,
-                    suffix: ' $unit',
-                    style: const TextStyle(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w900,
-                    ),
+                AnimatedQuantity(
+                  quantity,
+                  suffix: ' $unit',
+                  style: const TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 StatusBadge(status),
@@ -1150,30 +1421,30 @@ class _ItemDetail extends ConsumerWidget {
               const SizedBox(height: 24),
               const PageHeading('QR label', trailing: SizedBox.shrink()),
               Text(
-                'Print or screenshot this label for instant scanning.',
+                'Scan it with the app, or share and print it as an image or '
+                'PDF.',
                 style: TextStyle(color: context.mutedInkColor, fontSize: 12),
               ),
               const SizedBox(height: 8),
-              Center(
-                child: NotebookCard(
-                  tape: NotebookTape.yellow,
-                  padding: const EdgeInsets.all(12),
-                  child: ColoredBox(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: QrImageView(
-                        data: chemical != null
-                            ? 'labwizard:chemical:${chemical.qrCode}'
-                            : 'labwizard:apparatus:$itemId',
-                        size: 152,
-                        backgroundColor: Colors.white,
-                      ),
-                    ),
+              LabelCard(
+                label: chemical != null
+                    ? LabelSpec.chemical(chemical)
+                    : LabelSpec.apparatus(apparatus!),
+              ),
+              if ((chemical?.barcode ?? apparatus?.barcode) != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: LinkedBarcodeRow(
+                    kind: kind,
+                    itemId: itemId,
+                    barcode: (chemical?.barcode ?? apparatus?.barcode)!,
                   ),
                 ),
-              ),
             ],
+            if (chemical != null) ChemicalDetailsSummary(chemical),
+            if (apparatus != null) ApparatusDetailsSummary(apparatus),
+            if (apparatus != null) CheckoutSection(apparatus: apparatus),
+            if (apparatus != null) ServiceSection(apparatus: apparatus),
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 24),
               const PageHeading('notes', trailing: SizedBox.shrink()),
@@ -1181,28 +1452,97 @@ class _ItemDetail extends ConsumerWidget {
             ],
             const SizedBox(height: 24),
             const PageHeading('history', trailing: SizedBox.shrink()),
-            if (itemLogs.isEmpty)
+            if (history.isEmpty)
               Text(
                 'No activity yet.',
                 style: TextStyle(color: context.mutedInkColor),
               )
             else
-              ...itemLogs.map(
-                (log) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    child: Icon(
-                      log.action == InventoryAction.restock
-                          ? Icons.add
-                          : Icons.remove,
+              for (final entry in history)
+                switch (entry) {
+                  _LogEntry(:final log) => ListTile(
+                    key: Key('history-log-${log.id}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      child: Icon(
+                        log.action == InventoryAction.restock
+                            ? Icons.add
+                            : Icons.remove,
+                      ),
+                    ),
+                    title: Text(
+                      '${log.action.name} ${formatQuantity(log.amount)} $unit',
+                    ),
+                    subtitle: Text(
+                      '${log.loggedAt.day}/${log.loggedAt.month}/${log.loggedAt.year}${log.note.isEmpty ? '' : ' · ${log.note}'}',
+                    ),
+                    trailing: isUndoable(log)
+                        ? TextButton(
+                            key: Key('undo-${log.id}'),
+                            onPressed: () => _undo(
+                              context,
+                              ref,
+                              log: log,
+                              name: name,
+                              unit: unit,
+                              quantity: quantity,
+                            ),
+                            child: const Text('undo'),
+                          )
+                        : null,
+                  ),
+                  _EventEntry(:final event) => ListTile(
+                    key: Key('history-event-${event.key}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: historyColor(
+                        context,
+                        event.kind,
+                      ).withValues(alpha: .15),
+                      child: Icon(
+                        historyIcon(event.kind),
+                        color: historyColor(context, event.kind),
+                      ),
+                    ),
+                    title: Text(event.title),
+                    subtitle: Text(
+                      '${event.time.day}/${event.time.month}/${event.time.year}'
+                      '${event.detail.isEmpty ? '' : ' · ${event.detail}'}',
                     ),
                   ),
-                  title: Text(
-                    '${log.action.name} ${formatQuantity(log.amount)} $unit',
+                  _ReversalEntry(:final reversal) => ListTile(
+                    key: Key('history-undo-${reversal.id}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: context.ruledColor,
+                      child: Icon(Icons.undo, color: context.mutedInkColor),
+                    ),
+                    title: Text(
+                      '${reversal.action.name} ${formatQuantity(reversal.amount)} $unit',
+                      style: TextStyle(
+                        decoration: TextDecoration.lineThrough,
+                        color: context.mutedInkColor,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _reversalCaption(reversal),
+                      style: TextStyle(color: context.mutedInkColor),
+                    ),
                   ),
-                  subtitle: Text(
-                    '${log.loggedAt.day}/${log.loggedAt.month}/${log.loggedAt.year}${log.note.isEmpty ? '' : ' · ${log.note}'}',
+                },
+            if (apparatus != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('history-all'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ApparatusHistoryScreen(apparatusId: itemId),
+                    ),
                   ),
+                  icon: const Icon(Icons.timeline_outlined, size: 18),
+                  label: const Text('Full history & report'),
                 ),
               ),
             const SizedBox(height: 24),
@@ -1216,6 +1556,109 @@ class _ItemDetail extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  static List<_HistoryEntry> _historyFor(
+    InventoryState state,
+    String itemId, {
+    bool apparatus = false,
+  }) {
+    final entries = <_HistoryEntry>[
+      for (final log in state.logs)
+        if (log.itemId == itemId) _LogEntry(log),
+      for (final reversal in state.reversals)
+        if (reversal.itemId == itemId) _ReversalEntry(reversal),
+      // Loans and service tasks join the apparatus timeline (GEAR-04);
+      // stock changes above already cover logs and undo notes.
+      if (apparatus)
+        for (final event in buildApparatusHistory(
+          apparatusId: itemId,
+          checkouts: state.checkouts,
+          services: state.services,
+        ))
+          _EventEntry(event),
+    ]..sort((a, b) => b.time.compareTo(a.time));
+    return entries.take(8).toList();
+  }
+
+  static String _reversalCaption(InventoryReversal reversal) {
+    final buffer = StringBuffer('undone ${relativeTime(reversal.reversedAt)}');
+    final original = reversal.originalLoggedAt;
+    if (original != null) {
+      buffer.write(' · was ${original.day}/${original.month}/${original.year}');
+    }
+    if (reversal.originalNote.isNotEmpty) {
+      buffer.write(' · ${reversal.originalNote}');
+    }
+    if (reversal.localOnly) buffer.write(' · noted on this device');
+    return buffer.toString();
+  }
+
+  Future<void> _undo(
+    BuildContext context,
+    WidgetRef ref, {
+    required ConsumptionLog log,
+    required String name,
+    required String unit,
+    required double quantity,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (log.action == InventoryAction.restock && quantity < log.amount) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cannot undo: only ${formatQuantity(quantity)} $unit left of the '
+            '${formatQuantity(log.amount)} that was restocked.',
+          ),
+        ),
+      );
+      return;
+    }
+    final queued =
+        log.operationId != null &&
+        ref
+            .read(inventoryProvider)
+            .outbox
+            .any((operation) => operation.id == log.operationId);
+    final restored = log.action == InventoryAction.restock
+        ? quantity - log.amount
+        : quantity + log.amount;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          'Undo ${log.action.name} of ${formatQuantity(log.amount)} $unit?',
+        ),
+        content: Text(
+          queued
+              ? 'This change has not reached the server yet, so it is simply '
+                    'cancelled. $name goes back to ${formatQuantity(restored)} $unit.'
+              : '$name goes back to ${formatQuantity(restored)} $unit. The '
+                    'entry is removed from the log and an "undone" note is kept '
+                    'in the history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Undo'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      final result = await ref
+          .read(inventoryProvider.notifier)
+          .undoAction(log.id);
+      HapticFeedback.mediumImpact();
+      messenger.showSnackBar(SnackBar(content: Text(undoMessage(result))));
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    }
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref, String name) async {
@@ -1336,22 +1779,140 @@ class _QuantityPreview extends StatelessWidget {
   }
 }
 
-String _friendlyError(Object error) {
-  final message = error.toString().replaceFirst(
-    RegExp(r'^[A-Za-z]+Exception:\s*'),
-    '',
-  );
-  final lower = message.toLowerCase();
-  if (lower.contains('socket') ||
-      lower.contains('network') ||
-      lower.contains('connection') ||
-      lower.contains('host lookup')) {
-    return 'You appear to be offline. The change will sync when possible.';
+String _friendlyError(Object error) => friendlyErrorMessage(error);
+
+/// Inline note shown while adding an item that matches something on the
+/// shelf (DUP-01). The user can inspect the existing item or add anyway.
+class _DuplicateWarning extends StatelessWidget {
+  const _DuplicateWarning({
+    required this.matches,
+    required this.onView,
+    required this.onAddAnyway,
+  });
+
+  final List<DuplicateMatch> matches;
+  final ValueChanged<DuplicateMatch> onView;
+  final VoidCallback? onAddAnyway;
+
+  @override
+  Widget build(BuildContext context) {
+    return NotebookCard(
+      key: const Key('duplicate-warning'),
+      accent: context.lowColor,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.content_copy_outlined,
+                size: 18,
+                color: context.lowColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  matches.length == 1
+                      ? 'already on the shelf?'
+                      : '${matches.length} similar items on the shelf',
+                  style: const TextStyle(
+                    fontFamily: 'ArchitectsDaughter',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          for (final match in matches.take(3))
+            ListTile(
+              key: Key('duplicate-${match.id}'),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              title: Text(match.name),
+              subtitle: Text('${match.detail} · ${match.reason}'),
+              trailing: TextButton(
+                onPressed: () => onView(match),
+                child: const Text('view'),
+              ),
+            ),
+          if (matches.length > 3)
+            Text(
+              'and ${matches.length - 3} more',
+              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('duplicate-add-anyway'),
+              onPressed: onAddAnyway,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('add anyway'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
-  if (lower.contains('permission') || lower.contains('row-level security')) {
-    return 'This account does not have permission to change that item.';
+}
+
+/// Undoes [logId] from a snackbar after the recording sheet has closed.
+Future<void> undoRecordedAction(
+  ProviderContainer container,
+  ScaffoldMessengerState messenger,
+  String logId,
+) async {
+  try {
+    final result = await container
+        .read(inventoryProvider.notifier)
+        .undoAction(logId);
+    messenger.showSnackBar(SnackBar(content: Text(undoMessage(result))));
+  } catch (error) {
+    messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
   }
-  return message.isEmpty ? 'Something went wrong. Please try again.' : message;
+}
+
+/// One-line confirmation shown after an undo.
+String undoMessage(UndoResult result) {
+  if (result.cancelled) return 'Change cancelled before it synced';
+  if (result.alreadyUndone) return 'That entry was already undone elsewhere';
+  return 'Change undone';
+}
+
+sealed class _HistoryEntry {
+  const _HistoryEntry();
+
+  DateTime get time;
+}
+
+class _LogEntry extends _HistoryEntry {
+  const _LogEntry(this.log);
+
+  final ConsumptionLog log;
+
+  @override
+  DateTime get time => log.loggedAt;
+}
+
+class _ReversalEntry extends _HistoryEntry {
+  const _ReversalEntry(this.reversal);
+
+  final InventoryReversal reversal;
+
+  @override
+  DateTime get time => reversal.reversedAt;
+}
+
+class _EventEntry extends _HistoryEntry {
+  const _EventEntry(this.event);
+
+  final ApparatusEvent event;
+
+  @override
+  DateTime get time => event.time;
 }
 
 extension<T> on Iterable<T> {

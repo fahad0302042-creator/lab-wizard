@@ -1,0 +1,62 @@
+name: Update golden screenshots
+
+# Regenerates flutter_app/test/golden/goldens/*.png on Linux (the only
+# platform the comparisons run on) and commits them to the branch. Run it
+# after an intentional visual change; the regular CI run then compares
+# against the new images (TEST-01).
+#
+# Two ways to trigger it: the "Run workflow" button (once GitHub has seen
+# the workflow run at least once), or a push that changes the request file
+# flutter_app/test/golden/UPDATE_GOLDENS (write the date or a reason into
+# it), which also works for a branch that is not the default branch.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths:
+      - "flutter_app/test/golden/UPDATE_GOLDENS"
+
+permissions:
+  contents: write
+
+jobs:
+  goldens:
+    name: Render goldens on Linux and commit them
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Render goldens
+        run: flutter test --update-goldens --tags golden test/golden
+
+      - name: Commit the images
+        run: |
+          git add -A test/golden/goldens
+          if git diff --cached --quiet; then
+            echo "Goldens are unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test: update golden screenshots (CI)"
+          # The branch may have moved while rendering; the images never
+          # conflict with source commits, so rebase and push.
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
+import 'forgot_password_dialog.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -79,7 +80,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                         const SizedBox(height: 24),
                         AnimatedSize(
-                          duration: const Duration(milliseconds: 250),
+                          duration: context.motion(
+                            const Duration(milliseconds: 250),
+                          ),
                           child: _signUp
                               ? Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
@@ -123,6 +126,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
+                              tooltip: _obscure
+                                  ? 'Show password'
+                                  : 'Hide password',
                               onPressed: () =>
                                   setState(() => _obscure = !_obscure),
                               icon: Icon(
@@ -143,6 +149,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: LabColors.marginRed,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        if (auth.notice != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            auth.notice!,
+                            key: const Key('auth-notice'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: context.healthyColor,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -185,6 +203,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 : 'Create a new account',
                           ),
                         ),
+                        if (!_signUp)
+                          TextButton(
+                            key: const Key('forgot-password'),
+                            onPressed: auth.isBusy
+                                ? null
+                                : () => showForgotPasswordDialog(
+                                    context,
+                                    initialEmail: _email.text,
+                                  ),
+                            child: const Text('Forgot password?'),
+                          ),
                         const SizedBox(height: 4),
                         Text(
                           'Use the same account as the web app to load your existing data.',

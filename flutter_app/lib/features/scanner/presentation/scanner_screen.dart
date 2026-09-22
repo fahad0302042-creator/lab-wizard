@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,14 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
+import '../domain/recent_scan.dart';
+import '../domain/scan_batch.dart';
+import '../domain/scan_resolver.dart';
+import '../scanner_providers.dart';
+import 'batch_summary_sheet.dart';
+import 'link_barcode_sheet.dart';
+import 'recent_scans_section.dart';
+import 'scan_action_sheet.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({this.active = true, super.key});
@@ -25,21 +35,51 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   final _search = TextEditingController();
   bool _handling = false;
   String? _message;
+  Timer? _messageTimer;
+  bool _batchMode = false;
+  ScanBatch _batch = const ScanBatch();
+  String? _lastRaw;
+  DateTime? _lastRawAt;
 
   @override
   void initState() {
     super.initState();
     _scanner = MobileScannerController(
       autoStart: false,
-      formats: const [BarcodeFormat.qrCode],
+      // Product formats are decoded too, but only acted on when the
+      // "product barcodes" preference is on (SCAN-04).
+      formats: const [
+        BarcodeFormat.qrCode,
+        BarcodeFormat.dataMatrix,
+        BarcodeFormat.ean13,
+        BarcodeFormat.ean8,
+        BarcodeFormat.upcA,
+        BarcodeFormat.upcE,
+        BarcodeFormat.code128,
+        BarcodeFormat.code39,
+        BarcodeFormat.code93,
+        BarcodeFormat.itf14,
+      ],
       detectionSpeed: DetectionSpeed.noDuplicates,
     );
     _line = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1700),
-    )..repeat(reverse: true);
+    );
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _startScanner());
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The sweeping line is decoration; it stays still (and costs no frames)
+    // when the system asks for reduced motion (A11Y-05).
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _line.stop();
+    } else if (!_line.isAnimating) {
+      _line.repeat(reverse: true);
     }
   }
 
@@ -65,6 +105,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
   @override
   void dispose() {
+    _messageTimer?.cancel();
     _line.dispose();
     _search.dispose();
     _scanner.dispose();
@@ -123,13 +164,19 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ColoredBox(
-                  color: Colors.black,
-                  child: MobileScanner(
-                    controller: _scanner,
-                    onDetect: _onDetect,
-                    placeholderBuilder: (_) =>
-                        const Center(child: CircularProgressIndicator()),
+                Semantics(
+                  label:
+                      'Camera viewfinder. Hold the phone over a Lab Wizard '
+                      'label; the result is announced.',
+                  excludeSemantics: true,
+                  child: ColoredBox(
+                    color: Colors.black,
+                    child: MobileScanner(
+                      controller: _scanner,
+                      onDetect: _onDetect,
+                      placeholderBuilder: (_) =>
+                          const Center(child: CircularProgressIndicator()),
+                    ),
                   ),
                 ),
                 const _ScannerShade(),
@@ -198,7 +245,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                   right: 14,
                   bottom: 14,
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
+                    duration: context.motion(const Duration(milliseconds: 220)),
                     child: Container(
                       key: ValueKey(_message),
                       padding: const EdgeInsets.symmetric(
@@ -209,12 +256,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                         color: Colors.black54,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        _message ?? 'Hold steady inside the frame',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                      // Live region: TalkBack speaks each new status
+                      // ("Found Acetone", "not in your lab notebook").
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _message ?? _idleMessage,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -224,7 +276,68 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: SegmentedButton<bool>(
+                key: const Key('scan-mode'),
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.qr_code_scanner),
+                    label: Text('Single'),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.playlist_add_check_outlined),
+                    label: Text('Batch'),
+                  ),
+                ],
+                selected: {_batchMode},
+                onSelectionChanged: (selection) =>
+                    setState(() => _batchMode = selection.first),
+              ),
+            ),
+            if (_batch.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              FilledButton.tonalIcon(
+                key: const Key('batch-finish'),
+                onPressed: _finishBatch,
+                icon: const Icon(Icons.checklist_outlined),
+                label: Text('Finish (${_batch.itemCount})'),
+              ),
+            ],
+          ],
+        ),
+        if (_batchMode) ...[
+          const SizedBox(height: 6),
+          Text(
+            _batch.isEmpty
+                ? 'Every recognised label is added to a list without '
+                      'leaving the camera; repeated labels are counted, '
+                      'not listed twice.'
+                : _batch.summaryLine,
+            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+          ),
+        ],
+        SwitchListTile.adaptive(
+          key: const Key('scan-product-barcodes'),
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Also read product barcodes'),
+          subtitle: Text(
+            'EAN, UPC, Code 128 and similar open only the item you linked '
+            'them to; nothing is matched by guesswork.',
+            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+          ),
+          value: ref.watch(productBarcodesProvider),
+          onChanged: (value) =>
+              ref.read(productBarcodesProvider.notifier).set(value),
+        ),
+        const SizedBox(height: 16),
+        const RecentScansSection(),
         const PageHeading('or search manually', trailing: SizedBox.shrink()),
         TextField(
           controller: _search,
@@ -288,58 +401,137 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     );
   }
 
+  String get _idleMessage {
+    if (!_batchMode) return 'Hold steady inside the frame';
+    if (_batch.isEmpty) return 'Batch mode · scan the first label';
+    return '${_batch.summaryLine} · next label';
+  }
+
+  void _flash(
+    String text, {
+    Duration duration = const Duration(milliseconds: 1600),
+  }) {
+    setState(() => _message = text);
+    _messageTimer?.cancel();
+    _messageTimer = Timer(duration, () {
+      if (mounted) setState(() => _message = null);
+    });
+  }
+
+  Future<void> _finishBatch() async {
+    if (_batch.isEmpty) return;
+    await _scanner.stop();
+    if (!mounted) return;
+    final done = await showBatchSummarySheet(context, _batch);
+    if (!mounted) return;
+    if (done) setState(() => _batch = const ScanBatch());
+    if (widget.active) await _scanner.start();
+  }
+
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_handling) return;
-    final raw = capture.barcodes.firstOrNull?.rawValue;
-    if (raw == null || raw.isEmpty) return;
+    final barcode = capture.barcodes.firstOrNull;
+    final raw = barcode?.rawValue;
+    if (barcode == null || raw == null || raw.isEmpty) return;
+    final format = barcode.format;
+    final isProductCode =
+        format != BarcodeFormat.qrCode && format != BarcodeFormat.unknown;
+    if (isProductCode && !ref.read(productBarcodesProvider)) return;
+    final now = DateTime.now();
+    // The camera can re-read a label that stays in view; treat repeats within
+    // a couple of seconds as the same read.
+    if (raw == _lastRaw &&
+        _lastRawAt != null &&
+        now.difference(_lastRawAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastRaw = raw;
+    _lastRawAt = now;
     _handling = true;
     final inventory = ref.read(inventoryProvider);
-    ItemKind? kind;
-    String? id;
-    String? name;
+    final match = resolveScan(
+      raw,
+      chemicals: inventory.chemicals,
+      apparatus: inventory.apparatus,
+    );
+    final history = ref.read(recentScansProvider.notifier);
 
-    if (raw.startsWith('labwizard:apparatus:')) {
-      final apparatusId = raw.substring('labwizard:apparatus:'.length);
-      final item = inventory.apparatus
-          .where((value) => value.id == apparatusId)
-          .firstOrNull;
-      if (item != null) {
-        kind = ItemKind.apparatus;
-        id = item.id;
-        name = item.name;
+    if (_batchMode) {
+      final (batch, outcome) = _batch.add(raw, match, at: now);
+      unawaited(
+        history.record(
+          match == null
+              ? RecentScan.unknown(raw.trim(), now)
+              : RecentScan.found(match, raw.trim(), now),
+        ),
+      );
+      _batch = batch;
+      switch (outcome) {
+        case ScanBatchOutcome.added:
+          HapticFeedback.mediumImpact();
+          _flash('Added ${match!.name}');
+        case ScanBatchOutcome.duplicate:
+          HapticFeedback.lightImpact();
+          final item = match!;
+          final count = batch.entries
+              .firstWhere(
+                (entry) => entry.key == '${item.kind.name}:${item.id}',
+              )
+              .count;
+          _flash('${item.name} already in batch (×$count)');
+        case ScanBatchOutcome.unknown:
+          HapticFeedback.heavyImpact();
+          _flash('Not in your notebook · kept in the summary');
       }
-    } else {
-      final qrCode = raw.startsWith('labwizard:chemical:')
-          ? raw.substring('labwizard:chemical:'.length)
-          : raw;
-      final item = inventory.chemicals
-          .where((value) => value.qrCode == qrCode)
-          .firstOrNull;
-      if (item != null) {
-        kind = ItemKind.chemical;
-        id = item.id;
-        name = item.name;
-      }
-    }
-
-    if (kind == null || id == null) {
-      setState(() => _message = 'This code is not in your lab notebook');
-      HapticFeedback.heavyImpact();
-      await Future<void>.delayed(const Duration(seconds: 2));
-      if (mounted) setState(() => _message = null);
       _handling = false;
       return;
     }
+
     await _scanner.stop();
-    HapticFeedback.mediumImpact();
-    if (mounted) {
-      setState(() => _message = 'Found $name');
-      await showItemDetailSheet(context, ref, kind, id);
+    if (!mounted) return;
+    var found = match;
+    if (found == null) {
+      // SCAN-04: nothing carries this code. Offer an explicit link instead of
+      // guessing; the person can also just dismiss the sheet.
+      unawaited(history.record(RecentScan.unknown(raw.trim(), now)));
+      HapticFeedback.heavyImpact();
+      setState(() => _message = 'This code is not in your lab notebook');
+      found = await showLinkBarcodeSheet(
+        context,
+        code: raw.trim(),
+        formatLabel: barcodeFormatLabel(format),
+      );
+      if (!mounted) return;
+    } else {
+      HapticFeedback.mediumImpact();
     }
-    if (mounted) {
+    if (found != null) {
+      final item = found;
+      unawaited(
+        history.record(RecentScan.found(item, raw.trim(), DateTime.now())),
+      );
+      setState(() => _message = 'Found ${item.name}');
+      // SCAN-03: quick amount + action first; the full sheet is one tap away.
+      final result = await showScanActionSheet(
+        context,
+        kind: item.kind,
+        itemId: item.id,
+      );
+      if (!mounted) return;
+      if (result?.openDetails ?? false) {
+        await showItemDetailSheet(context, ref, item.kind, item.id);
+        if (!mounted) return;
+      }
+      final outcome = result?.message;
+      if (outcome != null) {
+        _flash(outcome, duration: const Duration(seconds: 3));
+      } else {
+        setState(() => _message = null);
+      }
+    } else {
       setState(() => _message = null);
-      await _scanner.start();
     }
+    if (widget.active) await _scanner.start();
     _handling = false;
   }
 }

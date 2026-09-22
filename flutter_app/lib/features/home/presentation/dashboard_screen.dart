@@ -8,6 +8,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/domain/models.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
+import '../../notifications/presentation/alerts_screen.dart';
+import '../../sync/presentation/sync_center_screen.dart';
+import '../../organizations/domain/models.dart';
+import '../../organizations/presentation/lab_switcher_sheet.dart';
+import '../../organizations/presentation/organization_providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({
@@ -56,6 +61,11 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 3),
                       PageHeading('${_greeting(now)}, $firstName'),
+                      const SizedBox(height: 5),
+                      _LabChip(
+                        activeLab: ref.watch(activeLabProvider),
+                        onTap: () => showLabSwitcherSheet(context),
+                      ),
                     ],
                   ),
                 ),
@@ -143,6 +153,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
           ],
+          const RemindersCard(),
           if (inventory.attentionCount > 0) ...[
             StaggerIn(
               index: 1,
@@ -179,11 +190,17 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
           ],
-          GridView.count(
-            crossAxisCount: 2,
-            childAspectRatio: 1.45,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+          GridView(
+            // Tile height follows the font size so the number and caption
+            // never clip at large text (A11Y-02).
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              // Four tiles in one row on tablets and landscape (A11Y-03).
+              crossAxisCount: MediaQuery.sizeOf(context).width >= 600 ? 4 : 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent:
+                  60 + 46 * (MediaQuery.textScalerOf(context).scale(10) / 10),
+            ),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
@@ -460,6 +477,7 @@ class _GlobalSearchSheetState extends State<_GlobalSearchSheet> {
                   suffixIcon: query.isEmpty
                       ? null
                       : IconButton(
+                          tooltip: 'Clear search',
                           onPressed: () {
                             _controller.clear();
                             setState(() {});
@@ -619,39 +637,42 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StaggerIn(
-      index: index,
-      child: NotebookCard(
-        onTap: onTap,
-        tape: switch (index % 4) {
-          0 => NotebookTape.yellow,
-          1 => NotebookTape.blue,
-          2 => NotebookTape.pink,
-          _ => NotebookTape.green,
-        },
-        accent: color,
-        rotation: index.isEven ? -.008 : .008,
-        padding: const EdgeInsets.all(13),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 21),
-            AnimatedQuantity(
-              value,
-              style: const TextStyle(
-                fontSize: 28,
-                height: 1.1,
-                fontWeight: FontWeight.w900,
+    // Value and caption are one spoken item ("3, low stock, button").
+    return MergeSemantics(
+      child: StaggerIn(
+        index: index,
+        child: NotebookCard(
+          onTap: onTap,
+          tape: switch (index % 4) {
+            0 => NotebookTape.yellow,
+            1 => NotebookTape.blue,
+            2 => NotebookTape.pink,
+            _ => NotebookTape.green,
+          },
+          accent: color,
+          rotation: index.isEven ? -.008 : .008,
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 21),
+              AnimatedQuantity(
+                value,
+                style: const TextStyle(
+                  fontSize: 28,
+                  height: 1.1,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-            ),
-          ],
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -731,32 +752,52 @@ class _SyncBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pending = state.pendingCount > 0;
-    return Material(
-      color: (pending ? LabColors.amber : LabColors.blue).withValues(
-        alpha: .12,
-      ),
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        child: Row(
-          children: [
-            Icon(
-              pending ? Icons.cloud_upload_outlined : Icons.cloud_off_outlined,
-              size: 19,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                pending
-                    ? '${state.pendingCount} change${state.pendingCount == 1 ? '' : 's'} waiting to sync'
-                    : state.error!,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+    final failed = state.failedCount > 0;
+    final color = failed
+        ? LabColors.marginRed
+        : pending
+        ? LabColors.amber
+        : LabColors.blue;
+    // Icon, message and chevron read as one button.
+    return MergeSemantics(
+      child: Material(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const SyncCenterScreen()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                Icon(
+                  failed
+                      ? Icons.error_outline
+                      : pending
+                      ? Icons.cloud_upload_outlined
+                      : Icons.cloud_off_outlined,
+                  size: 19,
                 ),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    failed
+                        ? '${state.failedCount} change${state.failedCount == 1 ? '' : 's'} need${state.failedCount == 1 ? 's' : ''} attention — open sync center'
+                        : pending
+                        ? '${state.pendingCount} change${state.pendingCount == 1 ? '' : 's'} waiting to sync — tap for details'
+                        : state.error!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, size: 18),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -790,48 +831,64 @@ class _WeekActivity extends StatelessWidget {
       1,
       (max, value) => value > max ? value : max,
     );
-    return SizedBox(
-      height: 130,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(7, (index) {
-          final ratio = counts[index] / maxCount;
-          return Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  counts[index] == 0 ? '' : '${counts[index]}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+    final total = counts.fold<int>(0, (sum, value) => sum + value);
+    final busiest = counts.indexOf(maxCount);
+    return Semantics(
+      label: total == 0
+          ? 'Last 7 days: no activity recorded'
+          : 'Last 7 days: $total action${total == 1 ? '' : 's'}, most on '
+                '${DateFormat.EEEE().format(days[busiest])} '
+                '($maxCount)',
+      excludeSemantics: true,
+      child: SizedBox(
+        // Two text lines grow with the font; the bars keep their height.
+        height: 106 + 24 * (MediaQuery.textScalerOf(context).scale(10) / 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(7, (index) {
+            final ratio = counts[index] / maxCount;
+            return Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    counts[index] == 0 ? '' : '${counts[index]}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                TweenAnimationBuilder<double>(
-                  tween: Tween(end: ratio),
-                  duration: Duration(milliseconds: 400 + index * 55),
-                  curve: Curves.easeOutBack,
-                  builder: (_, value, _) => Container(
-                    height: 68 * value + 5,
-                    width: 13,
-                    decoration: BoxDecoration(
-                      color: LabColors.marginRed.withValues(alpha: .78),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(8),
+                  const SizedBox(height: 3),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(end: ratio),
+                    duration: context.motion(
+                      Duration(milliseconds: 400 + index * 55),
+                    ),
+                    curve: Curves.easeOutBack,
+                    builder: (_, value, _) => Container(
+                      height: 68 * value + 5,
+                      width: 13,
+                      decoration: BoxDecoration(
+                        color: LabColors.marginRed.withValues(alpha: .78),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(8),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  DateFormat.E().format(days[index]).substring(0, 1),
-                  style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-                ),
-              ],
-            ),
-          );
-        }),
+                  const SizedBox(height: 7),
+                  Text(
+                    DateFormat.E().format(days[index]).substring(0, 1),
+                    style: TextStyle(
+                      color: context.mutedInkColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -907,5 +964,60 @@ extension<T> on Iterable<T> {
   T? get firstOrNull {
     final iterator = this.iterator;
     return iterator.moveNext() ? iterator.current : null;
+  }
+}
+
+class _LabChip extends StatelessWidget {
+  const _LabChip({required this.activeLab, required this.onTap});
+
+  final Lab? activeLab;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPersonal = activeLab == null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest
+              .withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant
+                .withValues(alpha: 0.5),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPersonal
+                  ? Icons.person_pin_outlined
+                  : (activeLab?.labType.icon ?? Icons.science_outlined),
+              size: 14,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                isPersonal ? 'Personal Lab' : (activeLab?.name ?? 'Lab'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.inkColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.arrow_drop_down, size: 16, color: context.mutedInkColor),
+          ],
+        ),
+      ),
+    );
   }
 }

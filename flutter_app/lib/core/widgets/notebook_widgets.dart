@@ -19,10 +19,12 @@ class NotebookPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The shadow stays on a DecoratedBox; the paper colour is a Material so
+    // list tiles and ink splashes on a page paint on the paper (Flutter
+    // asserts when a coloured box sits between a tile and its Material).
     final content = DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.paperColor,
-        boxShadow: const [
+      decoration: const BoxDecoration(
+        boxShadow: [
           BoxShadow(
             color: Color(0x35000000),
             blurRadius: 22,
@@ -30,13 +32,16 @@ class NotebookPage extends StatelessWidget {
           ),
         ],
       ),
-      child: CustomPaint(
-        painter: _PaperPainter(
-          ruled: context.ruledColor,
-          margin: context.marginLineColor,
-          desk: Theme.of(context).scaffoldBackgroundColor,
+      child: Material(
+        color: context.paperColor,
+        child: CustomPaint(
+          painter: _PaperPainter(
+            ruled: context.ruledColor,
+            margin: context.marginLineColor,
+            desk: Theme.of(context).scaffoldBackgroundColor,
+          ),
+          child: child,
         ),
-        child: child,
       ),
     );
     return includeSafeArea ? SafeArea(child: content) : content;
@@ -107,7 +112,9 @@ class PageHeading extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: SketchTitle(text, fontSize: fontSize ?? 35)),
-        ?trailing,
+        // Flexible so a wide trailing button wraps its label under large
+        // text instead of pushing past the edge.
+        if (trailing != null) Flexible(child: trailing!),
       ],
     );
   }
@@ -137,6 +144,13 @@ class _SketchTitleState extends State<SketchTitle>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduced motion: the underline is simply drawn, no ticker runs.
+    if (MediaQuery.disableAnimationsOf(context)) _controller.value = 1;
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -145,29 +159,33 @@ class _SketchTitleState extends State<SketchTitle>
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return RepaintBoundary(
-      child: Transform.rotate(
-        angle: -.012,
-        alignment: Alignment.centerLeft,
-        child: CustomPaint(
-          painter: _UnderlinePainter(
-            progress: reduceMotion
-                ? const AlwaysStoppedAnimation(1)
-                : _controller,
-            color: context.marginRedColor,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              widget.text,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Caveat',
-                fontSize: widget.fontSize,
-                height: .98,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -.4,
+    // A heading for screen readers so TalkBack's heading navigation works.
+    return Semantics(
+      header: true,
+      child: RepaintBoundary(
+        child: Transform.rotate(
+          angle: -.012,
+          alignment: Alignment.centerLeft,
+          child: CustomPaint(
+            painter: _UnderlinePainter(
+              progress: reduceMotion
+                  ? const AlwaysStoppedAnimation(1)
+                  : _controller,
+              color: context.marginRedColor,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                widget.text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Caveat',
+                  fontSize: widget.fontSize,
+                  height: .98,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.4,
+                ),
               ),
             ),
           ),
@@ -213,6 +231,7 @@ class NotebookCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
+    this.onLongPress,
     this.accent,
     this.rotation = 0,
     this.tape = NotebookTape.none,
@@ -224,6 +243,7 @@ class NotebookCard extends StatelessWidget {
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final Color? accent;
   final double rotation;
   final NotebookTape tape;
@@ -274,6 +294,7 @@ class NotebookCard extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
+              onLongPress: onLongPress,
               child: Padding(padding: padding, child: child),
             ),
           ),
@@ -397,23 +418,35 @@ class AnimatedQuantity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 480),
-      curve: Curves.easeOutCubic,
-      tween: Tween(end: value),
-      builder: (_, animated, _) =>
-          Text('${formatQuantity(animated)}$suffix', style: style),
+    // Screen readers get the final value straight away instead of the
+    // intermediate numbers of the count-up animation.
+    return Semantics(
+      label: '${formatQuantity(value)}$suffix',
+      excludeSemantics: true,
+      child: TweenAnimationBuilder<double>(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 480),
+        curve: Curves.easeOutCubic,
+        tween: Tween(end: value),
+        builder: (_, animated, _) =>
+            Text('${formatQuantity(animated)}$suffix', style: style),
+      ),
     );
   }
 }
 
 class StockBar extends StatelessWidget {
-  const StockBar({required this.progress, required this.status, super.key});
+  const StockBar({
+    required this.progress,
+    required this.status,
+    this.height = 9,
+    super.key,
+  });
 
   final double progress;
   final StockState status;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -423,8 +456,10 @@ class StockBar extends StatelessWidget {
       StockState.empty => context.marginRedColor,
     };
     return Semantics(
-      label: '${(progress * 100).round()} percent full',
-      value: '${(progress * 100).round()}%',
+      label:
+          '${stockSpoken(status)}, '
+          '${(progress.clamp(0, 1) * 100).round()} percent of the '
+          'starting amount',
       child: TweenAnimationBuilder<double>(
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
@@ -432,13 +467,14 @@ class StockBar extends StatelessWidget {
         curve: Curves.easeOutCubic,
         tween: Tween(end: progress.clamp(0, 1)),
         builder: (_, value, _) => SizedBox(
-          height: 17,
+          height: height,
           width: double.infinity,
           child: CustomPaint(
             painter: _HatchedBarPainter(
               progress: value,
               color: color,
               ink: context.inkColor,
+              status: status,
             ),
           ),
         ),
@@ -447,16 +483,22 @@ class StockBar extends StatelessWidget {
   }
 }
 
+/// Stock bar fill. The hatch pattern changes with the status as well as the
+/// colour (A11Y-04): sparse diagonal stripes when healthy, dense stripes when
+/// low, and a cross-hatch when empty, so the state is readable without
+/// colour vision.
 class _HatchedBarPainter extends CustomPainter {
   const _HatchedBarPainter({
     required this.progress,
     required this.color,
     required this.ink,
+    required this.status,
   });
 
   final double progress;
   final Color color;
   final Color ink;
+  final StockState status;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -477,9 +519,27 @@ class _HatchedBarPainter extends CustomPainter {
     canvas.clipRect(fill);
     final stripe = Paint()
       ..color = Color.lerp(color, Colors.black, .18)!
-      ..strokeWidth = 3.2;
-    for (double x = -size.height; x < fillWidth + size.height; x += 8) {
+      ..strokeWidth = status == StockState.healthy ? 3.2 : 2.4;
+    final gap = status == StockState.healthy ? 12.0 : 6.0;
+    for (double x = -size.height; x < fillWidth + size.height; x += gap) {
       canvas.drawLine(Offset(x, size.height), Offset(x + 9, 0), stripe);
+      if (status == StockState.empty) {
+        canvas.drawLine(Offset(x, 0), Offset(x + 9, size.height), stripe);
+      }
+    }
+    // An empty bar still shows a faint cross-hatch across the whole track
+    // so "empty" is not just "nothing".
+    if (progress <= 0) {
+      canvas.restore();
+      canvas.save();
+      canvas.clipRRect(shape);
+      final ghost = Paint()
+        ..color = ink.withValues(alpha: .18)
+        ..strokeWidth = 1.2;
+      for (double x = -size.height; x < size.width + size.height; x += 7) {
+        canvas.drawLine(Offset(x, size.height), Offset(x + 9, 0), ghost);
+        canvas.drawLine(Offset(x, 0), Offset(x + 9, size.height), ghost);
+      }
     }
     canvas.restore();
     canvas.restore();
@@ -496,7 +556,8 @@ class _HatchedBarPainter extends CustomPainter {
   bool shouldRepaint(covariant _HatchedBarPainter oldDelegate) =>
       oldDelegate.progress != progress ||
       oldDelegate.color != color ||
-      oldDelegate.ink != ink;
+      oldDelegate.ink != ink ||
+      oldDelegate.status != status;
 }
 
 Color statusColor(StockState status) => switch (status) {
@@ -517,6 +578,13 @@ String stockCaption(StockState status) => switch (status) {
   StockState.empty => 'out of stock!',
 };
 
+/// Plain words for screen readers (no symbols to read out).
+String stockSpoken(StockState status) => switch (status) {
+  StockState.healthy => 'in stock',
+  StockState.low => 'low stock',
+  StockState.empty => 'out of stock',
+};
+
 class StatusBadge extends StatelessWidget {
   const StatusBadge(this.status, {super.key});
 
@@ -529,27 +597,31 @@ class StatusBadge extends StatelessWidget {
       StockState.low => context.lowColor,
       StockState.empty => context.marginRedColor,
     };
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: status == StockState.empty
-            ? LabColors.highlighter.withValues(alpha: .75)
-            : color.withValues(alpha: .12),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(2),
-          topRight: Radius.circular(9),
-          bottomLeft: Radius.circular(8),
-          bottomRight: Radius.circular(3),
+    return Semantics(
+      label: stockSpoken(status),
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: status == StockState.empty
+              ? LabColors.highlighter.withValues(alpha: .75)
+              : color.withValues(alpha: .12),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(2),
+            topRight: Radius.circular(9),
+            bottomLeft: Radius.circular(8),
+            bottomRight: Radius.circular(3),
+          ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        child: Text(
-          stockCaption(status),
-          style: TextStyle(
-            color: status == StockState.empty ? context.inkColor : color,
-            fontFamily: 'Caveat',
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          child: Text(
+            stockCaption(status),
+            style: TextStyle(
+              color: status == StockState.empty ? context.inkColor : color,
+              fontFamily: 'Caveat',
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),
@@ -562,7 +634,7 @@ class NotebookFilterWord extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.fontSize = 22,
+    this.fontSize = 20,
     super.key,
   });
 
@@ -579,21 +651,96 @@ class NotebookFilterWord extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? context.marginRedColor : context.mutedInkColor,
-              fontFamily: 'Caveat',
-              fontSize: fontSize,
-              height: 1,
-              fontWeight: FontWeight.w700,
-              decoration: selected ? TextDecoration.underline : null,
-              decorationColor: context.marginRedColor,
-              decorationThickness: 2,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Center(
+              widthFactor: 1.0,
+              heightFactor: 1.0,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected
+                      ? context.marginRedColor
+                      : context.mutedInkColor,
+                  fontFamily: 'Caveat',
+                  fontSize: fontSize,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  decoration: selected ? TextDecoration.underline : null,
+                  decorationColor: context.marginRedColor,
+                  decorationThickness: 2,
+                ),
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Header of a collapsible "more details" block: chevron, title and a short
+/// summary. Title and summary share one paragraph so the summary simply
+/// wraps under the title on narrow screens or with large text instead of
+/// pushing the row past its edge.
+class DetailsToggle extends StatelessWidget {
+  const DetailsToggle({
+    required this.expanded,
+    required this.summary,
+    required this.onTap,
+    this.title = 'more details',
+    super.key,
+  });
+
+  final bool expanded;
+  final String summary;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              expanded ? Icons.expand_less : Icons.expand_more,
+              color: context.mutedInkColor,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: title,
+                      style: TextStyle(
+                        fontFamily: 'Caveat',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: context.inkColor,
+                      ),
+                    ),
+                    const TextSpan(text: '   '),
+                    TextSpan(
+                      text: summary,
+                      style: TextStyle(
+                        color: context.mutedInkColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -640,15 +787,20 @@ class MarginNote extends StatelessWidget {
   Widget build(BuildContext context) {
     return Transform.rotate(
       angle: -.12,
-      child: Text(
-        text,
-        maxLines: 2,
-        style: TextStyle(
-          color: context.marginRedColor,
-          fontFamily: 'Caveat',
-          fontSize: 16,
-          height: .9,
-          fontWeight: FontWeight.w700,
+      // Lives in a narrow margin: shrinks rather than clips with large text.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          maxLines: 2,
+          style: TextStyle(
+            color: context.marginRedColor,
+            fontFamily: 'Caveat',
+            fontSize: 16,
+            height: .9,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -679,7 +831,7 @@ class EmptyNotebookState extends StatelessWidget {
           TweenAnimationBuilder<double>(
             tween: Tween(begin: .8, end: 1),
             curve: Curves.elasticOut,
-            duration: const Duration(milliseconds: 700),
+            duration: context.motion(const Duration(milliseconds: 700)),
             builder: (_, value, child) =>
                 Transform.scale(scale: value, child: child),
             child: Icon(icon, size: 48, color: context.mutedInkColor),

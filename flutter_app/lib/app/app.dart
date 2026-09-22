@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../features/auth/presentation/new_password_screen.dart';
 import '../features/home/presentation/home_shell.dart';
+import '../features/security/presentation/lock_screen.dart';
 import 'providers.dart';
 
 class LabWizardApp extends ConsumerWidget {
@@ -25,9 +27,14 @@ class LabWizardApp extends ConsumerWidget {
           data: media.copyWith(
             disableAnimations:
                 media.disableAnimations || preferences.reduceMotion,
-            textScaler: media.textScaler.clamp(maxScaleFactor: 1.5),
+            // Android's largest font size is 200 %; everything above that
+            // (developer settings, some launchers) is capped so layouts
+            // verified at 200 % (A11Y-02) stay valid.
+            textScaler: media.textScaler.clamp(maxScaleFactor: 2),
           ),
-          child: child!,
+          // Above the navigator so the lock also covers open sheets and
+          // dialogs (SECURITY-01).
+          child: LockGate(child: child!),
         );
       },
       home: const _AuthGate(),
@@ -43,6 +50,7 @@ class _AuthGate extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final child = switch (auth.phase) {
       AuthPhase.signedIn when auth.user != null => HomeShell(user: auth.user!),
+      AuthPhase.passwordRecovery => const NewPasswordScreen(),
       _ => const AuthScreen(),
     };
     return PageTransitionSwitcher(

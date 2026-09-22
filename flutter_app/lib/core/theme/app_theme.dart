@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Shared notebook palette. These values intentionally mirror the web app so
@@ -14,10 +16,13 @@ abstract final class LabColors {
   static const card = Color(0xFFFEFCF5);
   static const cardDark = Color(0xFF2B2621);
   static const marginRed = Color(0xFFB23A2E);
-  static const marginRedDark = Color(0xFFD86A5C);
-  static const amber = Color(0xFFD89A3E);
+  // Status colours double as text colours, so they meet WCAG AA (4.5:1)
+  // on paper and card in their own theme (A11Y-04): amber 5.2:1, green
+  // 5.5:1, red 5.6:1 light; red 5.1:1 on the dark card.
+  static const marginRedDark = Color(0xFFE07A6C);
+  static const amber = Color(0xFF8F5E0E);
   static const amberDark = Color(0xFFE8B558);
-  static const green = Color(0xFF5E8C5A);
+  static const green = Color(0xFF3F6F3B);
   static const greenDark = Color(0xFF7BAE74);
   static const blue = Color(0xFF4A5C8A);
   static const ruled = Color(0xFFD8D2C0);
@@ -196,6 +201,9 @@ abstract final class AppTheme {
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
+        // Sheets stay a readable column on tablets and in landscape
+        // (A11Y-03); Material 3's default, made explicit.
+        constraints: const BoxConstraints(maxWidth: 640),
         showDragHandle: true,
         dragHandleColor: dark ? LabColors.mutedInkDark : LabColors.mutedInk,
         backgroundColor: Colors.transparent,
@@ -229,6 +237,11 @@ abstract final class AppTheme {
 
 extension LabThemeX on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  /// [duration] unless the person asked the system to reduce motion, in
+  /// which case animations complete at once (A11Y-05).
+  Duration motion(Duration duration) =>
+      MediaQuery.disableAnimationsOf(this) ? Duration.zero : duration;
   Color get paperColor => isDark ? LabColors.paperDark : LabColors.paper;
   Color get cardColor => isDark ? LabColors.cardDark : LabColors.card;
   Color get inkColor => isDark ? LabColors.inkDark : LabColors.ink;
@@ -241,4 +254,19 @@ extension LabThemeX on BuildContext {
       isDark ? LabColors.marginRedDark : LabColors.marginRed;
   Color get healthyColor => isDark ? LabColors.greenDark : LabColors.green;
   Color get lowColor => isDark ? LabColors.amberDark : LabColors.amber;
+}
+
+/// WCAG 2 contrast ratio between two opaque colours (1 to 21). Used by the
+/// palette audit (A11Y-04); text needs 4.5:1, large text 3:1.
+double contrastRatio(Color a, Color b) {
+  double channel(double value) => value <= 0.03928
+      ? value / 12.92
+      : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+  double luminance(Color color) =>
+      0.2126 * channel(color.r) +
+      0.7152 * channel(color.g) +
+      0.0722 * channel(color.b);
+  final light = math.max(luminance(a), luminance(b));
+  final dark = math.min(luminance(a), luminance(b));
+  return (light + 0.05) / (dark + 0.05);
 }
