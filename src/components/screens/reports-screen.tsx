@@ -13,7 +13,6 @@ import {
   monthLabel,
   recentMonthKeys,
   statusColor,
-  percentRemaining,
   stockStatus,
 } from "@/lib/utils";
 import { ShareIcon, PrintIcon } from "@/components/notebook/icons";
@@ -28,6 +27,8 @@ interface ReportRow {
   used: number;
   added: number;
   left: number;
+  /** Opening stock plus restocks in the month. initial − used = left. */
+  stock: number;
   status: ReturnType<typeof stockStatus>;
   pct: number;
 }
@@ -69,13 +70,17 @@ export function ReportsScreen() {
         const stockItem = tab === "chemical"
           ? chemicals.find((c) => c.id === item.id)!
           : apparatus.find((a) => a.id === item.id)!;
+        const left = item.quantity;
         return {
           ...item,
           used,
           added,
-          left: item.quantity,
+          left,
+          // Restock already raised quantity, so adding used back raises the
+          // opening figure by the same restock instead of leaving it put.
+          stock: left + used,
           status: stockStatus(stockItem),
-          pct: percentRemaining(stockItem),
+          pct: left + used > 0 ? (left / (left + used)) * 100 : 0,
         };
       })
       .filter((r): r is ReportRow => r !== null)
@@ -375,9 +380,14 @@ export function ReportsScreen() {
                           {r.formulaOrCat}
                         </div>
                       )}
+                      {r.added > 0 && (
+                        <div className="text-xs" style={{ color: "var(--stock-healthy)" }}>
+                          +{r.added} {r.unit} restocked
+                        </div>
+                      )}
                     </td>
                     <td className="text-right py-2 px-2" style={{ color: "var(--ink-muted)" }}>
-                      {r.quantity} {r.unit}
+                      {r.stock} {r.unit}
                     </td>
                     <td className="text-right py-2 px-2" style={{ color: "var(--stock-low)" }}>
                       −{r.used}
@@ -534,9 +544,14 @@ function PrintReport({
                         {r.formulaOrCat}
                       </div>
                     )}
+                    {r.added > 0 && (
+                      <div style={{ fontSize: "11px", color: "#5E8C5A", marginTop: "1px" }}>
+                        +{r.added} {r.unit} restocked
+                      </div>
+                    )}
                   </td>
                   <td style={{ textAlign: "right", padding: "8px 6px", verticalAlign: "top", whiteSpace: "nowrap", color: "#555" }}>
-                    {r.quantity} {r.unit}
+                    {r.stock} {r.unit}
                   </td>
                   <td style={{ textAlign: "right", padding: "8px 6px", verticalAlign: "top", whiteSpace: "nowrap", color: "#D89A3E" }}>
                     −{r.used}

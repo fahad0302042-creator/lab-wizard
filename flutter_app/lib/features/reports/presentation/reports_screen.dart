@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -21,6 +20,7 @@ import '../domain/csv_exports.dart';
 import '../domain/report_range.dart';
 import '../domain/report_stats.dart';
 import '../domain/runout.dart';
+import '../domain/usage_rows.dart';
 import '../lab_profile_providers.dart';
 import 'asset_report_sections.dart';
 
@@ -106,7 +106,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         : runOutReportForApparatus(state.apparatus, state.logs);
     // REPORT-04: expiry, damage, overdue loans, maintenance and calibration.
     final assets = AssetReports.compute(state, range: _range, kind: _kind);
-    final usageRows = _computeUsageRows(state, logs, _kind);
+    final usageRows = _usageRows(state, logs, _kind);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
@@ -340,7 +340,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Center(
                     child: Text(
-                      'No ${_kind == ItemKind.chemical ? 'chemical' : 'apparatus'} consumption logged for ${_range.label}.',
+                      'No ${_kind == ItemKind.chemical ? 'chemical' : 'apparatus'} use or restock logged for ${_range.label}.',
                       style: TextStyle(color: context.mutedInkColor),
                     ),
                   ),
@@ -350,50 +350,62 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     for (final row in usageRows) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            Text(
+                              row.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            if (row.formulaOrCategory.isNotEmpty)
+                              Text(
+                                row.formulaOrCategory,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: context.mutedInkColor,
+                                ),
+                              ),
+                            const SizedBox(height: 2),
+                            Text.rich(
+                              TextSpan(
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.mutedInkColor,
+                                ),
                                 children: [
-                                  Text(
-                                    row.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                  TextSpan(
+                                    text:
+                                        'initial ${formatQuantity(row.startStock)} ${row.unit}',
+                                  ),
+                                  if (row.added > 0)
+                                    TextSpan(
+                                      text:
+                                          '  +${formatQuantity(row.added)} restocked',
+                                      style: const TextStyle(
+                                        color: LabColors.green,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  if (row.used > 0)
+                                    TextSpan(
+                                      text: '  −${formatQuantity(row.used)} used',
+                                      style: const TextStyle(
+                                        color: LabColors.amber,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  TextSpan(
+                                    text:
+                                        '  = ${formatQuantity(row.left)} ${row.unit} final',
+                                    style: TextStyle(
+                                      color: context.inkColor,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  if (row.formulaOrCategory.isNotEmpty)
-                                    Text(
-                                      row.formulaOrCategory,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: context.mutedInkColor,
-                                      ),
-                                    ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '-${formatQuantity(row.used)} ${row.unit}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: LabColors.amber,
-                                  ),
-                                ),
-                                Text(
-                                  '${formatQuantity(row.left)} ${row.unit} left',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: context.mutedInkColor,
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),
@@ -582,7 +594,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ? state.chemicals.map((item) => item.stockState)
         : state.apparatus.map((item) => item.stockState);
     final sorted = [...logs]..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
-    final usageRows = _computeUsageRows(state, logs, _kind);
+    final usageRows = _usageRows(state, logs, _kind);
 
     return buildReportPdf(
       ReportPdfInput(
@@ -918,84 +930,28 @@ class _RunOutSectionState extends State<_RunOutSection> {
   }
 }
 
-List<ReportPdfUsageRow> _computeUsageRows(
+List<ReportPdfUsageRow> _usageRows(
   InventoryState state,
   List<ConsumptionLog> logs,
   ItemKind kind,
-) {
-  final usageRows = <ReportPdfUsageRow>[];
-  if (kind == ItemKind.chemical) {
-    for (final chem in state.chemicals) {
-      final itemLogs = logs.where((l) => l.itemId == chem.id).toList();
-      final used = itemLogs
-          .where(
-            (l) =>
-                l.action == InventoryAction.consume ||
-                l.action == InventoryAction.breakage,
-          )
-          .fold<double>(0.0, (sum, l) => sum + l.amount);
-      if (used <= 0) continue;
-      final added = itemLogs
-          .where((l) => l.action == InventoryAction.restock)
-          .fold<double>(0.0, (sum, l) => sum + l.amount);
-      final left = chem.quantity;
-      final startStock = math.max(0.0, left + used - added);
-      final pct = chem.initialQuantity > 0
-          ? (left / chem.initialQuantity * 100)
-          : (startStock > 0 ? (left / startStock * 100) : 100.0);
-      usageRows.add(
-        ReportPdfUsageRow(
-          name: chem.name,
-          formulaOrCategory: chem.formula,
-          unit: chem.unit,
-          startStock: startStock,
-          used: used,
-          added: added,
-          left: left,
-          pct: pct,
-        ),
-      );
-    }
-  } else {
-    for (final app in state.apparatus) {
-      final itemLogs = logs.where((l) => l.itemId == app.id).toList();
-      final used = itemLogs
-          .where(
-            (l) =>
-                l.action == InventoryAction.breakage ||
-                l.action == InventoryAction.consume,
-          )
-          .fold<double>(0.0, (sum, l) => sum + l.amount);
-      if (used <= 0) continue;
-      final added = itemLogs
-          .where((l) => l.action == InventoryAction.restock)
-          .fold<double>(0.0, (sum, l) => sum + l.amount);
-      final left = app.quantity.toDouble();
-      final startStock = math.max(0.0, left + used - added);
-      final pct = app.initialQuantity > 0
-          ? (left / app.initialQuantity * 100)
-          : (startStock > 0 ? (left / startStock * 100) : 100.0);
-      usageRows.add(
-        ReportPdfUsageRow(
-          name: app.name,
-          formulaOrCategory: app.category,
-          unit: 'pcs',
-          startStock: startStock,
-          used: used,
-          added: added,
-          left: left,
-          pct: pct,
-        ),
-      );
-    }
-  }
-  usageRows.sort((a, b) {
-    if (b.used != a.used) return b.used.compareTo(a.used);
-    if (b.added != a.added) return b.added.compareTo(a.added);
-    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-  });
-  return usageRows;
-}
+) => [
+  for (final row in periodUsageRows(
+    kind: kind,
+    chemicals: state.chemicals,
+    apparatus: state.apparatus,
+    logsInRange: logs,
+  ))
+    ReportPdfUsageRow(
+      name: row.name,
+      formulaOrCategory: row.detail,
+      unit: row.unit,
+      startStock: row.initial,
+      used: row.used,
+      added: row.restocked,
+      left: row.finalQuantity,
+      pct: row.pct,
+    ),
+];
 
 String _itemName(InventoryState state, ConsumptionLog log) =>
     _nameOfItem(state, log.itemType, log.itemId);
