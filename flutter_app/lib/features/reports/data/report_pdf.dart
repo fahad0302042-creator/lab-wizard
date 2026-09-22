@@ -29,7 +29,7 @@ class ReportPdfLog {
   final String note;
 }
 
-/// One summary usage row for the main usage table (matching the web app report format).
+/// One summary usage row for the main consumption table.
 class ReportPdfUsageRow {
   const ReportPdfUsageRow({
     required this.name,
@@ -97,7 +97,7 @@ class ReportPdfInput {
   final DateTime? generatedAt;
 
   String get title =>
-      '${kind == ItemKind.chemical ? 'Chemicals' : 'Apparatus'} Usage Report';
+      '${kind == ItemKind.chemical ? 'Chemicals' : 'Apparatus'} Consumption Report';
 }
 
 const _ink = PdfColor.fromInt(0xFF1A1A1A);
@@ -109,9 +109,9 @@ const _green = PdfColor.fromInt(0xFF5E8C5A);
 const _red = PdfColor.fromInt(0xFFB23A2E);
 const _amber = PdfColor.fromInt(0xFFD89A3E);
 
-/// Builds the A4 report: matching the web app's clean Usage Report format
-/// (header, 3 KPI boxes, Name/Stock/−Used/=Left table, * and ** indicators,
-/// and optional activity breakdown).
+/// Builds the A4 consumption report: branded header, 3 KPI cards,
+/// clean table of consumed items only (Name, Start Stock, Used, Left),
+/// followed by the activity audit trail.
 Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final generated = input.generatedAt ?? DateTime.now();
   final profile = input.profile;
@@ -129,12 +129,14 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
         .where((line) => line.isNotEmpty),
   ];
 
-  // Header matching the web app report format
+  // Header matching standard lab report layout
   pw.Widget header(pw.Context context) => pw.Container(
     padding: const pw.EdgeInsets.only(bottom: 12),
     margin: const pw.EdgeInsets.only(bottom: 16),
     decoration: const pw.BoxDecoration(
-      border: pw.Border(bottom: pw.BorderSide(color: _ink, width: 2.0)),
+      border: pw.Border(
+        bottom: pw.BorderSide(color: _ink, width: 2.0),
+      ),
     ),
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -161,9 +163,12 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
               pw.SizedBox(height: 2),
               pw.Text(
                 contactLines.isNotEmpty
-                    ? contactLines.join(' · ')
+                    ? contactLines.join(' - ')
                     : 'bench inventory',
-                style: const pw.TextStyle(fontSize: 11, color: _muted),
+                style: const pw.TextStyle(
+                  fontSize: 11,
+                  color: _muted,
+                ),
               ),
             ],
           ),
@@ -181,8 +186,11 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             ),
             pw.SizedBox(height: 3),
             pw.Text(
-              'Period: ${input.range.label}  ·  Generated: ${stamp.format(generated)}',
-              style: const pw.TextStyle(fontSize: 10, color: _muted),
+              'Period: ${input.range.label} - Generated: ${stamp.format(generated)}',
+              style: const pw.TextStyle(
+                fontSize: 10,
+                color: _muted,
+              ),
             ),
           ],
         ),
@@ -190,7 +198,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
     ),
   );
 
-  // Footer with legend and page number
+  // Footer with clean page number and generation stamp (no cryptic asterisks)
   pw.Widget footer(pw.Context context) => pw.Container(
     padding: const pw.EdgeInsets.only(top: 8),
     margin: const pw.EdgeInsets.only(top: 14),
@@ -200,33 +208,9 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
     child: pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Row(
-          children: [
-            pw.Text(
-              '* ',
-              style: pw.TextStyle(
-                fontSize: 8.5,
-                fontWeight: pw.FontWeight.bold,
-                color: _red,
-              ),
-            ),
-            pw.Text(
-              'below 50% remaining    ',
-              style: const pw.TextStyle(fontSize: 8.5, color: _muted),
-            ),
-            pw.Text(
-              '** ',
-              style: pw.TextStyle(
-                fontSize: 8.5,
-                fontWeight: pw.FontWeight.bold,
-                color: _red,
-              ),
-            ),
-            pw.Text(
-              'below 20% remaining — reorder',
-              style: const pw.TextStyle(fontSize: 8.5, color: _muted),
-            ),
-          ],
+        pw.Text(
+          'Lab Wizard - ${input.title}',
+          style: const pw.TextStyle(fontSize: 8.5, color: _muted),
         ),
         pw.Text(
           'Page ${context.pageNumber} of ${context.pagesCount}',
@@ -251,7 +235,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   pw.Widget note(String text) =>
       pw.Text(text, style: const pw.TextStyle(fontSize: 9, color: _muted));
 
-  // KPI Box matching web app's KpiBox
+  // KPI Card
   pw.Widget kpiBox(String value, String label, PdfColor color) => pw.Expanded(
     child: pw.Container(
       margin: const pw.EdgeInsets.symmetric(horizontal: 4),
@@ -318,15 +302,17 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
 
   // Usage stats for KPI boxes
   final usageRows = input.usageRows;
-  final itemsUsedCount =
-      input.itemsUsedCount ?? usageRows.where((r) => r.used > 0).length;
-  final restockedCount =
-      input.restockedCount ?? usageRows.where((r) => r.added > 0).length;
-  final criticalCount =
-      input.criticalCount ?? (input.totalItems - input.healthyItems);
+  final itemsUsedCount = input.itemsUsedCount ?? usageRows.length;
+  final totalUsesCount = input.logs
+      .where((l) =>
+          l.action == InventoryAction.consume.name ||
+          l.action == InventoryAction.breakage.name)
+      .length;
+  final lowStockCount = input.criticalCount ??
+      usageRows.where((r) => r.pct < 50).length;
 
   final document = pw.Document(
-    title: '${input.title} — ${input.range.dates}',
+    title: '${input.title} - ${input.range.dates}',
     author: labName,
     creator: 'Lab Wizard',
   );
@@ -343,20 +329,24 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           padding: const pw.EdgeInsets.only(bottom: 20),
           child: pw.Row(
             children: [
-              kpiBox('$itemsUsedCount', 'Items used', _ink),
-              kpiBox('$restockedCount', 'Restocked', _green),
-              kpiBox('$criticalCount', 'Critical', _red),
+              kpiBox('$itemsUsedCount', 'Items consumed', _ink),
+              kpiBox(
+                totalUsesCount > 0 ? '$totalUsesCount' : '${usageRows.length}',
+                'Consumption events',
+                _green,
+              ),
+              kpiBox('$lowStockCount', 'Low stock items', _red),
             ],
           ),
         ),
 
-        // 2. Primary Usage Report Table (matches web app format)
+        // 2. Primary Consumption Table (ONLY items with consumption)
         if (usageRows.isEmpty)
           pw.Padding(
-            padding: const pw.EdgeInsets.symmetric(vertical: 20),
+            padding: const pw.EdgeInsets.symmetric(vertical: 24),
             child: pw.Center(
               child: note(
-                'No ${input.kind == ItemKind.chemical ? 'chemical' : 'apparatus'} usage logged for ${input.range.label}.',
+                'No ${input.kind == ItemKind.chemical ? 'chemical' : 'apparatus'} consumption logged for ${input.range.label}.',
               ),
             ),
           )
@@ -364,9 +354,9 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           pw.Table(
             columnWidths: const {
               0: pw.FlexColumnWidth(3.8),
-              1: pw.FlexColumnWidth(1.6),
-              2: pw.FlexColumnWidth(1.6),
-              3: pw.FlexColumnWidth(2.0),
+              1: pw.FlexColumnWidth(1.8),
+              2: pw.FlexColumnWidth(1.8),
+              3: pw.FlexColumnWidth(1.8),
             },
             children: [
               // Header
@@ -400,7 +390,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                     child: pw.Align(
                       alignment: pw.Alignment.centerRight,
                       child: pw.Text(
-                        'STOCK',
+                        'START STOCK',
                         style: pw.TextStyle(
                           fontSize: 9.5,
                           fontWeight: pw.FontWeight.bold,
@@ -418,7 +408,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                     child: pw.Align(
                       alignment: pw.Alignment.centerRight,
                       child: pw.Text(
-                        '− USED',
+                        'CONSUMED',
                         style: pw.TextStyle(
                           fontSize: 9.5,
                           fontWeight: pw.FontWeight.bold,
@@ -436,7 +426,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                     child: pw.Align(
                       alignment: pw.Alignment.centerRight,
                       child: pw.Text(
-                        '= LEFT',
+                        'REMAINING',
                         style: pw.TextStyle(
                           fontSize: 9.5,
                           fontWeight: pw.FontWeight.bold,
@@ -510,11 +500,11 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                       child: pw.Align(
                         alignment: pw.Alignment.centerRight,
                         child: pw.Text(
-                          row.used > 0 ? '−${formatQuantity(row.used)}' : '—',
+                          '-${formatQuantity(row.used)} ${row.unit}',
                           style: pw.TextStyle(
                             fontSize: 9.5,
                             fontWeight: pw.FontWeight.bold,
-                            color: row.used > 0 ? _amber : _muted,
+                            color: _amber,
                           ),
                         ),
                       ),
@@ -526,36 +516,13 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                       ),
                       child: pw.Align(
                         alignment: pw.Alignment.centerRight,
-                        child: pw.Row(
-                          mainAxisSize: pw.MainAxisSize.min,
-                          children: [
-                            pw.Text(
-                              '${formatQuantity(row.left)} ${row.unit}',
-                              style: pw.TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _ink,
-                              ),
-                            ),
-                            if (row.pct < 20)
-                              pw.Text(
-                                ' **',
-                                style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: _red,
-                                ),
-                              )
-                            else if (row.pct < 50)
-                              pw.Text(
-                                ' *',
-                                style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: _red,
-                                ),
-                              ),
-                          ],
+                        child: pw.Text(
+                          '${formatQuantity(row.left)} ${row.unit}',
+                          style: pw.TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _ink,
+                          ),
                         ),
                       ),
                     ),
@@ -564,7 +531,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             ],
           ),
 
-        // 3. Activity Log Table
+        // 3. Activity Log Table (detailed log of each consumption action)
         if (input.logs.isNotEmpty) ...[
           heading('Activity Log (${input.logs.length})'),
           table(
@@ -681,7 +648,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           ),
           pw.SizedBox(height: 4),
           note(
-            '${services.openTasks} open tasks · ${services.completedInRange} '
+            '${services.openTasks} open tasks - ${services.completedInRange} '
             'completed in this range.',
           ),
         ],

@@ -171,6 +171,18 @@ void main() {
             kind: ItemKind.apparatus,
             unitOf: (_) => 'pcs',
           ),
+          usageRows: const [
+            ReportPdfUsageRow(
+              name: 'Beaker 250mL',
+              formulaOrCategory: 'Glassware',
+              unit: 'pcs',
+              startStock: 15,
+              used: 2,
+              added: 0,
+              left: 13,
+              pct: 86.6,
+            ),
+          ],
           logs: const [],
           runOut: const RunOutReport(estimates: [], gaps: {}),
           damage: DamageReport(

@@ -474,7 +474,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       final kindTitle = _kind == ItemKind.chemical ? 'Chemicals' : 'Apparatus';
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'Lab Wizard — $kindTitle Report — ${_range.label}.pdf',
+        filename: 'Lab Wizard - $kindTitle Consumption Report - ${_range.label}.pdf',
       );
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -534,7 +534,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         : state.apparatus.map((item) => item.stockState);
     final sorted = [...logs]..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
 
-    // Web app format usage rows: Name, Stock, - Used, = Left, * / **
+    // Web app format usage rows: Name, Stock, - Used, = Left
+    // ONLY include items that were actually consumed/used in this period!
     final usageRows = <ReportPdfUsageRow>[];
     if (_kind == ItemKind.chemical) {
       for (final chem in state.chemicals) {
@@ -546,6 +547,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   l.action == InventoryAction.breakage,
             )
             .fold<double>(0.0, (sum, l) => sum + l.amount);
+        // Exclude items that were not consumed
+        if (used <= 0) continue;
         final added = itemLogs
             .where((l) => l.action == InventoryAction.restock)
             .fold<double>(0.0, (sum, l) => sum + l.amount);
@@ -577,6 +580,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   l.action == InventoryAction.consume,
             )
             .fold<double>(0.0, (sum, l) => sum + l.amount);
+        // Exclude items that were not consumed / broken
+        if (used <= 0) continue;
         final added = itemLogs
             .where((l) => l.action == InventoryAction.restock)
             .fold<double>(0.0, (sum, l) => sum + l.amount);
