@@ -441,24 +441,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           'like formulas are written as text so nothing in a note can run.',
           style: TextStyle(color: context.mutedInkColor, fontSize: 11),
         ),
-        const SizedBox(height: 24),
-        const PageHeading('activity log'),
-        if (logs.isEmpty)
-          const EmptyNotebookState(
-            icon: Icons.query_stats,
-            title: 'no activity in this range',
-            message: 'Choose another range or start logging inventory actions.',
-          )
-        else
-          ...logs.asMap().entries.map(
-            (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: StaggerIn(
-                index: entry.key,
-                child: _ReportLogRow(log: entry.value, state: state),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -1035,54 +1017,6 @@ class _ActivityChart extends StatelessWidget {
               ? Duration.zero
               : const Duration(milliseconds: 500),
         ),
-      ),
-    );
-  }
-}
-
-class _ReportLogRow extends StatelessWidget {
-  const _ReportLogRow({required this.log, required this.state});
-
-  final ConsumptionLog log;
-  final InventoryState state;
-
-  @override
-  Widget build(BuildContext context) {
-    return NotebookCard(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            child: Text(
-              DateFormat('dd\nMMM').format(log.loggedAt.toLocal()),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _itemName(state, log),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  log.action.name,
-                  style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            formatQuantity(log.amount),
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-        ],
       ),
     );
   }

@@ -111,7 +111,7 @@ const _amber = PdfColor.fromInt(0xFFD89A3E);
 
 /// Builds the A4 consumption report: branded header, 3 KPI cards,
 /// clean table of consumed items only (Name, Start Stock, Used, Left),
-/// followed by the activity audit trail.
+/// and asset health sections.
 Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final generated = input.generatedAt ?? DateTime.now();
   final profile = input.profile;
@@ -525,26 +525,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             ],
           ),
 
-        // 3. Activity Log Table (detailed log of each consumption action)
-        if (input.logs.isNotEmpty) ...[
-          heading('Activity Log (${input.logs.length})'),
-          table(
-            const ['Date', 'Item', 'Action', 'Amount', 'Note'],
-            [
-              for (final log in input.logs)
-                [
-                  day.format(log.at.toLocal()),
-                  log.item,
-                  log.action,
-                  log.amount,
-                  log.note,
-                ],
-            ],
-            alignments: const {3: pw.Alignment.centerRight},
-          ),
-        ],
-
-        // 4. Run-out estimates
+        // 3. Run-out estimates
         if (estimates.isNotEmpty) ...[
           heading('Run-out estimates'),
           table(
