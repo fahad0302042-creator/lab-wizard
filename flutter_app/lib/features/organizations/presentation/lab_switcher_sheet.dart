@@ -80,10 +80,7 @@ class _LabSwitcherContent extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               'Cloud organization features require migration 010.',
-              style: TextStyle(
-                color: context.mutedInkColor,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
             ),
           ),
           data: (labs) {
@@ -92,10 +89,7 @@ class _LabSwitcherContent extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'No team organizations found. You are working in your private lab.',
-                  style: TextStyle(
-                    color: context.mutedInkColor,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: context.mutedInkColor, fontSize: 13),
                 ),
               );
             }
@@ -111,9 +105,7 @@ class _LabSwitcherContent extends ConsumerWidget {
                     isSelected: activeLab?.id == lab.id,
                     badgeText: lab.userRole.label,
                     onTap: () async {
-                      await ref
-                          .read(activeLabProvider.notifier)
-                          .selectLab(lab);
+                      await ref.read(activeLabProvider.notifier).selectLab(lab);
                       if (context.mounted) {
                         Navigator.of(context).pop();
                       }
@@ -258,7 +250,8 @@ class _LabListTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
         color: isSelected
-            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35)
+            ? Theme.of(context).colorScheme.primaryContainer
+                  .withValues(alpha: 0.35)
             : context.cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),

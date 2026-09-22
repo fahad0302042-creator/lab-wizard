@@ -831,7 +831,8 @@ class _ShelfControls extends StatelessWidget {
                           Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Tooltip(
-                              message: 'Filtered by: ${filter.name}. Tap to clear',
+                              message:
+                                  'Filtered by: ${filter.name}. Tap to clear',
                               child: InkWell(
                                 onTap: () => onFilter(_StockFilter.all),
                                 borderRadius: BorderRadius.circular(12),
@@ -1658,18 +1659,14 @@ class _InventoryCard extends StatelessWidget {
                               height: 1,
                               fontWeight: FontWeight.w700,
                               backgroundColor: item.status == StockState.empty
-                                  ? LabColors.highlighter.withValues(
-                                      alpha: .72,
-                                    )
+                                  ? LabColors.highlighter.withValues(alpha: .72)
                                   : null,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         _CardAction(
-                          label: kind == ItemKind.chemical
-                              ? 'use'
-                              : 'damage',
+                          label: kind == ItemKind.chemical ? 'use' : 'damage',
                           color: context.marginRedColor,
                           onTap: selecting ? onTap : onConsume,
                         ),
