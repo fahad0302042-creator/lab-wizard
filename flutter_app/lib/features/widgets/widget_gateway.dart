@@ -124,20 +124,26 @@ Map<String, dynamic> computeConsumptionWidgetData({
       .firstOrNull;
 
   final String flaskieSpeech;
+  final int flaskieFrame;
   if (criticalChemical != null) {
     flaskieSpeech = 'Low on ${criticalChemical.name}!';
+    flaskieFrame = 1;
   } else if (criticalApparatus != null) {
     flaskieSpeech = 'Low on ${criticalApparatus.name}!';
+    flaskieFrame = 1;
   } else if (totalItemsUsed > 0) {
     flaskieSpeech = '$totalItemsUsed used today! Keep it up!';
+    flaskieFrame = 2;
   } else {
     flaskieSpeech = 'Ready to experiment!';
+    flaskieFrame = 0;
   }
 
   final data = <String, dynamic>{
     'lab_name': labName.trim().isEmpty ? 'Lab Wizard' : labName.trim(),
     'today_header': todayHeader,
     'flaskie_speech': flaskieSpeech,
+    'flaskie_frame': flaskieFrame,
   };
 
   // Populate top 3 items

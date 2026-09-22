@@ -61,6 +61,7 @@ void main() {
       expect(payload['lab_name'], 'Organic Chem Lab');
       expect(payload['today_header'], "TODAY'S CONSUMPTION");
       expect(payload['flaskie_speech'], 'Ready to experiment!');
+      expect(payload['flaskie_frame'], 0);
       expect(payload['item_1_name'], '');
       expect(payload['item_1_used'], '');
       expect(payload['item_1_remaining'], '');
@@ -147,6 +148,7 @@ void main() {
 
       expect(payload['today_header'], 'TODAY: 2 items (3 uses)');
       expect(payload['flaskie_speech'], '2 used today! Keep it up!');
+      expect(payload['flaskie_frame'], 2);
 
       // Top item is chem-1 (150 mL used)
       expect(payload['item_1_id'], 'chem-1');
@@ -175,6 +177,7 @@ void main() {
       );
 
       expect(payload['flaskie_speech'], 'Low on Acetone!');
+      expect(payload['flaskie_frame'], 1);
     });
   });
 
