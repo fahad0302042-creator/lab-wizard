@@ -192,15 +192,15 @@ void main() {
       Map<Object?, Object?>? receivedArguments;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(WidgetGateway.channel, (call) async {
-        if (call.method == 'updateWidget') {
-          receivedArguments = call.arguments as Map<Object?, Object?>?;
-          return true;
-        }
-        if (call.method == 'getInitialUri') {
-          return 'labwizard://scan_consume';
-        }
-        return null;
-      });
+            if (call.method == 'updateWidget') {
+              receivedArguments = call.arguments as Map<Object?, Object?>?;
+              return true;
+            }
+            if (call.method == 'getInitialUri') {
+              return 'labwizard://scan_consume';
+            }
+            return null;
+          });
 
       final success = await WidgetGateway.updateWidget(
         labName: 'Lab Alpha',

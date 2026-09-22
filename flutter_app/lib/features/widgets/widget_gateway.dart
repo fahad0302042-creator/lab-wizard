@@ -128,16 +128,22 @@ Map<String, dynamic> computeConsumptionWidgetData({
 
   // Card 0: Critical stock alert or health confirmation
   if (criticalChemical != null) {
-    infoCards.add('Low on ${criticalChemical.name}! (${formatQuantity(criticalChemical.quantity)} ${criticalChemical.unit} left)');
+    infoCards.add(
+      'Low on ${criticalChemical.name}! (${formatQuantity(criticalChemical.quantity)} ${criticalChemical.unit} left)',
+    );
   } else if (criticalApparatus != null) {
-    infoCards.add('Low on ${criticalApparatus.name}! (${criticalApparatus.quantity.toInt()} left)');
+    infoCards.add(
+      'Low on ${criticalApparatus.name}! (${criticalApparatus.quantity.toInt()} left)',
+    );
   } else {
     infoCards.add('All inventory stock healthy ✨');
   }
 
   // Card 1: Today's consumption stats
   if (totalItemsUsed > 0) {
-    infoCards.add('$totalItemsUsed item${totalItemsUsed == 1 ? '' : 's'} used today ($totalEvents logs)');
+    infoCards.add(
+      '$totalItemsUsed item${totalItemsUsed == 1 ? '' : 's'} used today ($totalEvents logs)',
+    );
   } else {
     infoCards.add('No usage logged today yet 🧪');
   }
