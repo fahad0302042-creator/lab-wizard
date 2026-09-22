@@ -60,8 +60,9 @@ Future<void> _pumpShelf(
   WidgetTester tester, {
   required InventoryState state,
   ItemKind kind = ItemKind.chemical,
+  double height = 1400,
 }) async {
-  tester.view.physicalSize = const Size(420, 1400);
+  tester.view.physicalSize = Size(420, height);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
@@ -209,10 +210,14 @@ void main() {
       final handle = tester.ensureSemantics();
       // The strip only appears once a shelf is long enough to need it.
       final many = [
-        for (var index = 0; index < 24; index++)
+        for (var index = 0; index < 12; index++)
           _chemical('m$index', '${String.fromCharCode(65 + index)}-reagent'),
       ];
-      await _pumpShelf(tester, state: InventoryState(chemicals: many));
+      await _pumpShelf(
+        tester,
+        state: InventoryState(chemicals: many),
+        height: 700,
+      );
       // One node for the strip; letters with items are TalkBack actions,
       // letters without are simply absent (A11Y-05 keeps targets at 48 dp).
       final strip = _node(tester, 'A to Z index');
