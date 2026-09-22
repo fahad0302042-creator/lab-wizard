@@ -148,7 +148,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       },
     );
     ref.listen(inventoryProvider, (_, next) => _syncWidget(next));
-    ref.listen(activeLabProvider, (_, __) => _syncWidget());
+    ref.listen(activeLabProvider, (_, _) => _syncWidget());
     final pages = <Widget>[
       DashboardScreen(
         user: widget.user,

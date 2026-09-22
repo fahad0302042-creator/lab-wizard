@@ -110,8 +110,20 @@ Map<String, dynamic> computeConsumptionWidgetData({
       : 'TODAY: $totalItemsUsed item${totalItemsUsed == 1 ? '' : 's'} ($totalEvents use${totalEvents == 1 ? '' : 's'})';
 
   // Determine Flaskie's dynamic speech bubble
-  final criticalChemical = chemicals.where((c) => c.stockState == StockState.empty || c.stockState == StockState.critical).firstOrNull;
-  final criticalApparatus = apparatus.where((a) => a.stockState == StockState.empty || a.stockState == StockState.critical).firstOrNull;
+  final criticalChemical = chemicals
+      .where(
+        (c) =>
+            c.stockState == StockState.empty ||
+            c.stockState == StockState.critical,
+      )
+      .firstOrNull;
+  final criticalApparatus = apparatus
+      .where(
+        (a) =>
+            a.stockState == StockState.empty ||
+            a.stockState == StockState.critical,
+      )
+      .firstOrNull;
 
   final String flaskieSpeech;
   if (criticalChemical != null) {
@@ -157,7 +169,8 @@ Map<String, dynamic> computeConsumptionWidgetData({
       data['${prefix}_id'] = itemId;
       data['${prefix}_name'] = name;
       data['${prefix}_used'] = '-${formatQuantity(used)} $unit'.trim();
-      data['${prefix}_remaining'] = '(${formatQuantity(left)} $unit left)'.trim();
+      data['${prefix}_remaining'] = '(${formatQuantity(left)} $unit left)'
+          .trim();
     } else {
       data['${prefix}_id'] = '';
       data['${prefix}_name'] = '';
