@@ -50,7 +50,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   void _syncWidget([InventoryState? state]) {
-    final inventory = state ?? ref.read(inventoryProvider);
+    final InventoryState inventory = state ?? ref.read(inventoryProvider);
     final activeLab = ref.read(activeLabProvider);
     final labName = activeLab?.name ?? 'Lab Wizard';
     WidgetGateway.updateWidget(
@@ -103,7 +103,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   Future<void> _handleUndoAction() async {
     final inventory = ref.read(inventoryProvider);
-    final undoable = inventory.logs.where((l) => canUndo(l)).firstOrNull;
+    final undoable = inventory.logs.where((l) => isUndoable(l)).firstOrNull;
     if (undoable == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

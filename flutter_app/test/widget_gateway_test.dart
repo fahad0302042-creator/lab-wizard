@@ -11,26 +11,26 @@ void main() {
   final testChemicals = <Chemical>[
     Chemical(
       id: 'chem-1',
-      userId: 'user-1',
       name: 'Ethanol 99.8%',
       formula: 'C2H5OH',
-      category: 'Solvent',
-      quantity: 1200,
       unit: 'mL',
-      threshold: 200,
-      updatedAt: baseDate,
+      quantity: 1200,
+      initialQuantity: 1500,
+      lowStockThreshold: 200,
+      notes: '',
+      qrCode: 'qr-chem-1',
       createdAt: baseDate,
     ),
     Chemical(
       id: 'chem-2',
-      userId: 'user-1',
       name: 'Acetone',
       formula: 'C3H6O',
-      category: 'Solvent',
-      quantity: 50,
       unit: 'mL',
-      threshold: 100, // Critical stock! (50 <= 100)
-      updatedAt: baseDate,
+      quantity: 50,
+      initialQuantity: 500,
+      lowStockThreshold: 100, // Low stock! (50 <= 100)
+      notes: '',
+      qrCode: 'qr-chem-2',
       createdAt: baseDate,
     ),
   ];
@@ -38,12 +38,12 @@ void main() {
   final testApparatus = <Apparatus>[
     Apparatus(
       id: 'app-1',
-      userId: 'user-1',
       name: 'Erlenmeyer 250mL',
       category: 'Glassware',
       quantity: 15,
-      threshold: 5,
-      updatedAt: baseDate,
+      initialQuantity: 20,
+      lowStockThreshold: 5,
+      notes: '',
       createdAt: baseDate,
     ),
   ];
@@ -83,60 +83,55 @@ void main() {
         // Today's consumption on chem-1 (100 mL)
         ConsumptionLog(
           id: 'log-1',
-          userId: 'user-1',
           itemId: 'chem-1',
           itemType: ItemKind.chemical,
           action: InventoryAction.consume,
           amount: 100,
-          reason: 'Titration 1',
+          note: 'Titration 1',
           loggedAt: DateTime(2026, 9, 22, 10, 0),
           createdAt: DateTime(2026, 9, 22, 10, 0),
         ),
         // Additional consumption on chem-1 (50 mL) -> Total 150 mL
         ConsumptionLog(
           id: 'log-2',
-          userId: 'user-1',
           itemId: 'chem-1',
           itemType: ItemKind.chemical,
           action: InventoryAction.consume,
           amount: 50,
-          reason: 'Titration 2',
+          note: 'Titration 2',
           loggedAt: DateTime(2026, 9, 22, 11, 0),
           createdAt: DateTime(2026, 9, 22, 11, 0),
         ),
         // Today's breakage on apparatus app-1 (2 pcs)
         ConsumptionLog(
           id: 'log-3',
-          userId: 'user-1',
           itemId: 'app-1',
           itemType: ItemKind.apparatus,
           action: InventoryAction.breakage,
           amount: 2,
-          reason: 'Benchtop drop',
+          note: 'Benchtop drop',
           loggedAt: DateTime(2026, 9, 22, 12, 0),
           createdAt: DateTime(2026, 9, 22, 12, 0),
         ),
         // Restock on chem-1 should NOT count as consumption
         ConsumptionLog(
           id: 'log-4',
-          userId: 'user-1',
           itemId: 'chem-1',
           itemType: ItemKind.chemical,
           action: InventoryAction.restock,
           amount: 500,
-          reason: 'Supplier batch',
+          note: 'Supplier batch',
           loggedAt: DateTime(2026, 9, 22, 13, 0),
           createdAt: DateTime(2026, 9, 22, 13, 0),
         ),
         // Consumption from yesterday should NOT count
         ConsumptionLog(
           id: 'log-5',
-          userId: 'user-1',
           itemId: 'chem-1',
           itemType: ItemKind.chemical,
           action: InventoryAction.consume,
           amount: 200,
-          reason: 'Yesterday experiment',
+          note: 'Yesterday experiment',
           loggedAt: DateTime(2026, 9, 21, 15, 0),
           createdAt: DateTime(2026, 9, 21, 15, 0),
         ),
@@ -170,10 +165,10 @@ void main() {
       expect(payload['item_3_name'], '');
     });
 
-    test('prioritizes low stock critical alert in Flaskie speech', () {
+    test('prioritizes low stock alert in Flaskie speech', () {
       final payload = computeConsumptionWidgetData(
         labName: 'Central Lab',
-        chemicals: testChemicals, // chem-2 is critical!
+        chemicals: testChemicals, // chem-2 is low stock!
         apparatus: testApparatus,
         logs: const [],
         now: baseDate,
