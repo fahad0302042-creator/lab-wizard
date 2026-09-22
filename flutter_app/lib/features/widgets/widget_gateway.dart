@@ -113,15 +113,13 @@ Map<String, dynamic> computeConsumptionWidgetData({
   final criticalChemical = chemicals
       .where(
         (c) =>
-            c.stockState == StockState.empty ||
-            c.stockState == StockState.low,
+            c.stockState == StockState.empty || c.stockState == StockState.low,
       )
       .firstOrNull;
   final criticalApparatus = apparatus
       .where(
         (a) =>
-            a.stockState == StockState.empty ||
-            a.stockState == StockState.low,
+            a.stockState == StockState.empty || a.stockState == StockState.low,
       )
       .firstOrNull;
 
@@ -169,7 +167,8 @@ Map<String, dynamic> computeConsumptionWidgetData({
       data['${prefix}_id'] = itemId;
       data['${prefix}_name'] = name;
       data['${prefix}_used'] = '-${formatQuantity(used)} $unit'.trim();
-      data['${prefix}_remaining'] = '(${formatQuantity(left)} $unit left)'.trim();
+      data['${prefix}_remaining'] = '(${formatQuantity(left)} $unit left)'
+          .trim();
     } else {
       data['${prefix}_id'] = '';
       data['${prefix}_name'] = '';
