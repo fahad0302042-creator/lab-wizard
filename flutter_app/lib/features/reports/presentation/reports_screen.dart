@@ -397,8 +397,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           ],
                         ),
                       ),
-                      if (row != usageRows.last)
-                        const Divider(height: 1),
+                      if (row != usageRows.last) const Divider(height: 1),
                     ],
                   ],
                 ),
