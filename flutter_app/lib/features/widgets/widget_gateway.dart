@@ -109,7 +109,7 @@ Map<String, dynamic> computeConsumptionWidgetData({
       ? "TODAY'S CONSUMPTION"
       : 'TODAY: $totalItemsUsed item${totalItemsUsed == 1 ? '' : 's'} ($totalEvents use${totalEvents == 1 ? '' : 's'})';
 
-  // Determine Flaskie's dynamic speech bubble
+  // Determine Flaskie's dynamic information cards (1 per click)
   final criticalChemical = chemicals
       .where(
         (c) =>
@@ -123,28 +123,46 @@ Map<String, dynamic> computeConsumptionWidgetData({
       )
       .firstOrNull;
 
-  final String flaskieSpeech;
-  final int flaskieFrame;
+  final cleanLabName = labName.trim().isEmpty ? 'Lab Wizard' : labName.trim();
+  final List<String> infoCards = [];
+
+  // Card 0: Critical stock alert or health confirmation
   if (criticalChemical != null) {
-    flaskieSpeech = 'Low on ${criticalChemical.name}!';
-    flaskieFrame = 1;
+    infoCards.add('Low on ${criticalChemical.name}! (${formatQuantity(criticalChemical.quantity)} ${criticalChemical.unit} left)');
   } else if (criticalApparatus != null) {
-    flaskieSpeech = 'Low on ${criticalApparatus.name}!';
-    flaskieFrame = 1;
-  } else if (totalItemsUsed > 0) {
-    flaskieSpeech = '$totalItemsUsed used today! Keep it up!';
-    flaskieFrame = 2;
+    infoCards.add('Low on ${criticalApparatus.name}! (${criticalApparatus.quantity.toInt()} left)');
   } else {
-    flaskieSpeech = 'Ready to experiment!';
-    flaskieFrame = 0;
+    infoCards.add('All inventory stock healthy ✨');
   }
 
+  // Card 1: Today's consumption stats
+  if (totalItemsUsed > 0) {
+    infoCards.add('$totalItemsUsed item${totalItemsUsed == 1 ? '' : 's'} used today ($totalEvents logs)');
+  } else {
+    infoCards.add('No usage logged today yet 🧪');
+  }
+
+  // Card 2: Shelf counts
+  infoCards.add('Shelf: ${chemicals.length} chems • ${apparatus.length} gear');
+
+  // Card 3: Active lab name
+  infoCards.add('Lab: $cleanLabName');
+
+  // Card 4: Quick action tip
+  infoCards.add('Tip: Tap [📷 Scan] to log in seconds');
+
   final data = <String, dynamic>{
-    'lab_name': labName.trim().isEmpty ? 'Lab Wizard' : labName.trim(),
+    'lab_name': cleanLabName,
     'today_header': todayHeader,
-    'flaskie_speech': flaskieSpeech,
-    'flaskie_frame': flaskieFrame,
+    'flaskie_speech': infoCards[0],
+    'info_count': infoCards.length,
+    'total_chems': chemicals.length,
+    'total_apparatus': apparatus.length,
   };
+
+  for (var i = 0; i < infoCards.length; i++) {
+    data['info_$i'] = infoCards[i];
+  }
 
   // Populate top 3 items
   for (var i = 0; i < 3; i++) {

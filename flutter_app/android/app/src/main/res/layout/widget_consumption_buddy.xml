@@ -94,7 +94,7 @@
         android:background="#E5DFC9"
         android:contentDescription="Divider" />
 
-    <!-- Main Content Area: Feed on Left + Flaskie on Right -->
+    <!-- Main Content Area: Feed on Left + Continuous Animated Flaskie on Right -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -106,7 +106,7 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="65"
+            android:layout_weight="64"
             android:gravity="center_vertical"
             android:orientation="vertical">
 
@@ -125,6 +125,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
+                android:layout_marginBottom="2dp"
                 android:orientation="vertical"
                 android:visibility="gone">
 
@@ -140,9 +141,17 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="No consumption logged today.\nTap [📷 Scan] above to record usage."
+                    android:text="No consumption logged today yet."
                     android:textColor="#6A665E"
                     android:textSize="10sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Tap [📷 Scan] above to record usage."
+                    android:textColor="#3F6F3B"
+                    android:textSize="9.5sp" />
             </LinearLayout>
 
             <!-- Items List Container -->
@@ -285,18 +294,29 @@
                         android:textSize="9.5sp" />
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- Bottom Quick Inventory Count -->
+            <TextView
+                android:id="@+id/widget_stock_summary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="24 chems • 18 apparatus"
+                android:textColor="#8C867A"
+                android:textSize="8.5sp"
+                android:visibility="gone" />
         </LinearLayout>
 
-        <!-- Right: Flaskie Buddy + Speech Bubble -->
+        <!-- Right: Animated Flaskie Buddy + Information Bubble -->
         <LinearLayout
             android:id="@+id/widget_flaskie_container"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="35"
+            android:layout_weight="36"
             android:gravity="center"
             android:orientation="vertical">
 
-            <!-- Speech Bubble -->
+            <!-- Information Speech Bubble (1 info per click) -->
             <TextView
                 android:id="@+id/widget_flaskie_bubble"
                 android:layout_width="wrap_content"
@@ -310,24 +330,45 @@
                 android:paddingTop="3dp"
                 android:paddingRight="7dp"
                 android:paddingBottom="3dp"
-                android:text="3 used today!"
+                android:text="Ready to experiment!"
                 android:textColor="#1A1917"
-                android:textSize="9.5sp"
+                android:textSize="9sp"
                 android:textStyle="bold" />
 
-            <!-- Flaskie Buddy Character View -->
-            <ImageView
-                android:id="@+id/widget_flaskie_image"
-                android:layout_width="60dp"
-                android:layout_height="66dp"
-                android:contentDescription="Flaskie" />
+            <!-- Continuously Animated ViewFlipper (Frame 1 -> Frame 2 -> Frame 3 loop) -->
+            <ViewFlipper
+                android:id="@+id/widget_flaskie_flipper"
+                android:layout_width="62dp"
+                android:layout_height="68dp"
+                android:autoStart="true"
+                android:flipInterval="1100">
 
+                <ImageView
+                    android:id="@+id/widget_flaskie_frame_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="Flaskie Resting" />
+
+                <ImageView
+                    android:id="@+id/widget_flaskie_frame_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="Flaskie Blinking" />
+
+                <ImageView
+                    android:id="@+id/widget_flaskie_frame_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="Flaskie Smiling" />
+            </ViewFlipper>
+
+            <!-- Tap Hint for Interactive Information Rotation -->
             <TextView
                 android:id="@+id/widget_flaskie_hint"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
-                android:text="Tap Flaskie ✨"
+                android:text="Tap for info 💬"
                 android:textColor="#8C867A"
                 android:textSize="8sp" />
         </LinearLayout>

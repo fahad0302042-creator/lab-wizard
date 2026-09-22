@@ -9,8 +9,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
@@ -26,11 +24,11 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_FLASKIE_TAP) {
-            animateFlaskieBurst(context)
+            cycleNextInformation(context)
         }
     }
 
-    private fun animateFlaskieBurst(context: Context) {
+    private fun cycleNextInformation(context: Context) {
         val appWidgetManager = AppWidgetManager.getInstance(context)
         val ids = appWidgetManager.getAppWidgetIds(
             ComponentName(context, ConsumptionBuddyWidgetProvider::class.java)
@@ -38,43 +36,19 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
         if (ids == null || ids.isEmpty()) return
 
         val prefs = context.getSharedPreferences("LabWizardWidgetPrefs", Context.MODE_PRIVATE)
-        val baseSpeech = prefs.getString("flaskie_speech", "Ready to experiment!") ?: "Ready to experiment!"
-        val baseFrame = prefs.getInt("flaskie_frame", 0)
-        val quotes = arrayOf("Bubbles rising! ✨", "Safety goggles check! 🥽", "Pop! Ready to log! 🧪")
+        val infoCount = prefs.getInt("info_count", 5).coerceAtLeast(1)
+        val currentIndex = prefs.getInt("current_info_index", 0)
+        val nextIndex = (currentIndex + 1) % infoCount
+        prefs.edit().putInt("current_info_index", nextIndex).apply()
 
-        val pendingResult = goAsync()
-        val handler = Handler(Looper.getMainLooper())
+        val nextText = prefs.getString("info_$nextIndex", null)
+            ?: prefs.getString("flaskie_speech", "Ready to experiment!") ?: "Ready to experiment!"
 
-        // Frame 0: Bubble rising
-        val views0 = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
-        renderFlaskieBitmap(context, 0)?.let { views0.setImageViewBitmap(R.id.widget_flaskie_image, it) }
-        views0.setTextViewText(R.id.widget_flaskie_bubble, quotes[0])
-        for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, views0)
-
-        // Frame 1: Wink / Blink after 320ms
-        handler.postDelayed({
-            val views1 = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
-            renderFlaskieBitmap(context, 1)?.let { views1.setImageViewBitmap(R.id.widget_flaskie_image, it) }
-            views1.setTextViewText(R.id.widget_flaskie_bubble, quotes[1])
-            for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, views1)
-        }, 320)
-
-        // Frame 2: Joyful bubble pop after 640ms
-        handler.postDelayed({
-            val views2 = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
-            renderFlaskieBitmap(context, 2)?.let { views2.setImageViewBitmap(R.id.widget_flaskie_image, it) }
-            views2.setTextViewText(R.id.widget_flaskie_bubble, quotes[2])
-            for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, views2)
-        }, 640)
-
-        // Reset to lab status after 1200ms
-        handler.postDelayed({
-            val viewsRestore = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
-            renderFlaskieBitmap(context, baseFrame)?.let { viewsRestore.setImageViewBitmap(R.id.widget_flaskie_image, it) }
-            viewsRestore.setTextViewText(R.id.widget_flaskie_bubble, baseSpeech)
-            for (id in ids) appWidgetManager.partiallyUpdateAppWidget(id, viewsRestore)
-            pendingResult.finish()
-        }, 1200)
+        val views = RemoteViews(context.packageName, R.layout.widget_consumption_buddy)
+        views.setTextViewText(R.id.widget_flaskie_bubble, nextText)
+        for (id in ids) {
+            appWidgetManager.partiallyUpdateAppWidget(id, views)
+        }
     }
 
     companion object {
@@ -89,8 +63,8 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
             return try {
                 val drawable = ContextCompat.getDrawable(context, resId) ?: return null
                 val density = context.resources.displayMetrics.density
-                val width = (60 * density).toInt().coerceAtLeast(1)
-                val height = (66 * density).toInt().coerceAtLeast(1)
+                val width = (62 * density).toInt().coerceAtLeast(1)
+                val height = (68 * density).toInt().coerceAtLeast(1)
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bitmap)
                 drawable.setBounds(0, 0, width, height)
@@ -112,16 +86,21 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                 val todayHeader = prefs.getString("today_header", "TODAY'S CONSUMPTION") ?: "TODAY'S CONSUMPTION"
                 views.setTextViewText(R.id.widget_today_header, todayHeader)
 
-                val flaskieSpeech = prefs.getString("flaskie_speech", "Ready to experiment!") ?: "Ready to experiment!"
-                views.setTextViewText(R.id.widget_flaskie_bubble, flaskieSpeech)
+                // Current information card for the speech bubble (one per click)
+                val currentIndex = prefs.getInt("current_info_index", 0)
+                val currentInfo = prefs.getString("info_$currentIndex", null)
+                    ?: prefs.getString("flaskie_speech", "Ready to experiment!") ?: "Ready to experiment!"
+                views.setTextViewText(R.id.widget_flaskie_bubble, currentInfo)
 
-                // Render dynamic Flaskie buddy into a parcelable Bitmap
-                val frameIndex = prefs.getInt("flaskie_frame", 0)
-                val flaskieBmp = renderFlaskieBitmap(context, frameIndex)
-                if (flaskieBmp != null) {
-                    views.setImageViewBitmap(R.id.widget_flaskie_image, flaskieBmp)
-                }
+                // Render pre-drawn frames onto ViewFlipper's ImageViews for constant native animation
+                val bmp0 = renderFlaskieBitmap(context, 0)
+                val bmp1 = renderFlaskieBitmap(context, 1)
+                val bmp2 = renderFlaskieBitmap(context, 2)
+                if (bmp0 != null) views.setImageViewBitmap(R.id.widget_flaskie_frame_1, bmp0)
+                if (bmp1 != null) views.setImageViewBitmap(R.id.widget_flaskie_frame_2, bmp1)
+                if (bmp2 != null) views.setImageViewBitmap(R.id.widget_flaskie_frame_3, bmp2)
 
+                // Today's consumed items
                 val item1Name = prefs.getString("item_1_name", "") ?: ""
                 val item1Used = prefs.getString("item_1_used", "") ?: ""
                 val item1Remaining = prefs.getString("item_1_remaining", "") ?: ""
@@ -189,6 +168,16 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                     }
                 }
 
+                // Quick shelf totals at bottom
+                val totalChems = prefs.getInt("total_chems", 0)
+                val totalApparatus = prefs.getInt("total_apparatus", 0)
+                if (totalChems > 0 || totalApparatus > 0) {
+                    views.setTextViewText(R.id.widget_stock_summary, "$totalChems chemicals • $totalApparatus apparatus")
+                    views.setViewVisibility(R.id.widget_stock_summary, View.VISIBLE)
+                } else {
+                    views.setViewVisibility(R.id.widget_stock_summary, View.GONE)
+                }
+
                 // Benchtop Action Buttons
                 views.setOnClickPendingIntent(
                     R.id.btn_widget_scan,
@@ -203,9 +192,13 @@ class ConsumptionBuddyWidgetProvider : AppWidgetProvider() {
                     createLaunchIntent(context, "labwizard://undo", 203)
                 )
 
-                // Interactive Flaskie Buddy Tap Animation
+                // Interactive Flaskie Buddy (One information per click!)
                 views.setOnClickPendingIntent(
-                    R.id.widget_flaskie_image,
+                    R.id.widget_flaskie_flipper,
+                    createFlaskieTapIntent(context)
+                )
+                views.setOnClickPendingIntent(
+                    R.id.widget_flaskie_hint,
                     createFlaskieTapIntent(context)
                 )
 

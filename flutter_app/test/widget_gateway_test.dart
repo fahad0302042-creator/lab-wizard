@@ -49,7 +49,7 @@ void main() {
   ];
 
   group('computeConsumptionWidgetData', () {
-    test('computes empty consumption state with ready speech', () {
+    test('computes empty consumption state with multi-card info cycle', () {
       final payload = computeConsumptionWidgetData(
         labName: 'Organic Chem Lab',
         chemicals: [testChemicals[0]], // Healthy stock
@@ -60,8 +60,14 @@ void main() {
 
       expect(payload['lab_name'], 'Organic Chem Lab');
       expect(payload['today_header'], "TODAY'S CONSUMPTION");
-      expect(payload['flaskie_speech'], 'Ready to experiment!');
-      expect(payload['flaskie_frame'], 0);
+      expect(payload['flaskie_speech'], 'All inventory stock healthy ✨');
+      expect(payload['info_count'], 5);
+      expect(payload['info_0'], 'All inventory stock healthy ✨');
+      expect(payload['info_1'], 'No usage logged today yet 🧪');
+      expect(payload['info_2'], 'Shelf: 1 chems • 1 gear');
+      expect(payload['info_3'], 'Lab: Organic Chem Lab');
+      expect(payload['total_chems'], 1);
+      expect(payload['total_apparatus'], 1);
       expect(payload['item_1_name'], '');
       expect(payload['item_1_used'], '');
       expect(payload['item_1_remaining'], '');
@@ -77,9 +83,10 @@ void main() {
       );
 
       expect(payload['lab_name'], 'Lab Wizard');
+      expect(payload['info_3'], 'Lab: Lab Wizard');
     });
 
-    test('aggregates today consumption logs, sorts top items, and ignores restocks', () {
+    test('aggregates today consumption logs, sorts top items, and populates info cards', () {
       final logs = <ConsumptionLog>[
         // Today's consumption on chem-1 (100 mL)
         ConsumptionLog(
@@ -147,8 +154,7 @@ void main() {
       );
 
       expect(payload['today_header'], 'TODAY: 2 items (3 uses)');
-      expect(payload['flaskie_speech'], '2 used today! Keep it up!');
-      expect(payload['flaskie_frame'], 2);
+      expect(payload['info_1'], '2 items used today (3 logs)');
 
       // Top item is chem-1 (150 mL used)
       expect(payload['item_1_id'], 'chem-1');
@@ -167,7 +173,7 @@ void main() {
       expect(payload['item_3_name'], '');
     });
 
-    test('prioritizes low stock alert in Flaskie speech', () {
+    test('prioritizes low stock alert in Card 0', () {
       final payload = computeConsumptionWidgetData(
         labName: 'Central Lab',
         chemicals: testChemicals, // chem-2 is low stock!
@@ -176,8 +182,8 @@ void main() {
         now: baseDate,
       );
 
-      expect(payload['flaskie_speech'], 'Low on Acetone!');
-      expect(payload['flaskie_frame'], 1);
+      expect(payload['info_0'], contains('Low on Acetone!'));
+      expect(payload['flaskie_speech'], contains('Low on Acetone!'));
     });
   });
 
@@ -186,15 +192,15 @@ void main() {
       Map<Object?, Object?>? receivedArguments;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(WidgetGateway.channel, (call) async {
-            if (call.method == 'updateWidget') {
-              receivedArguments = call.arguments as Map<Object?, Object?>?;
-              return true;
-            }
-            if (call.method == 'getInitialUri') {
-              return 'labwizard://scan_consume';
-            }
-            return null;
-          });
+        if (call.method == 'updateWidget') {
+          receivedArguments = call.arguments as Map<Object?, Object?>?;
+          return true;
+        }
+        if (call.method == 'getInitialUri') {
+          return 'labwizard://scan_consume';
+        }
+        return null;
+      });
 
       final success = await WidgetGateway.updateWidget(
         labName: 'Lab Alpha',
