@@ -134,9 +134,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
     padding: const pw.EdgeInsets.only(bottom: 12),
     margin: const pw.EdgeInsets.only(bottom: 16),
     decoration: const pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: _ink, width: 2.0),
-      ),
+      border: pw.Border(bottom: pw.BorderSide(color: _ink, width: 2.0)),
     ),
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -165,10 +163,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                 contactLines.isNotEmpty
                     ? contactLines.join(' - ')
                     : 'bench inventory',
-                style: const pw.TextStyle(
-                  fontSize: 11,
-                  color: _muted,
-                ),
+                style: const pw.TextStyle(fontSize: 11, color: _muted),
               ),
             ],
           ),
@@ -187,10 +182,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
             pw.SizedBox(height: 3),
             pw.Text(
               'Period: ${input.range.label} - Generated: ${stamp.format(generated)}',
-              style: const pw.TextStyle(
-                fontSize: 10,
-                color: _muted,
-              ),
+              style: const pw.TextStyle(fontSize: 10, color: _muted),
             ),
           ],
         ),
@@ -304,12 +296,14 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final usageRows = input.usageRows;
   final itemsUsedCount = input.itemsUsedCount ?? usageRows.length;
   final totalUsesCount = input.logs
-      .where((l) =>
-          l.action == InventoryAction.consume.name ||
-          l.action == InventoryAction.breakage.name)
+      .where(
+        (l) =>
+            l.action == InventoryAction.consume.name ||
+            l.action == InventoryAction.breakage.name,
+      )
       .length;
-  final lowStockCount = input.criticalCount ??
-      usageRows.where((r) => r.pct < 50).length;
+  final lowStockCount =
+      input.criticalCount ?? usageRows.where((r) => r.pct < 50).length;
 
   final document = pw.Document(
     title: '${input.title} - ${input.range.dates}',

@@ -474,7 +474,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       final kindTitle = _kind == ItemKind.chemical ? 'Chemicals' : 'Apparatus';
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'Lab Wizard - $kindTitle Consumption Report - ${_range.label}.pdf',
+        filename:
+            'Lab Wizard - $kindTitle Consumption Report - ${_range.label}.pdf',
       );
     } finally {
       if (mounted) setState(() => _exporting = false);
