@@ -340,7 +340,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Center(
                     child: Text(
-                      'No ${_kind == ItemKind.chemical ? 'chemical' : 'apparatus'} use or restock logged for ${_range.label}.',
+                      'No ${_kind == ItemKind.chemical ? 'chemical' : 'apparatus'} consumption logged for ${_range.label}.',
                       style: TextStyle(color: context.mutedInkColor),
                     ),
                   ),
@@ -350,65 +350,68 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     for (final row in usageRows) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              row.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (row.formulaOrCategory.isNotEmpty)
-                              Text(
-                                row.formulaOrCategory,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: context.mutedInkColor,
-                                ),
-                              ),
-                            const SizedBox(height: 2),
-                            Text.rich(
-                              TextSpan(
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.mutedInkColor,
-                                ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  TextSpan(
-                                    text:
-                                        'initial ${formatQuantity(row.startStock)} ${row.unit}',
+                                  Text(
+                                    row.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                  if (row.added > 0)
-                                    TextSpan(
-                                      text:
-                                          '  +${formatQuantity(row.added)} restocked',
+                                  if (row.formulaOrCategory.isNotEmpty)
+                                    Text(
+                                      row.formulaOrCategory,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: context.mutedInkColor,
+                                      ),
+                                    ),
+                                  if (row.added > 0) ...[
+                                    Text(
+                                      '${formatQuantity(row.startStock)} ${row.unit} start',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: context.mutedInkColor,
+                                      ),
+                                    ),
+                                    Text(
+                                      '+${formatQuantity(row.added)} ${row.unit} increase',
                                       style: const TextStyle(
+                                        fontSize: 11,
                                         color: LabColors.green,
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),
-                                  if (row.used > 0)
-                                    TextSpan(
-                                      text:
-                                          '  −${formatQuantity(row.used)} used',
-                                      style: const TextStyle(
-                                        color: LabColors.amber,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  TextSpan(
-                                    text:
-                                        '  = ${formatQuantity(row.left)} ${row.unit} final',
-                                    style: TextStyle(
-                                      color: context.inkColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                  ],
                                 ],
                               ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (row.used > 0)
+                                  Text(
+                                    '-${formatQuantity(row.used)} ${row.unit}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: LabColors.amber,
+                                    ),
+                                  ),
+                                Text(
+                                  '${formatQuantity(row.left)} ${row.unit} left',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.mutedInkColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -948,7 +951,7 @@ List<ReportPdfUsageRow> _usageRows(
       name: row.name,
       formulaOrCategory: row.detail,
       unit: row.unit,
-      startStock: row.initial,
+      startStock: row.opening,
       used: row.used,
       added: row.restocked,
       left: row.finalQuantity,

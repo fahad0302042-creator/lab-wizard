@@ -4,20 +4,22 @@ import '../../inventory/domain/models.dart';
 
 /// One chemical or apparatus that was used or restocked in the report range.
 ///
-/// [initial] is the stock at the start of the range plus restocks in the
-/// range, so a restock raises both the opening figure and [finalQuantity].
-/// Used-only rows leave [initial] at the opening stock. Nothing else is
-/// listed: an item with no use and no restock in the range is omitted.
+/// [opening] is the stock at the start of the range, before restocks in the
+/// range. [restocked] is the increase. [initial] is opening plus that
+/// increase, so initial − used = [finalQuantity]. An item with neither use
+/// nor restock is omitted.
 class PeriodUsageRow {
   const PeriodUsageRow({
     required this.id,
     required this.name,
     required this.detail,
     required this.unit,
+    required this.opening,
     required this.initial,
     required this.restocked,
     required this.used,
     required this.finalQuantity,
+    required this.pct,
   });
 
   final String id;
@@ -25,7 +27,10 @@ class PeriodUsageRow {
   final String detail;
   final String unit;
 
-  /// Opening stock plus restocks in the range.
+  /// Stock before restocks in the range. This is the start-stock column.
+  final double opening;
+
+  /// [opening] plus restocks in the range.
   final double initial;
   final double restocked;
 
@@ -33,8 +38,9 @@ class PeriodUsageRow {
   final double used;
   final double finalQuantity;
 
-  /// Remaining as a percentage of [initial].
-  double get pct => initial > 0 ? finalQuantity / initial * 100 : 0;
+  /// Remaining as a percentage of the catalog opening, matching the
+  /// original report when nothing was added.
+  final double pct;
 }
 
 /// Rows for the consumption table: restocked items and used items only.
@@ -53,6 +59,7 @@ List<PeriodUsageRow> periodUsageRows({
         detail: item.formula,
         unit: item.unit,
         quantity: item.quantity,
+        catalogInitial: item.initialQuantity,
         logs: logsInRange.where((log) => log.itemId == item.id),
       );
       if (row != null) rows.add(row);
@@ -65,6 +72,7 @@ List<PeriodUsageRow> periodUsageRows({
         detail: item.category,
         unit: 'pcs',
         quantity: item.quantity,
+        catalogInitial: item.initialQuantity,
         logs: logsInRange.where((log) => log.itemId == item.id),
       );
       if (row != null) rows.add(row);
@@ -84,6 +92,7 @@ PeriodUsageRow? _rowFor({
   required String detail,
   required String unit,
   required double quantity,
+  required double catalogInitial,
   required Iterable<ConsumptionLog> logs,
 }) {
   var used = 0.0;
@@ -98,17 +107,23 @@ PeriodUsageRow? _rowFor({
     }
   }
   if (used <= 0 && restocked <= 0) return null;
-  // Current quantity already includes the restock, so adding [used] back
-  // raises the opening figure by the same restock instead of leaving it put.
+  // Current quantity already includes the restock. Subtracting it leaves the
+  // start-stock column put, and the increase column carries the addition.
+  final opening = math.max(0.0, quantity + used - restocked);
   final initial = math.max(0.0, quantity + used);
+  final pct = catalogInitial > 0
+      ? quantity / catalogInitial * 100
+      : (opening > 0 ? quantity / opening * 100 : 100.0);
   return PeriodUsageRow(
     id: id,
     name: name,
     detail: detail,
     unit: unit,
+    opening: opening,
     initial: initial,
     restocked: restocked,
     used: used,
     finalQuantity: quantity,
+    pct: pct,
   );
 }

@@ -13,6 +13,7 @@ import {
   monthLabel,
   recentMonthKeys,
   statusColor,
+  percentRemaining,
   stockStatus,
 } from "@/lib/utils";
 import { ShareIcon, PrintIcon } from "@/components/notebook/icons";
@@ -27,8 +28,8 @@ interface ReportRow {
   used: number;
   added: number;
   left: number;
-  /** Opening stock plus restocks in the month. initial − used = left. */
-  stock: number;
+  /** Stock before this month's restocks. Shown when the increase column is on. */
+  opening: number;
   status: ReturnType<typeof stockStatus>;
   pct: number;
 }
@@ -89,6 +90,7 @@ export function ReportsScreen() {
 
   const totalUsed = rows.reduce((s, r) => s + r.used, 0);
   const totalAdded = rows.reduce((s, r) => s + r.added, 0);
+  const showIncrease = totalAdded > 0;
   const criticalCount = rows.filter((r) => r.pct < 20).length;
 
   const handleClear = async () => {
@@ -355,8 +357,13 @@ export function ReportsScreen() {
                     Name
                   </th>
                   <th className="text-right py-2 px-2 font-display font-bold" style={{ color: "var(--ink-muted)" }}>
-                    Stock
+                    {showIncrease ? "Start" : "Stock"}
                   </th>
+                  {showIncrease && (
+                    <th className="text-right py-2 px-2 font-display font-bold" style={{ color: "var(--stock-healthy)" }}>
+                      Increase
+                    </th>
+                  )}
                   <th className="text-right py-2 px-2 font-display font-bold" style={{ color: "var(--stock-low)" }}>
                     −Used
                   </th>
@@ -380,15 +387,15 @@ export function ReportsScreen() {
                           {r.formulaOrCat}
                         </div>
                       )}
-                      {r.added > 0 && (
-                        <div className="text-xs" style={{ color: "var(--stock-healthy)" }}>
-                          +{r.added} {r.unit} restocked
-                        </div>
-                      )}
                     </td>
                     <td className="text-right py-2 px-2" style={{ color: "var(--ink-muted)" }}>
-                      {r.stock} {r.unit}
+                      {showIncrease ? r.opening : r.quantity} {r.unit}
                     </td>
+                    {showIncrease && (
+                      <td className="text-right py-2 px-2" style={{ color: "var(--stock-healthy)" }}>
+                        +{r.added}
+                      </td>
+                    )}
                     <td className="text-right py-2 px-2" style={{ color: "var(--stock-low)" }}>
                       −{r.used}
                     </td>
@@ -410,6 +417,7 @@ export function ReportsScreen() {
             <p className="font-body text-xs mt-3" style={{ color: "var(--ink-muted)" }}>
               <span style={{ color: "var(--margin-red)" }}>*</span> below 50% remaining &nbsp;
               <span style={{ color: "var(--margin-red)" }}>**</span> below 20% remaining — reorder
+              {showIncrease ? " · start + increase − used = left" : ""}
             </p>
           )}
         </NotebookCard>
@@ -473,6 +481,7 @@ function PrintReport({
 
   const itemsUsedCount = rows.filter((r) => r.used > 0).length;
   const restockedCount = rows.filter((r) => r.added > 0).length;
+  const showIncrease = restockedCount > 0;
 
   return (
     <div
@@ -522,8 +531,13 @@ function PrintReport({
                 Name
               </th>
               <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px", color: "#555", whiteSpace: "nowrap" }}>
-                Stock
+                {showIncrease ? "Start" : "Stock"}
               </th>
+              {showIncrease && (
+                <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px", color: "#5E8C5A", whiteSpace: "nowrap" }}>
+                  Increase
+                </th>
+              )}
               <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px", color: "#555", whiteSpace: "nowrap" }}>
                 − Used
               </th>
@@ -544,15 +558,15 @@ function PrintReport({
                         {r.formulaOrCat}
                       </div>
                     )}
-                    {r.added > 0 && (
-                      <div style={{ fontSize: "11px", color: "#5E8C5A", marginTop: "1px" }}>
-                        +{r.added} {r.unit} restocked
-                      </div>
-                    )}
                   </td>
                   <td style={{ textAlign: "right", padding: "8px 6px", verticalAlign: "top", whiteSpace: "nowrap", color: "#555" }}>
-                    {r.stock} {r.unit}
+                    {showIncrease ? r.opening : r.quantity} {r.unit}
                   </td>
+                  {showIncrease && (
+                    <td style={{ textAlign: "right", padding: "8px 6px", verticalAlign: "top", whiteSpace: "nowrap", color: "#5E8C5A", fontWeight: 600 }}>
+                      +{r.added} {r.unit}
+                    </td>
+                  )}
                   <td style={{ textAlign: "right", padding: "8px 6px", verticalAlign: "top", whiteSpace: "nowrap", color: "#D89A3E" }}>
                     −{r.used}
                   </td>
@@ -572,6 +586,7 @@ function PrintReport({
         <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #e0e0e0", fontSize: "11px", color: "#666" }}>
           <span style={{ color: "#B23A2E" }}>*</span> below 50% remaining &nbsp;&nbsp;
           <span style={{ color: "#B23A2E" }}>**</span> below 20% remaining — reorder &nbsp;&nbsp;
+          {showIncrease && "Start + increase − used = left. "}
           <span style={{ float: "right" }}>Page 1</span>
         </div>
       )}

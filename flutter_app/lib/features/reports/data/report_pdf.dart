@@ -110,8 +110,8 @@ const _red = PdfColor.fromInt(0xFFB23A2E);
 const _amber = PdfColor.fromInt(0xFFD89A3E);
 
 /// Builds the A4 consumption report: branded header, 3 KPI cards,
-/// and a table of restocked and used items only (Initial, Used, Final).
-/// Initial includes restocks in the range, so initial − used = final.
+/// and the consumption table. The increase column is added only when
+/// something was restocked; otherwise the original columns stay.
 Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final generated = input.generatedAt ?? DateTime.now();
   final profile = input.profile;
@@ -292,14 +292,55 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final services = input.services;
   final estimates = input.runOut.estimates.take(10).toList();
 
-  // Usage stats for KPI boxes
+  // Usage stats for KPI boxes. Same cards as the original report.
   final usageRows = input.usageRows;
+  final showIncrease = usageRows.any((row) => row.added > 0);
   final itemsUsedCount =
       input.itemsUsedCount ?? usageRows.where((row) => row.used > 0).length;
-  final restockedCount =
-      input.restockedCount ?? usageRows.where((row) => row.added > 0).length;
-  final criticalCount =
-      input.criticalCount ?? usageRows.where((row) => row.pct < 20).length;
+  final totalUsesCount = input.logs
+      .where(
+        (log) =>
+            log.action == InventoryAction.consume.name ||
+            log.action == InventoryAction.breakage.name,
+      )
+      .length;
+  final lowStockCount =
+      input.criticalCount ?? usageRows.where((row) => row.pct < 50).length;
+
+  pw.Widget usageHead(String label, {bool left = false}) => pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+    child: pw.Align(
+      alignment: left ? pw.Alignment.centerLeft : pw.Alignment.centerRight,
+      child: pw.Text(
+        label,
+        style: pw.TextStyle(
+          fontSize: 9.5,
+          fontWeight: pw.FontWeight.bold,
+          color: _muted,
+          letterSpacing: 0.5,
+        ),
+      ),
+    ),
+  );
+
+  pw.Widget usageQty(
+    String value, {
+    PdfColor color = _muted,
+    bool emphasize = false,
+  }) => pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+    child: pw.Align(
+      alignment: pw.Alignment.centerRight,
+      child: pw.Text(
+        value,
+        style: pw.TextStyle(
+          fontSize: 9.5,
+          fontWeight: emphasize ? pw.FontWeight.bold : pw.FontWeight.normal,
+          color: color,
+        ),
+      ),
+    ),
+  );
 
   final document = pw.Document(
     title: '${input.title} - ${input.range.dates}',
@@ -319,33 +360,35 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           padding: const pw.EdgeInsets.only(bottom: 20),
           child: pw.Row(
             children: [
-              kpiBox('$itemsUsedCount', 'Items used', _ink),
-              kpiBox('$restockedCount', 'Restocked', _green),
-              kpiBox('$criticalCount', 'Critical', _red),
+              kpiBox('$itemsUsedCount', 'Items consumed', _ink),
+              kpiBox(
+                totalUsesCount > 0 ? '$totalUsesCount' : '${usageRows.length}',
+                'Consumption events',
+                _green,
+              ),
+              kpiBox('$lowStockCount', 'Low stock items', _red),
             ],
           ),
         ),
 
-        // Restocked items and used items only. Nothing else is listed.
+        // Used items, plus restocked items when the increase column is shown.
         if (usageRows.isEmpty)
           pw.Padding(
             padding: const pw.EdgeInsets.symmetric(vertical: 24),
             child: pw.Center(
               child: note(
-                'No ${input.kind == ItemKind.chemical ? 'chemical' : 'apparatus'} use or restock logged for ${input.range.label}.',
+                'No ${input.kind == ItemKind.chemical ? 'chemical' : 'apparatus'} consumption logged for ${input.range.label}.',
               ),
             ),
           )
         else
           pw.Table(
-            columnWidths: const {
-              0: pw.FlexColumnWidth(3.8),
-              1: pw.FlexColumnWidth(1.8),
-              2: pw.FlexColumnWidth(1.8),
-              3: pw.FlexColumnWidth(1.8),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(3.4),
+              for (var column = 1; column < (showIncrease ? 5 : 4); column++)
+                column: const pw.FlexColumnWidth(1.6),
             },
             children: [
-              // Header
               pw.TableRow(
                 decoration: const pw.BoxDecoration(
                   border: pw.Border(
@@ -353,78 +396,13 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                   ),
                 ),
                 children: [
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      vertical: 6,
-                      horizontal: 4,
-                    ),
-                    child: pw.Text(
-                      'NAME',
-                      style: pw.TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: pw.FontWeight.bold,
-                        color: _muted,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      vertical: 6,
-                      horizontal: 4,
-                    ),
-                    child: pw.Align(
-                      alignment: pw.Alignment.centerRight,
-                      child: pw.Text(
-                        'INITIAL',
-                        style: pw.TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: pw.FontWeight.bold,
-                          color: _muted,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      vertical: 6,
-                      horizontal: 4,
-                    ),
-                    child: pw.Align(
-                      alignment: pw.Alignment.centerRight,
-                      child: pw.Text(
-                        'USED',
-                        style: pw.TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: pw.FontWeight.bold,
-                          color: _muted,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                      vertical: 6,
-                      horizontal: 4,
-                    ),
-                    child: pw.Align(
-                      alignment: pw.Alignment.centerRight,
-                      child: pw.Text(
-                        'FINAL',
-                        style: pw.TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: pw.FontWeight.bold,
-                          color: _muted,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
+                  usageHead('NAME', left: true),
+                  usageHead('START STOCK'),
+                  if (showIncrease) usageHead('INCREASE'),
+                  usageHead('CONSUMED'),
+                  usageHead('REMAINING'),
                 ],
               ),
-              // Item rows
               for (final row in usageRows)
                 pw.TableRow(
                   decoration: const pw.BoxDecoration(
@@ -462,68 +440,34 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                         ],
                       ),
                     ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 4,
+                    usageQty('${formatQuantity(row.startStock)} ${row.unit}'),
+                    if (showIncrease)
+                      usageQty(
+                        row.added > 0
+                            ? '+${formatQuantity(row.added)} ${row.unit}'
+                            : '0 ${row.unit}',
+                        color: row.added > 0 ? _green : _muted,
+                        emphasize: row.added > 0,
                       ),
-                      child: pw.Align(
-                        alignment: pw.Alignment.centerRight,
-                        child: pw.Text(
-                          '${formatQuantity(row.startStock)} ${row.unit}',
-                          style: const pw.TextStyle(
-                            fontSize: 9.5,
-                            color: _muted,
-                          ),
-                        ),
-                      ),
+                    usageQty(
+                      '-${formatQuantity(row.used)} ${row.unit}',
+                      color: _amber,
+                      emphasize: true,
                     ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 4,
-                      ),
-                      child: pw.Align(
-                        alignment: pw.Alignment.centerRight,
-                        child: pw.Text(
-                          row.used > 0
-                              ? '−${formatQuantity(row.used)} ${row.unit}'
-                              : '0 ${row.unit}',
-                          style: pw.TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: pw.FontWeight.bold,
-                            color: _amber,
-                          ),
-                        ),
-                      ),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 4,
-                      ),
-                      child: pw.Align(
-                        alignment: pw.Alignment.centerRight,
-                        child: pw.Text(
-                          '${formatQuantity(row.left)} ${row.unit}',
-                          style: pw.TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: pw.FontWeight.bold,
-                            color: _ink,
-                          ),
-                        ),
-                      ),
+                    usageQty(
+                      '${formatQuantity(row.left)} ${row.unit}',
+                      color: _ink,
+                      emphasize: true,
                     ),
                   ],
                 ),
             ],
           ),
-        if (usageRows.isNotEmpty) ...[
+        if (showIncrease) ...[
           pw.SizedBox(height: 8),
           note(
-            'Only restocked and used items are listed. Initial includes '
-            'restocks in this period, so initial − used = final. '
-            '* below 50% of that initial. ** below 20% — reorder.',
+            'Start stock + increase − consumed = remaining. '
+            'Only used and restocked items are listed.',
           ),
         ],
 
