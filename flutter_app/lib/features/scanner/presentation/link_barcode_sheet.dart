@@ -192,7 +192,6 @@ class _LinkBarcodeFormState extends ConsumerState<LinkBarcodeForm> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontFamily: 'ArchitectsDaughter',
                             fontWeight: FontWeight.w700,
                           ),
                         ),

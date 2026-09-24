@@ -110,7 +110,7 @@ class _ApparatusHistoryScreenState
     return Scaffold(
       body: NotebookPage(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(54, 12, 20, 32),
+          padding: const EdgeInsets.fromLTRB(notebookGutter, 20, 18, 32),
           children: [
             Row(
               children: [

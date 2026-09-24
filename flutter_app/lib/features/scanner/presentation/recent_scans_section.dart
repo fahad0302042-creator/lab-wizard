@@ -235,7 +235,6 @@ class _RecentScanTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: 'ArchitectsDaughter',
                       fontWeight: FontWeight.w700,
                       color: scan.found && exists ? null : muted,
                     ),

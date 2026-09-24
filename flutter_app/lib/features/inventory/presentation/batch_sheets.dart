@@ -453,7 +453,6 @@ class _AmountRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontFamily: 'ArchitectsDaughter',
                     fontWeight: FontWeight.w700,
                   ),
                 ),

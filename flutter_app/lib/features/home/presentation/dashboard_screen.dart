@@ -45,7 +45,7 @@ class DashboardScreen extends ConsumerWidget {
       onRefresh: ref.read(inventoryProvider.notifier).refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
+        padding: const EdgeInsets.fromLTRB(notebookGutter, 20, 18, 32),
         children: [
           StaggerIn(
             index: 0,
@@ -87,13 +87,24 @@ class DashboardScreen extends ConsumerWidget {
             _SyncBanner(state: inventory),
           ],
           const SizedBox(height: 14),
-          TextField(
-            readOnly: true,
+          NotebookCard(
             onTap: () => _showGlobalSearch(context, ref),
-            decoration: const InputDecoration(
-              hintText: 'search chemicals, apparatus…',
-              prefixIcon: Icon(Icons.search),
-              suffixIcon: Icon(Icons.arrow_forward),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(Icons.search, color: context.mutedInkColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'search the notebook',
+                    style: TextStyle(
+                      color: context.inkColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Icon(Icons.arrow_forward, color: context.mutedInkColor, size: 18),
+              ],
             ),
           ),
           const SizedBox(height: 18),
@@ -159,13 +170,13 @@ class DashboardScreen extends ConsumerWidget {
             StaggerIn(
               index: 1,
               child: NotebookCard(
-                accent: LabColors.marginRed,
+                accent: context.marginRedColor,
                 onTap: () => _showAttentionSheet(context, ref),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.notification_important_outlined,
-                      color: LabColors.marginRed,
+                      color: context.marginRedColor,
                       size: 30,
                     ),
                     const SizedBox(width: 12),
@@ -210,7 +221,7 @@ class DashboardScreen extends ConsumerWidget {
                 icon: Icons.science_outlined,
                 value: inventory.chemicals.length.toDouble(),
                 label: 'chemicals',
-                color: LabColors.blue,
+                color: context.blueColor,
                 onTap: () => onNavigate(1),
               ),
               _MetricCard(
@@ -218,7 +229,7 @@ class DashboardScreen extends ConsumerWidget {
                 icon: Icons.precision_manufacturing_outlined,
                 value: inventory.apparatus.length.toDouble(),
                 label: 'apparatus',
-                color: LabColors.green,
+                color: context.healthyColor,
                 onTap: () => onNavigate(3),
               ),
               _MetricCard(
@@ -226,7 +237,7 @@ class DashboardScreen extends ConsumerWidget {
                 icon: Icons.warning_amber_rounded,
                 value: inventory.attentionCount.toDouble(),
                 label: 'need attention',
-                color: LabColors.marginRed,
+                color: context.marginRedColor,
                 onTap: () => _showAttentionSheet(context, ref),
               ),
               _MetricCard(
@@ -234,33 +245,8 @@ class DashboardScreen extends ConsumerWidget {
                 icon: Icons.history,
                 value: weeklyLogs.length.toDouble(),
                 label: 'actions this week',
-                color: LabColors.amber,
+                color: context.lowColor,
                 onTap: () => onNavigate(4),
-              ),
-            ],
-          ),
-          const SizedBox(height: 26),
-          const PageHeading('quick actions', trailing: SizedBox.shrink()),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              FilledButton.icon(
-                onPressed: () => onNavigate(2),
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scan'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    showAddItemSheet(context, ref, ItemKind.chemical),
-                icon: const Icon(Icons.add),
-                label: const Text('Chemical'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    showAddItemSheet(context, ref, ItemKind.apparatus),
-                icon: const Icon(Icons.add),
-                label: const Text('Apparatus'),
               ),
             ],
           ),
@@ -564,7 +550,6 @@ class _ResultList extends StatelessWidget {
         final item = results[itemIndex];
         return NotebookCard(
           onTap: () => onOpen(item.kind, item.id),
-          tape: itemIndex % 4 == 0 ? NotebookTape.yellow : NotebookTape.none,
           alternate: itemIndex.isOdd,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Row(
@@ -587,8 +572,7 @@ class _ResultList extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontFamily: 'ArchitectsDaughter',
-                        fontSize: 17,
+                          fontSize: 17,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -644,14 +628,7 @@ class _MetricCard extends StatelessWidget {
         index: index,
         child: NotebookCard(
           onTap: onTap,
-          tape: switch (index % 4) {
-            0 => NotebookTape.yellow,
-            1 => NotebookTape.blue,
-            2 => NotebookTape.pink,
-            _ => NotebookTape.green,
-          },
           accent: color,
-          rotation: index.isEven ? -.008 : .008,
           padding: const EdgeInsets.all(13),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -755,10 +732,10 @@ class _SyncBanner extends StatelessWidget {
     final pending = state.pendingCount > 0;
     final failed = state.failedCount > 0;
     final color = failed
-        ? LabColors.marginRed
+        ? context.marginRedColor
         : pending
-        ? LabColors.amber
-        : LabColors.blue;
+        ? context.lowColor
+        : context.blueColor;
     // Icon, message and chevron read as one button.
     return MergeSemantics(
       child: Material(
@@ -870,7 +847,7 @@ class _WeekActivity extends StatelessWidget {
                       height: 68 * value + 5,
                       width: 13,
                       decoration: BoxDecoration(
-                        color: LabColors.marginRed.withValues(alpha: .78),
+                        color: context.marginRedColor.withValues(alpha: .78),
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(8),
                         ),
@@ -913,9 +890,9 @@ class _ActivityRow extends StatelessWidget {
               .map((item) => item.name)
               .firstOrNull;
     final actionColor = switch (log.action) {
-      InventoryAction.restock => LabColors.green,
-      InventoryAction.consume => LabColors.amber,
-      InventoryAction.breakage => LabColors.marginRed,
+      InventoryAction.restock => context.healthyColor,
+      InventoryAction.consume => context.lowColor,
+      InventoryAction.breakage => context.marginRedColor,
     };
     return NotebookCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

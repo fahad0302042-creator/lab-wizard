@@ -43,9 +43,9 @@ class NotificationSettingsCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.notifications_active_outlined,
-                color: LabColors.marginRed,
+                color: context.marginRedColor,
               ),
               const SizedBox(width: 8),
               const Text(
@@ -105,8 +105,8 @@ class NotificationSettingsCard extends ConsumerWidget {
               child: Text(
                 status.lastError!,
                 key: const Key('notify-error'),
-                style: const TextStyle(
-                  color: LabColors.marginRed,
+                style: TextStyle(
+                  color: context.marginRedColor,
                   fontSize: 13,
                 ),
               ),

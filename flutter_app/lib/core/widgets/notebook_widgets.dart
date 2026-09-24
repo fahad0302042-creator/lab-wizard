@@ -7,6 +7,10 @@ import '../theme/app_theme.dart';
 
 enum NotebookTape { none, yellow, blue, green, pink }
 
+/// Content starts just past the red margin line. The gutter used to be 54px,
+/// which ate the name column on a phone.
+const double notebookGutter = 26;
+
 class NotebookPage extends StatelessWidget {
   const NotebookPage({
     required this.child,
@@ -39,6 +43,7 @@ class NotebookPage extends StatelessWidget {
             ruled: context.ruledColor,
             margin: context.marginLineColor,
             desk: Theme.of(context).scaffoldBackgroundColor,
+            ink: context.inkColor,
           ),
           child: child,
         ),
@@ -53,42 +58,54 @@ class _PaperPainter extends CustomPainter {
     required this.ruled,
     required this.margin,
     required this.desk,
+    required this.ink,
   });
 
   final Color ruled;
   final Color margin;
   final Color desk;
+  final Color ink;
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     final linePaint = Paint()
       ..color = ruled
       ..strokeWidth = 1;
-    for (double y = 70; y < size.height; y += 27) {
+    for (double y = 36; y < size.height; y += 27) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
     }
     canvas.drawLine(
-      const Offset(38.5, 0),
-      Offset(38.5, size.height),
+      const Offset(10, 16),
+      Offset(10, size.height),
       Paint()
         ..color = margin
-        ..strokeWidth = 1.4,
+        ..strokeWidth = 1.6,
     );
 
-    // A restrained torn-paper edge, matching the web page without making the
-    // Android status area noisy.
-    final tear = Path()..moveTo(0, 1);
-    for (double x = 0; x <= size.width + 12; x += 12) {
-      tear
-        ..lineTo(x + 6, 4)
-        ..lineTo(x + 12, 1);
+    // Desk colour shows through a jagged tear, with an ink edge and shadow.
+    const depth = 13.0;
+    final tear = Path()..moveTo(0, 0);
+    var x = 0.0;
+    var dip = true;
+    while (x < size.width) {
+      final next = math.min(x + 12, size.width);
+      tear.lineTo(next, dip ? depth : 3);
+      x = next;
+      dip = !dip;
+      if (next >= size.width) break;
     }
+    tear
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawShadow(tear, ink.withValues(alpha: .5), 3.5, false);
+    canvas.drawPath(tear, Paint()..color = desk);
     canvas.drawPath(
       tear,
       Paint()
-        ..color = desk.withValues(alpha: .45)
+        ..color = ink.withValues(alpha: .75)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+        ..strokeWidth = 1.8,
     );
   }
 
@@ -96,7 +113,8 @@ class _PaperPainter extends CustomPainter {
   bool shouldRepaint(covariant _PaperPainter oldDelegate) =>
       oldDelegate.ruled != ruled ||
       oldDelegate.margin != margin ||
-      oldDelegate.desk != desk;
+      oldDelegate.desk != desk ||
+      oldDelegate.ink != ink;
 }
 
 class PageHeading extends StatelessWidget {
@@ -111,7 +129,7 @@ class PageHeading extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: SketchTitle(text, fontSize: fontSize ?? 35)),
+        Expanded(child: SketchTitle(text, fontSize: fontSize ?? 26)),
         // Flexible so a wide trailing button wraps its label under large
         // text instead of pushing past the edge.
         if (trailing != null) Flexible(child: trailing!),
@@ -121,7 +139,7 @@ class PageHeading extends StatelessWidget {
 }
 
 class SketchTitle extends StatefulWidget {
-  const SketchTitle(this.text, {this.fontSize = 35, super.key});
+  const SketchTitle(this.text, {this.fontSize = 26, super.key});
 
   final String text;
   final double fontSize;
@@ -618,8 +636,7 @@ class StatusBadge extends StatelessWidget {
             stockCaption(status),
             style: TextStyle(
               color: status == StockState.empty ? context.inkColor : color,
-              fontFamily: 'Caveat',
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -661,10 +678,7 @@ class NotebookFilterWord extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: selected
-                      ? context.marginRedColor
-                      : context.mutedInkColor,
-                  fontFamily: 'Caveat',
+                  color: selected ? context.inkColor : context.mutedInkColor,
                   fontSize: fontSize,
                   height: 1,
                   fontWeight: FontWeight.w700,

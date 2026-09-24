@@ -28,7 +28,7 @@ class SyncCenterScreen extends ConsumerWidget {
     return Scaffold(
       body: NotebookPage(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(54, 12, 20, 32),
+          padding: const EdgeInsets.fromLTRB(notebookGutter, 20, 18, 32),
           children: [
             Row(
               children: [
@@ -463,8 +463,7 @@ class _OperationCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: statusColor,
-                        fontFamily: 'Caveat',
-                        fontSize: 16,
+                        fontSize: 15,
                         height: 1,
                         fontWeight: FontWeight.w700,
                       ),

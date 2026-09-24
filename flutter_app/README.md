@@ -246,4 +246,3 @@ The Gradle configuration (`android/app/build.gradle.kts`) and GitHub Actions wor
 2. **Production Mode (Private)**: When private credentials (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) are added to GitHub Secrets (or locally in `key.properties`), the build automatically signs with the private keystore and produces both the universal APK and the Google Play Android App Bundle (`.aab`).
 
 For complete instructions on keystore generation, key rotation/recovery, Google Play App Signing, and the Play Console Data Safety questionnaire, consult [`docs/RELEASE_AND_PLAY_STORE_GUIDE.md`](../docs/RELEASE_AND_PLAY_STORE_GUIDE.md).
-UIDE.md).

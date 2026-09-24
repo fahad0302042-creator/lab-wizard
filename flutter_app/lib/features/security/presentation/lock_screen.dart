@@ -217,10 +217,10 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.lock_outline,
                     size: 40,
-                    color: LabColors.marginRed,
+                    color: context.marginRedColor,
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -258,8 +258,8 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                           : Text(
                               _error!,
                               key: const Key('lock-error'),
-                              style: const TextStyle(
-                                color: LabColors.marginRed,
+                              style: TextStyle(
+                                color: context.marginRedColor,
                                 fontWeight: FontWeight.w700,
                               ),
                               textAlign: TextAlign.center,

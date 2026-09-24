@@ -253,6 +253,7 @@ void main() {
         'margin red': LabColors.marginRedDark,
         'amber': LabColors.amberDark,
         'green': LabColors.greenDark,
+        'blue': LabColors.blueDark,
       };
       for (final entry in lightText.entries) {
         for (final background in [LabColors.paper, LabColors.card]) {

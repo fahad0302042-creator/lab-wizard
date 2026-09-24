@@ -149,7 +149,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
               .toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(54, 18, 20, 28),
+      padding: const EdgeInsets.fromLTRB(notebookGutter, 20, 18, 28),
       children: [
         const PageHeading('scan an item'),
         Text(
@@ -198,10 +198,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                               child: Container(
                                 height: 2,
                                 decoration: BoxDecoration(
-                                  color: LabColors.marginRed,
+                                  color: LabColors.marginRedDark,
                                   boxShadow: const [
                                     BoxShadow(
-                                      color: LabColors.marginRed,
+                                      color: LabColors.marginRedDark,
                                       blurRadius: 8,
                                     ),
                                   ],
@@ -221,8 +221,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                       IconButton.filled(
                         tooltip: 'Torch',
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.black45,
-                          foregroundColor: Colors.white,
+                          backgroundColor: context.cardColor,
+                          foregroundColor: context.inkColor,
+                          side: BorderSide(color: context.inkColor, width: 1.4),
                         ),
                         onPressed: _scanner.toggleTorch,
                         icon: const Icon(Icons.flashlight_on_outlined),
@@ -231,8 +232,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                       IconButton.filled(
                         tooltip: 'Switch camera',
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.black45,
-                          foregroundColor: Colors.white,
+                          backgroundColor: context.cardColor,
+                          foregroundColor: context.inkColor,
+                          side: BorderSide(color: context.inkColor, width: 1.4),
                         ),
                         onPressed: _scanner.switchCamera,
                         icon: const Icon(Icons.cameraswitch_outlined),
@@ -253,8 +255,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                         vertical: 9,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(12),
+                        color: context.cardColor,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: context.inkColor, width: 1.3),
                       ),
                       // Live region: TalkBack speaks each new status
                       // ("Found Acetone", "not in your lab notebook").
@@ -263,8 +266,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                         child: Text(
                           _message ?? _idleMessage,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: context.inkColor,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -374,8 +377,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                           Text(
                             item.name,
                             style: const TextStyle(
-                              fontFamily: 'ArchitectsDaughter',
-                              fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w700,
                             ),
                           ),
                           if (item.subtitle.isNotEmpty)

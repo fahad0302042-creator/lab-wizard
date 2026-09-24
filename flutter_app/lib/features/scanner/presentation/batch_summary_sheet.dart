@@ -75,7 +75,6 @@ class BatchSummary extends ConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontFamily: 'ArchitectsDaughter',
                             fontWeight: FontWeight.w700,
                           ),
                         ),

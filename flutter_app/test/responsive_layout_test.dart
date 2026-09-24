@@ -214,7 +214,7 @@ void main() {
         for (final label in ['chemicals', 'apparatus', 'need attention'])
           tester.getTopLeft(find.text(label).first).dy,
       ];
-      // Tiles are drawn with a slight alternating tilt, hence the tolerance.
+      // A few pixels of slack for text metrics; the four counts share one row.
       expect(
         tops.reduce((a, b) => a > b ? a : b) -
             tops.reduce((a, b) => a < b ? a : b),

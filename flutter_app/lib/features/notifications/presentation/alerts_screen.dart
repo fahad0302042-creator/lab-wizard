@@ -29,7 +29,7 @@ class AlertsScreen extends ConsumerWidget {
     return Scaffold(
       body: NotebookPage(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(54, 12, 20, 32),
+          padding: const EdgeInsets.fromLTRB(notebookGutter, 20, 18, 32),
           children: [
             Row(
               children: [
@@ -67,9 +67,9 @@ class AlertsScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.calendar_view_week_outlined,
-                        color: LabColors.marginRed,
+                        color: context.marginRedColor,
                       ),
                       const SizedBox(width: 8),
                       const Text(
@@ -123,7 +123,9 @@ class _AlertTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = alert.kind.urgent ? LabColors.marginRed : LabColors.amber;
+    final color = alert.kind.urgent
+        ? context.marginRedColor
+        : context.lowColor;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: NotebookCard(
@@ -216,7 +218,7 @@ class RemindersCard extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 18),
       child: NotebookCard(
         key: const Key('reminders-card'),
-        accent: urgent > 0 ? LabColors.marginRed : LabColors.amber,
+        accent: urgent > 0 ? context.marginRedColor : context.lowColor,
         onTap: () => Navigator.of(
           context,
         ).push(MaterialPageRoute<void>(builder: (_) => const AlertsScreen())),
@@ -224,7 +226,7 @@ class RemindersCard extends ConsumerWidget {
           children: [
             Icon(
               Icons.alarm_on_outlined,
-              color: urgent > 0 ? LabColors.marginRed : LabColors.amber,
+              color: urgent > 0 ? context.marginRedColor : context.lowColor,
               size: 30,
             ),
             const SizedBox(width: 12),

@@ -922,8 +922,7 @@ class _BatchConsumeFormState extends ConsumerState<_BatchConsumeForm> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontFamily: 'ArchitectsDaughter',
-                                  fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w700,
                                 ),
                               ),
                               Text(
@@ -1767,8 +1766,7 @@ class _QuantityPreview extends StatelessWidget {
           label,
           style: TextStyle(
             color: context.mutedInkColor,
-            fontFamily: 'Caveat',
-            fontSize: 15,
+            fontSize: 14,
           ),
         ),
         Text(
@@ -1818,7 +1816,6 @@ class _DuplicateWarning extends StatelessWidget {
                       ? 'already on the shelf?'
                       : '${matches.length} similar items on the shelf',
                   style: const TextStyle(
-                    fontFamily: 'ArchitectsDaughter',
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                   ),

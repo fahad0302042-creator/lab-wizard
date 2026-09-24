@@ -268,20 +268,12 @@ class NotebookBottomNavigation extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  static const _items = <({String label, IconData icon, IconData selected})>[
-    (label: 'home', icon: Icons.home_outlined, selected: Icons.home),
-    (label: 'chems', icon: Icons.science_outlined, selected: Icons.science),
-    (
-      label: 'scan',
-      icon: Icons.center_focus_weak,
-      selected: Icons.center_focus_strong,
-    ),
-    (
-      label: 'gear',
-      icon: Icons.precision_manufacturing_outlined,
-      selected: Icons.precision_manufacturing,
-    ),
-    (label: 'reports', icon: Icons.insights_outlined, selected: Icons.insights),
+  static const _items = <({String label, IconData icon})>[
+    (label: 'home', icon: Icons.home_outlined),
+    (label: 'chems', icon: Icons.science_outlined),
+    (label: 'scan', icon: Icons.center_focus_weak),
+    (label: 'gear', icon: Icons.precision_manufacturing_outlined),
+    (label: 'reports', icon: Icons.insights_outlined),
   ];
 
   @override
@@ -308,9 +300,6 @@ class NotebookBottomNavigation extends StatelessWidget {
                 final item = _items[index];
                 final selected = selectedIndex == index;
                 final scan = index == 2;
-                final color = selected
-                    ? context.marginRedColor
-                    : context.mutedInkColor;
                 return Expanded(
                   child: Semantics(
                     button: true,
@@ -323,73 +312,43 @@ class NotebookBottomNavigation extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (scan)
-                            Transform.translate(
-                              offset: const Offset(0, -4),
-                              child: AnimatedContainer(
-                                duration: context.motion(
-                                  const Duration(milliseconds: 180),
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: context.cardColor,
+                                border: Border.all(
+                                  color: context.inkColor,
+                                  width: 1.6,
                                 ),
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? context.marginRedColor
-                                      : context.cardColor,
-                                  border: Border.all(
-                                    color: selected
-                                        ? context.marginRedColor
-                                        : context.inkColor,
-                                    width: 2,
-                                  ),
-                                  shape: BoxShape.circle,
-                                  boxShadow: selected
-                                      ? const [
-                                          BoxShadow(
-                                            color: Color(0x33000000),
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Icon(
-                                  selected ? item.selected : item.icon,
-                                  color: selected
-                                      ? context.cardColor
-                                      : context.inkColor,
-                                  size: 23,
-                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                item.icon,
+                                color: context.inkColor,
+                                size: 22,
                               ),
                             )
                           else
-                            AnimatedRotation(
-                              turns: selected ? -.008 : 0,
-                              duration: context.motion(
-                                const Duration(milliseconds: 180),
-                              ),
-                              child: Icon(
-                                selected ? item.selected : item.icon,
-                                color: color,
-                                size: 25,
-                              ),
-                            ),
-                          if (!scan) const SizedBox(height: 1),
-                          Transform.translate(
-                            offset: Offset(0, scan ? -5 : 0),
-                            child: Text(
-                              item.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: color,
-                                fontFamily: 'Caveat',
-                                fontSize: 17,
-                                height: .95,
-                                fontWeight: FontWeight.w700,
-                                decoration: selected
-                                    ? TextDecoration.underline
-                                    : null,
-                                decorationThickness: 1.6,
-                              ),
+                            Icon(item.icon, color: context.inkColor, size: 24),
+                          const SizedBox(height: 1),
+                          Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: selected
+                                  ? context.inkColor
+                                  : context.mutedInkColor,
+                              fontFamily: 'Kalam',
+                              fontSize: 13,
+                              height: 1.1,
+                              fontWeight: FontWeight.w700,
+                              decoration: selected
+                                  ? TextDecoration.underline
+                                  : null,
+                              decorationColor: context.marginRedColor,
+                              decorationThickness: 1.6,
                             ),
                           ),
                         ],

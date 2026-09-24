@@ -25,6 +25,7 @@ abstract final class LabColors {
   static const green = Color(0xFF3F6F3B);
   static const greenDark = Color(0xFF7BAE74);
   static const blue = Color(0xFF4A5C8A);
+  static const blueDark = Color(0xFF9AADD4);
   static const ruled = Color(0xFFD8D2C0);
   static const ruledDark = Color(0xFF3D362E);
   static const marginLine = Color(0xFFE6B8AE);
@@ -104,9 +105,9 @@ abstract final class AppTheme {
         filled: false,
         labelStyle: TextStyle(
           color: dark ? LabColors.mutedInkDark : LabColors.mutedInk,
-          fontFamily: 'Caveat',
+          fontFamily: 'Kalam',
           fontWeight: FontWeight.w700,
-          fontSize: 18,
+          fontSize: 15,
         ),
         hintStyle: TextStyle(
           color: (dark ? LabColors.mutedInkDark : LabColors.mutedInk)
@@ -144,8 +145,8 @@ abstract final class AppTheme {
           backgroundColor: ink,
           foregroundColor: card,
           textStyle: const TextStyle(
-            fontFamily: 'Caveat',
-            fontSize: 19,
+            fontFamily: 'Kalam',
+            fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
           shape: const StadiumBorder(),
@@ -156,8 +157,8 @@ abstract final class AppTheme {
           foregroundColor: ink,
           side: BorderSide(color: ink, width: 1.8),
           textStyle: const TextStyle(
-            fontFamily: 'Caveat',
-            fontSize: 18,
+            fontFamily: 'Kalam',
+            fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
           shape: const StadiumBorder(),
@@ -167,8 +168,8 @@ abstract final class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: red,
           textStyle: const TextStyle(
-            fontFamily: 'Caveat',
-            fontSize: 18,
+            fontFamily: 'Kalam',
+            fontSize: 16,
             fontWeight: FontWeight.w700,
             decoration: TextDecoration.underline,
           ),
@@ -180,8 +181,8 @@ abstract final class AppTheme {
         side: BorderSide.none,
         labelStyle: TextStyle(
           color: dark ? LabColors.mutedInkDark : LabColors.mutedInk,
-          fontFamily: 'Caveat',
-          fontSize: 18,
+          fontFamily: 'Kalam',
+          fontSize: 15,
           fontWeight: FontWeight.w700,
         ),
         padding: EdgeInsets.zero,
@@ -254,6 +255,7 @@ extension LabThemeX on BuildContext {
       isDark ? LabColors.marginRedDark : LabColors.marginRed;
   Color get healthyColor => isDark ? LabColors.greenDark : LabColors.green;
   Color get lowColor => isDark ? LabColors.amberDark : LabColors.amber;
+  Color get blueColor => isDark ? LabColors.blueDark : LabColors.blue;
 }
 
 /// WCAG 2 contrast ratio between two opaque colours (1 to 21). Used by the

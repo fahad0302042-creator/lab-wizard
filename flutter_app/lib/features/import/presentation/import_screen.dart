@@ -718,8 +718,7 @@ class _RowTile extends StatelessWidget {
           ? Text(
               'skip',
               style: TextStyle(
-                fontFamily: 'Caveat',
-                fontSize: 17,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: context.mutedInkColor,
               ),

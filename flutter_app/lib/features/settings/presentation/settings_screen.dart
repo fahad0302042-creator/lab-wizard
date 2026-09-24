@@ -35,7 +35,7 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       body: NotebookPage(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(54, 12, 20, 32),
+          padding: const EdgeInsets.fromLTRB(notebookGutter, 20, 18, 32),
           children: [
             Row(
               children: [
@@ -328,13 +328,28 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 13),
             const DiagnosticsCard(),
             const SizedBox(height: 13),
-            NotebookCard(
-              child: Column(
+            // Pulls left onto the page's red margin line. Other cards stay
+            // in the writing column.
+            Container(
+              margin: const EdgeInsets.only(left: -(notebookGutter - 10)),
+              child: NotebookCard(
+              accent: context.marginRedColor,
+              padding: EdgeInsets.zero,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: context.marginRedColor, width: 6),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 16, 16),
+                  child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _CardTitle(
+                  _CardTitle(
                     icon: Icons.warning_amber_outlined,
                     title: 'danger zone',
+                    color: context.marginRedColor,
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -360,6 +375,9 @@ class SettingsScreen extends ConsumerWidget {
                     label: const Text('Delete account…'),
                   ),
                 ],
+                  ),
+                ),
+              ),
               ),
             ),
             const SizedBox(height: 20),
@@ -465,16 +483,17 @@ class SettingsScreen extends ConsumerWidget {
 }
 
 class _CardTitle extends StatelessWidget {
-  const _CardTitle({required this.icon, required this.title});
+  const _CardTitle({required this.icon, required this.title, this.color});
 
   final IconData icon;
   final String title;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: LabColors.marginRed),
+        Icon(icon, color: color ?? context.marginRedColor),
         const SizedBox(width: 8),
         Text(
           title,

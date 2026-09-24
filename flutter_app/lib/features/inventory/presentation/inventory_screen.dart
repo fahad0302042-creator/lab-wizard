@@ -96,15 +96,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   static const _detailedGap = 8.0;
   static const _minimumItemsForIndex = 8;
 
-  static const _tapes = [
-    NotebookTape.yellow,
-    NotebookTape.blue,
-    NotebookTape.green,
-    NotebookTape.pink,
-    NotebookTape.none,
-    NotebookTape.none,
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -222,7 +213,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             ? const SizedBox(width: double.infinity)
                             : Padding(
                                 padding: const EdgeInsets.fromLTRB(
-                                  54,
+                                  notebookGutter,
                                   18,
                                   20,
                                   0,
@@ -235,7 +226,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(54, 6, 20, 6),
+                        padding: const EdgeInsets.fromLTRB(notebookGutter, 16, 18, 6),
                         child: _ShelfControls(
                           kind: widget.kind,
                           searchController: _searchController,
@@ -328,7 +319,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             else ...[
                               SliverPadding(
                                 padding: EdgeInsets.fromLTRB(
-                                  54,
+                                  notebookGutter,
                                   compact ? 2 : 12,
                                   showIndex ? 34 : 20,
                                   22,
@@ -367,7 +358,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               SliverToBoxAdapter(
                                 child: Padding(
                                   padding: const EdgeInsets.fromLTRB(
-                                    54,
+                                    notebookGutter,
                                     4,
                                     20,
                                     108,
@@ -512,7 +503,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         child: _InventoryCard(
           item: item,
           index: index,
-          tape: _tapes[index % _tapes.length],
+          tape: index == 0 ? NotebookTape.yellow : NotebookTape.none,
           kind: widget.kind,
           selecting: _selectionMode,
           selected: _selected.contains(item.id),
@@ -790,7 +781,6 @@ class _ShelfControls extends StatelessWidget {
                 child: Text(
                   '$selectedCount selected',
                   style: const TextStyle(
-                    fontFamily: 'ArchitectsDaughter',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -859,10 +849,7 @@ class _ShelfControls extends StatelessWidget {
                                       Text(
                                         filter.name,
                                         style: TextStyle(
-                                          color: context.marginRedColor,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                          color: con               ),
                                       ),
                                       const SizedBox(width: 2),
                                       Icon(
@@ -1027,8 +1014,7 @@ class _ShelfControls extends StatelessWidget {
                                   'sort: ${sort.name}',
                                   style: TextStyle(
                                     color: context.mutedInkColor,
-                                    fontFamily: 'Caveat',
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     height: 1,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -1471,6 +1457,35 @@ class _MetadataMarks extends StatelessWidget {
   }
 }
 
+class _ShelfTick extends StatelessWidget {
+  const _ShelfTick({required this.status});
+
+  final StockState status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      StockState.healthy => context.healthyColor,
+      StockState.low => context.lowColor,
+      StockState.empty => context.marginRedColor,
+    };
+    return Semantics(
+      excludeSemantics: true,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: status == StockState.healthy
+              ? color.withValues(alpha: .35)
+              : color,
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 1.4),
+        ),
+      ),
+    );
+  }
+}
+
 class _InventoryCard extends StatelessWidget {
   const _InventoryCard({
     required this.item,
@@ -1498,7 +1513,6 @@ class _InventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final flagged = item.status != StockState.healthy;
     return _RowSemantics(
       item: item,
       kind: kind,
@@ -1511,15 +1525,6 @@ class _InventoryCard extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          if (flagged)
-            Positioned(
-              left: -43,
-              top: 10,
-              width: 38,
-              child: MarginNote(
-                item.status == StockState.empty ? 'empty!' : 'order!',
-              ),
-            ),
           Dismissible(
             key: ValueKey('${kind.name}-${item.id}'),
             direction: selecting
@@ -1557,9 +1562,8 @@ class _InventoryCard extends StatelessWidget {
                 onLongPress: onLongPress,
                 tape: tape,
                 accent: selected ? context.inkColor : null,
-                paperclip: item.status == StockState.empty,
-                alternate: index.isOdd,
-                rotation: index.isEven ? -.008 : .009,
+                paperclip: index == 0 && item.status == StockState.empty,
+                rotation: index == 0 ? -.006 : 0,
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
                 child: Column(
                   children: [
@@ -1573,6 +1577,11 @@ class _InventoryCard extends StatelessWidget {
                               selected: selected,
                               key: Key('select-mark-${item.id}'),
                             ),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8, top: 5),
+                            child: _ShelfTick(status: item.status),
                           ),
                         Expanded(
                           child: Column(
@@ -1583,9 +1592,8 @@ class _InventoryCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontFamily: 'ArchitectsDaughter',
-                                  fontSize: 18,
-                                  height: 1.1,
+                                  fontSize: 17,
+                                  height: 1.15,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -1607,8 +1615,8 @@ class _InventoryCard extends StatelessWidget {
                         // Large numbers with large text shrink to fit rather
                         // than push past the card edge (A11Y-02). Bounded,
                         // not Flexible: the name column keeps the rest.
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 132),
+                        SizedBox(
+                          width: 88,
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.topRight,
@@ -1655,8 +1663,7 @@ class _InventoryCard extends StatelessWidget {
                                   : item.status == StockState.low
                                   ? context.lowColor
                                   : context.marginRedColor,
-                              fontFamily: 'Caveat',
-                              fontSize: 16,
+                              fontSize: 15,
                               height: 1,
                               fontWeight: FontWeight.w700,
                               backgroundColor: item.status == StockState.empty
@@ -1804,7 +1811,6 @@ class _CompactRow extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: 'ArchitectsDaughter',
                               fontSize: 16,
                               height: 1.15,
                               fontWeight: FontWeight.w700,
@@ -1825,9 +1831,10 @@ class _CompactRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Shrinks with large text instead of overflowing (A11Y-02).
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 96),
+                    // Fixed width so quantities share one column; large text
+                    // scales down instead of overflowing (A11Y-02).
+                    SizedBox(
+                      width: 88,
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
@@ -1849,8 +1856,7 @@ class _CompactRow extends StatelessWidget {
                                 color: item.status == StockState.healthy
                                     ? context.mutedInkColor
                                     : statusColor,
-                                fontFamily: 'Caveat',
-                                fontSize: 14,
+                                fontSize: 13,
                                 height: 1,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2044,8 +2050,7 @@ class _SelectionButton extends StatelessWidget {
               label,
               maxLines: 1,
               style: const TextStyle(
-                fontFamily: 'Caveat',
-                fontSize: 16,
+                fontSize: 15,
                 height: 1,
                 fontWeight: FontWeight.w700,
               ),
@@ -2081,8 +2086,7 @@ class _CardAction extends StatelessWidget {
             label,
             style: TextStyle(
               color: color,
-              fontFamily: 'Caveat',
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
               decoration: TextDecoration.underline,
             ),
@@ -2179,8 +2183,7 @@ class _AddDoodle extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: context.mutedInkColor,
-                  fontFamily: 'Caveat',
-                  fontSize: 17,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
               ),

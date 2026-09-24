@@ -109,7 +109,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final usageRows = _usageRows(state, logs, _kind);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(54, 18, 20, 32),
+      padding: const EdgeInsets.fromLTRB(notebookGutter, 20, 18, 32),
       children: [
         const PageHeading('report'),
         const SizedBox(height: 2),
@@ -156,8 +156,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                             _range.label,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontFamily: 'Caveat',
-                              fontSize: 23,
+                              fontSize: 18,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -297,8 +296,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         ? '—'
                         : '${(healthRatio * 100).round()}%',
                     style: const TextStyle(
-                      fontFamily: 'Caveat',
-                      fontSize: 31,
+                      fontSize: 28,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -334,7 +332,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         const SizedBox(height: 24),
         const PageHeading('consumption report'),
         NotebookCard(
-          tape: NotebookTape.yellow,
           child: usageRows.isEmpty
               ? Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -345,81 +342,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     ),
                   ),
                 )
-              : Column(
-                  children: [
-                    for (final row in usageRows) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    row.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  if (row.formulaOrCategory.isNotEmpty)
-                                    Text(
-                                      row.formulaOrCategory,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: context.mutedInkColor,
-                                      ),
-                                    ),
-                                  if (row.added > 0) ...[
-                                    Text(
-                                      '${formatQuantity(row.startStock)} ${row.unit} start',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: context.mutedInkColor,
-                                      ),
-                                    ),
-                                    Text(
-                                      '+${formatQuantity(row.added)} ${row.unit} increase',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: LabColors.green,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                if (row.used > 0)
-                                  Text(
-                                    '-${formatQuantity(row.used)} ${row.unit}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: LabColors.amber,
-                                    ),
-                                  ),
-                                Text(
-                                  '${formatQuantity(row.left)} ${row.unit} left',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: context.mutedInkColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (row != usageRows.last) const Divider(height: 1),
-                    ],
-                  ],
-                ),
+              : _ConsumptionTable(rows: usageRows),
         ),
         if (topUsage.isNotEmpty) ...[
           const SizedBox(height: 24),
@@ -706,8 +629,7 @@ class _TopUsageRow extends StatelessWidget {
               '$rank.',
               style: TextStyle(
                 color: context.marginRedColor,
-                fontFamily: 'Caveat',
-                fontSize: 19,
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -930,6 +852,117 @@ class _RunOutSectionState extends State<_RunOutSection> {
             'restocks raise the stock and move the date out.',
             style: TextStyle(color: muted, fontSize: 11),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConsumptionTable extends StatelessWidget {
+  const _ConsumptionTable({required this.rows});
+
+  final List<ReportPdfUsageRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final showIncrease = rows.any((row) => row.added > 0);
+    return Column(
+      children: [
+        _tableRow(
+          context,
+          name: 'Name',
+          increase: showIncrease ? 'Increase' : null,
+          used: 'Used',
+          left: 'Left',
+          header: true,
+        ),
+        for (final row in rows)
+          _tableRow(
+            context,
+            name: row.name,
+            detail: row.formulaOrCategory,
+            increase: showIncrease
+                ? (row.added > 0 ? '+${formatQuantity(row.added)}' : '0')
+                : null,
+            used: '-${formatQuantity(row.used)}',
+            left: '${formatQuantity(row.left)} ${row.unit}',
+            increaseColor: row.added > 0 ? context.healthyColor : null,
+          ),
+        if (showIncrease)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Start + increase − used = left.',
+              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _tableRow(
+    BuildContext context, {
+    required String name,
+    required String used,
+    required String left,
+    String? increase,
+    String detail = '',
+    bool header = false,
+    Color? increaseColor,
+  }) {
+    final style = TextStyle(
+      fontSize: header ? 13 : 14,
+      height: 1.2,
+      fontWeight: FontWeight.w700,
+      color: header ? context.mutedInkColor : context.inkColor,
+    );
+    Widget number(String text, {Color? color}) => Expanded(
+      flex: 2,
+      child: Text(
+        text,
+        textAlign: TextAlign.right,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style.copyWith(color: color ?? style.color),
+      ),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: header ? context.inkColor : context.ruledColor,
+            width: header ? 1.4 : 1,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+                if (!header && detail.isNotEmpty)
+                  Text(
+                    detail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: context.mutedInkColor, fontSize: 11),
+                  ),
+              ],
+            ),
+          ),
+          if (increase != null) number(increase, color: increaseColor),
+          number(used, color: header ? null : context.lowColor),
+          number(left),
         ],
       ),
     );
