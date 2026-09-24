@@ -853,7 +853,11 @@ class _ShelfControls extends StatelessWidget {
                                     children: [
                                       Text(
                                         filter.name,
-                                        style: TextStyle(color: con),
+                                        style: TextStyle(
+                                          color: context.marginRedColor,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                       const SizedBox(width: 2),
                                       Icon(
