@@ -103,7 +103,11 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                Icon(Icons.arrow_forward, color: context.mutedInkColor, size: 18),
+                Icon(
+                  Icons.arrow_forward,
+                  color: context.mutedInkColor,
+                  size: 18,
+                ),
               ],
             ),
           ),
@@ -572,7 +576,7 @@ class _ResultList extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 17,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

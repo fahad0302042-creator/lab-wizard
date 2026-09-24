@@ -452,9 +452,7 @@ class _AmountRow extends StatelessWidget {
                   item.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 Text(
                   'now ${formatQuantity(item.quantity)} ${item.unit}',

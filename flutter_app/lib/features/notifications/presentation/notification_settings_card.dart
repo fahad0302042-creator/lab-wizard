@@ -105,10 +105,7 @@ class NotificationSettingsCard extends ConsumerWidget {
               child: Text(
                 status.lastError!,
                 key: const Key('notify-error'),
-                style: TextStyle(
-                  color: context.marginRedColor,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: context.marginRedColor, fontSize: 13),
               ),
             ),
           const Divider(height: 8),

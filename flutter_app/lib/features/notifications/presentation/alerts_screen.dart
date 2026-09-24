@@ -123,9 +123,7 @@ class _AlertTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = alert.kind.urgent
-        ? context.marginRedColor
-        : context.lowColor;
+    final color = alert.kind.urgent ? context.marginRedColor : context.lowColor;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: NotebookCard(

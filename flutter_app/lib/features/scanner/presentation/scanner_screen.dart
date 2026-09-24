@@ -376,9 +376,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                         children: [
                           Text(
                             item.name,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           if (item.subtitle.isNotEmpty)
                             Text(

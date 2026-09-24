@@ -955,7 +955,10 @@ class _ConsumptionTable extends StatelessWidget {
                     detail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: context.mutedInkColor, fontSize: 11),
+                    style: TextStyle(
+                      color: context.mutedInkColor,
+                      fontSize: 11,
+                    ),
                   ),
               ],
             ),

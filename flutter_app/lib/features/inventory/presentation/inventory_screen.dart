@@ -226,7 +226,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(notebookGutter, 16, 18, 6),
+                        padding: const EdgeInsets.fromLTRB(
+                          notebookGutter,
+                          16,
+                          18,
+                          6,
+                        ),
                         child: _ShelfControls(
                           kind: widget.kind,
                           searchController: _searchController,
@@ -848,8 +853,7 @@ class _ShelfControls extends StatelessWidget {
                                     children: [
                                       Text(
                                         filter.name,
-                                        style: TextStyle(
-                                          color: con               ),
+                                        style: TextStyle(color: con),
                                       ),
                                       const SizedBox(width: 2),
                                       Icon(

@@ -333,51 +333,53 @@ class SettingsScreen extends ConsumerWidget {
             Container(
               margin: const EdgeInsets.only(left: -(notebookGutter - 10)),
               child: NotebookCard(
-              accent: context.marginRedColor,
-              padding: EdgeInsets.zero,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border(
-                    left: BorderSide(color: context.marginRedColor, width: 6),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 16, 16),
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _CardTitle(
-                    icon: Icons.warning_amber_outlined,
-                    title: 'danger zone',
-                    color: context.marginRedColor,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Deleting the account removes all chemicals, apparatus and '
-                    'history from Lab Wizard for good. You can export '
-                    'everything first.',
-                    style: TextStyle(color: context.mutedInkColor),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    key: const Key('delete-account'),
-                    onPressed: () async {
-                      final deleted = await showDeleteAccountSheet(context);
-                      if (deleted == true && context.mounted) {
-                        Navigator.of(context)
-                            .popUntil((route) => route.isFirst);
-                      }
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: context.marginRedColor,
+                accent: context.marginRedColor,
+                padding: EdgeInsets.zero,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: context.marginRedColor, width: 6),
                     ),
-                    icon: const Icon(Icons.delete_forever_outlined),
-                    label: const Text('Delete account…'),
                   ),
-                ],
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _CardTitle(
+                          icon: Icons.warning_amber_outlined,
+                          title: 'danger zone',
+                          color: context.marginRedColor,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Deleting the account removes all chemicals, apparatus and '
+                          'history from Lab Wizard for good. You can export '
+                          'everything first.',
+                          style: TextStyle(color: context.mutedInkColor),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          key: const Key('delete-account'),
+                          onPressed: () async {
+                            final deleted = await showDeleteAccountSheet(
+                              context,
+                            );
+                            if (deleted == true && context.mounted) {
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: context.marginRedColor,
+                          ),
+                          icon: const Icon(Icons.delete_forever_outlined),
+                          label: const Text('Delete account…'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               ),
             ),
             const SizedBox(height: 20),

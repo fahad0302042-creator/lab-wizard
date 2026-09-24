@@ -74,9 +74,7 @@ class BatchSummary extends ConsumerWidget {
                           entry.match.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         if (entry.match.subtitle.isNotEmpty)
                           Text(

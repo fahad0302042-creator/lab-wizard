@@ -922,7 +922,7 @@ class _BatchConsumeFormState extends ConsumerState<_BatchConsumeForm> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               Text(
@@ -1764,10 +1764,7 @@ class _QuantityPreview extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: context.mutedInkColor,
-            fontSize: 14,
-          ),
+          style: TextStyle(color: context.mutedInkColor, fontSize: 14),
         ),
         Text(
           '${formatQuantity(value)} $unit',
