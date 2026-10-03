@@ -152,7 +152,7 @@ const _allOn = NotificationPreferences(enabled: true, weeklySummary: true);
 
 /// The alert list otherwise follows the runner's clock, so a loan that was
 /// still open on [_now] becomes overdue later and the expected counts drift.
-Override get _frozenAlerts => alertsProvider.overrideWith((ref) {
+final _frozenAlerts = alertsProvider.overrideWith((ref) {
   final inventory = ref.watch(inventoryProvider);
   final preferences = ref.watch(notificationPreferencesProvider);
   return buildAlerts(
