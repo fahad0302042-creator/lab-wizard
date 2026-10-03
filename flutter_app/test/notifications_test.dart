@@ -460,15 +460,15 @@ void main() {
     test('few new alerts are shown individually with item payloads', () async {
       SharedPreferences.setMockInitialValues({});
       final small = ProviderContainer(
-          overrides: [
-            inventoryProvider.overrideWith(
-              () => _FakeInventory(
-                InventoryState(chemicals: [_chem('acid', 'Acid', quantity: 1)]),
-              ),
+        overrides: [
+          inventoryProvider.overrideWith(
+            () => _FakeInventory(
+              InventoryState(chemicals: [_chem('acid', 'Acid', quantity: 1)]),
             ),
-            notificationGatewayProvider.overrideWithValue(gateway),
-            _frozenAlerts,
-          ],
+          ),
+          notificationGatewayProvider.overrideWithValue(gateway),
+          _frozenAlerts,
+        ],
       );
       addTearDown(small.dispose);
       final coordinator = small.read(notificationCoordinatorProvider.notifier);
