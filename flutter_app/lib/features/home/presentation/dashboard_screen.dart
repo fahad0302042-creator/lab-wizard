@@ -1070,39 +1070,39 @@ class _StockRow extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                line.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
               ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 132,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
+              const SizedBox(width: 12),
+              Expanded(
                 child: Text(
-                  trailing,
+                  line.name,
                   maxLines: 1,
-                  style: TextStyle(
-                    color: trailingColor,
-                    fontWeight: FontWeight.w600,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 132,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    trailing,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: trailingColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );

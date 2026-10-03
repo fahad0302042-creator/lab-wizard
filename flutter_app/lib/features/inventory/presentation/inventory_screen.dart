@@ -1001,59 +1001,59 @@ class _ShelfControls extends StatelessWidget {
                           onTap: () => onFilter(_StockFilter.expiring),
                           fontSize: 15,
                         ),
-                        Container(
-                          width: 1,
-                          height: 16,
-                          color: context.ruledColor,
-                        ),
-                        const SizedBox(width: 6),
-                        PopupMenuButton<_InventorySort>(
-                          tooltip: 'Sort shelf',
-                          initialValue: sort,
-                          onSelected: onSort,
-                          itemBuilder: (context) => [
-                            for (final value in _InventorySort.values)
-                              CheckedPopupMenuItem(
-                                value: value,
-                                checked: value == sort,
-                                child: Text('sort by ${value.name}'),
-                              ),
-                          ],
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 4,
+                      Container(
+                        width: 1,
+                        height: 16,
+                        color: context.ruledColor,
+                      ),
+                      const SizedBox(width: 6),
+                      PopupMenuButton<_InventorySort>(
+                        tooltip: 'Sort shelf',
+                        initialValue: sort,
+                        onSelected: onSort,
+                        itemBuilder: (context) => [
+                          for (final value in _InventorySort.values)
+                            CheckedPopupMenuItem(
+                              value: value,
+                              checked: value == sort,
+                              child: Text('sort by ${value.name}'),
                             ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.sort,
-                                    size: 16,
+                        ],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 4,
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.sort,
+                                  size: 16,
+                                  color: context.mutedInkColor,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'sort: ${sort.name}',
+                                  style: TextStyle(
                                     color: context.mutedInkColor,
+                                    fontSize: 14,
+                                    height: 1,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    'sort: ${sort.name}',
-                                    style: TextStyle(
-                                      color: context.mutedInkColor,
-                                      fontSize: 14,
-                                      height: 1,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.arrow_drop_down,
-                                    size: 16,
-                                    color: context.mutedInkColor,
-                                  ),
-                                ],
-                              ),
+                                ),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 16,
+                                  color: context.mutedInkColor,
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                      ),
                       Text(
                         '$shown of $total',
                         style: TextStyle(
