@@ -394,7 +394,9 @@ class _CardPressState extends State<_CardPress>
   }
 
   void _down(PointerDownEvent _) {
-    if (!widget.enabled || MediaQuery.disableAnimationsOf(context)) return;
+    // A fling can deliver the pointer after the card has scrolled away.
+    if (!mounted || !widget.enabled) return;
+    if (MediaQuery.disableAnimationsOf(context)) return;
     _press.animateTo(
       0.965,
       duration: const Duration(milliseconds: 90),
@@ -403,7 +405,7 @@ class _CardPressState extends State<_CardPress>
   }
 
   void _up(PointerEvent _) {
-    if (!widget.enabled) return;
+    if (!mounted || !widget.enabled) return;
     if (MediaQuery.disableAnimationsOf(context)) {
       _press.value = 1;
       return;
