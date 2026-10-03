@@ -19,7 +19,7 @@ Future<bool?> showDeleteAccountSheet(
   BuildContext context, {
   Future<void> Function(InventoryState state)? export,
 }) {
-  return showModalBottomSheet<bool>(
+  return showLabSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

@@ -38,7 +38,7 @@ Future<ScanMatch?> showLinkBarcodeSheet(
   required String code,
   String formatLabel = 'barcode',
 }) {
-  return showModalBottomSheet<ScanMatch>(
+  return showLabSheet<ScanMatch>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

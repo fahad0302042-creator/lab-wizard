@@ -146,7 +146,7 @@ enum PinSheetMode { set, change, disable }
 
 /// Opens the PIN form; resolves to true when the lock changed.
 Future<bool?> showPinSheet(BuildContext context, PinSheetMode mode) {
-  return showModalBottomSheet<bool>(
+  return showLabSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

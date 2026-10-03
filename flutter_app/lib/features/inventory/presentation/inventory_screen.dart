@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -501,11 +502,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   Widget _buildDetailedCard(List<_InventoryView> items, int index) {
     final item = items[index];
-    return KeyedSubtree(
-      key: _itemKey(item.id),
-      child: StaggerIn(
-        index: index,
-        child: _InventoryCard(
+    return _ShelfFlight(
+      key: ValueKey('flight-${widget.kind.name}-${item.id}'),
+      quantity: item.quantity,
+      progress: item.progress,
+      status: item.status,
+      child: KeyedSubtree(
+        key: _itemKey(item.id),
+        child: StaggerIn(
+          index: index,
+          onceKey: '${widget.kind.name}:${item.id}',
+          child: _InventoryCard(
           item: item,
           index: index,
           tape: index == 0 ? NotebookTape.yellow : NotebookTape.none,
@@ -520,15 +527,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           onConsume: () => _openAction(item.id, _primaryAction),
           onRestock: () => _openAction(item.id, InventoryAction.restock),
         ),
+        ),
       ),
     );
   }
 
   Widget _buildCompactRow(List<_InventoryView> items, int index) {
     final item = items[index];
-    return KeyedSubtree(
-      key: _itemKey(item.id),
-      child: _CompactRow(
+    return _ShelfFlight(
+      key: ValueKey('flight-${widget.kind.name}-${item.id}'),
+      quantity: item.quantity,
+      progress: item.progress,
+      status: item.status,
+      child: KeyedSubtree(
+        key: _itemKey(item.id),
+        child: StaggerIn(
+          index: index,
+          onceKey: '${widget.kind.name}:${item.id}',
+          child: _CompactRow(
         item: item,
         kind: widget.kind,
         selecting: _selectionMode,
@@ -540,6 +556,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             : _enterSelection(item.id),
         onConsume: () => _openAction(item.id, _primaryAction),
         onRestock: () => _openAction(item.id, InventoryAction.restock),
+          ),
+        ),
       ),
     );
   }
@@ -552,7 +570,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   void _openDetail(String id) =>
       showItemDetailSheet(context, ref, widget.kind, id);
 
-  void _openAction(String id, InventoryAction action) =>
+  Future<InventoryActionResult?> _openAction(String id, InventoryAction action) =>
       showInventoryActionSheet(
         context,
         ref,
@@ -1494,6 +1512,97 @@ class _ShelfTick extends StatelessWidget {
   }
 }
 
+/// Holds the visible quantity until a use or restock chip has landed, so
+/// the number ticks after the chip instead of behind the sheet.
+class _ShelfFlight extends StatefulWidget {
+  const _ShelfFlight({
+    required this.quantity,
+    required this.progress,
+    required this.status,
+    required this.child,
+    super.key,
+  });
+
+  final double quantity;
+  final double progress;
+  final StockState status;
+  final Widget child;
+
+  static _ShelfFlightState of(BuildContext context) {
+    final scope = context.getInheritedWidgetOfExactType<_ShelfFlightScope>();
+    assert(scope != null, 'Shelf actions need a _ShelfFlight ancestor');
+    return scope!.state;
+  }
+
+  @override
+  State<_ShelfFlight> createState() => _ShelfFlightState();
+}
+
+class _ShelfFlightState extends State<_ShelfFlight> {
+  final GlobalKey quantityKey = GlobalKey();
+  double? _pinnedQuantity;
+  double? _pinnedProgress;
+  StockState? _pinnedStatus;
+  int _busy = 0;
+
+  double get shown => _pinnedQuantity ?? widget.quantity;
+  double get progress => _pinnedProgress ?? widget.progress;
+  StockState get status => _pinnedStatus ?? widget.status;
+
+  Future<void> play(
+    BuildContext origin,
+    Future<InventoryActionResult?> Function() action,
+  ) async {
+    setState(() {
+      _busy++;
+      _pinnedQuantity ??= widget.quantity;
+      _pinnedProgress ??= widget.progress;
+      _pinnedStatus ??= widget.status;
+    });
+    InventoryActionResult? result;
+    try {
+      result = await action();
+    } finally {
+      if (mounted && result != null && origin.mounted) {
+        final added = result.action == InventoryAction.restock;
+        try {
+          await flyActionChip(
+            context: origin,
+            label: '${added ? '+' : '-'}${formatQuantity(result.amount)}',
+            destination: quantityKey,
+          );
+        } catch (_) {
+          // The number still has to land if the overlay cannot take the chip.
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _busy--;
+        if (_busy <= 0) {
+          _busy = 0;
+          _pinnedQuantity = null;
+          _pinnedProgress = null;
+          _pinnedStatus = null;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ShelfFlightScope(state: this, child: widget.child);
+  }
+}
+
+class _ShelfFlightScope extends InheritedWidget {
+  const _ShelfFlightScope({required this.state, required super.child});
+
+  final _ShelfFlightState state;
+
+  @override
+  bool updateShouldNotify(_ShelfFlightScope oldWidget) => true;
+}
+
 class _InventoryCard extends StatelessWidget {
   const _InventoryCard({
     required this.item,
@@ -1513,20 +1622,21 @@ class _InventoryCard extends StatelessWidget {
   final NotebookTape tape;
   final ItemKind kind;
   final VoidCallback onTap;
-  final VoidCallback onConsume;
-  final VoidCallback onRestock;
+  final Future<InventoryActionResult?> Function() onConsume;
+  final Future<InventoryActionResult?> Function() onRestock;
   final bool selecting;
   final bool selected;
   final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
+    final flight = _ShelfFlight.of(context);
     return _RowSemantics(
       item: item,
       kind: kind,
       onTap: onTap,
-      onConsume: onConsume,
-      onRestock: onRestock,
+      onConsume: () => unawaited(flight.play(context, onConsume)),
+      onRestock: () => unawaited(flight.play(context, onRestock)),
       onLongPress: onLongPress,
       selecting: selecting,
       selected: selected,
@@ -1541,9 +1651,9 @@ class _InventoryCard extends StatelessWidget {
             confirmDismiss: (direction) async {
               HapticFeedback.mediumImpact();
               if (direction == DismissDirection.startToEnd) {
-                onRestock();
+                unawaited(flight.play(context, onRestock));
               } else {
-                onConsume();
+                unawaited(flight.play(context, onConsume));
               }
               return false;
             },
@@ -1589,7 +1699,7 @@ class _InventoryCard extends StatelessWidget {
                         else
                           Padding(
                             padding: const EdgeInsets.only(right: 8, top: 5),
-                            child: _ShelfTick(status: item.status),
+                            child: _ShelfTick(status: flight.status),
                           ),
                         Expanded(
                           child: Column(
@@ -1624,6 +1734,7 @@ class _InventoryCard extends StatelessWidget {
                         // than push past the card edge (A11Y-02). Bounded,
                         // not Flexible: the name column keeps the rest.
                         SizedBox(
+                          key: flight.quantityKey,
                           width: 88,
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
@@ -1632,7 +1743,7 @@ class _InventoryCard extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 AnimatedQuantity(
-                                  item.quantity,
+                                  flight.shown,
                                   suffix: ' ${item.unit}',
                                   style: const TextStyle(
                                     fontSize: 18,
@@ -1656,25 +1767,25 @@ class _InventoryCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    StockBar(progress: item.progress, status: item.status),
+                    StockBar(progress: flight.progress, status: flight.status),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         Expanded(
                           child: Text(
-                            stockCaption(item.status),
+                            stockCaption(flight.status),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: item.status == StockState.healthy
+                              color: flight.status == StockState.healthy
                                   ? context.inkColor
-                                  : item.status == StockState.low
+                                  : flight.status == StockState.low
                                   ? context.lowColor
                                   : context.marginRedColor,
                               fontSize: 15,
                               height: 1,
                               fontWeight: FontWeight.w700,
-                              backgroundColor: item.status == StockState.empty
+                              backgroundColor: flight.status == StockState.empty
                                   ? LabColors.highlighter.withValues(alpha: .72)
                                   : null,
                             ),
@@ -1684,13 +1795,17 @@ class _InventoryCard extends StatelessWidget {
                         _CardAction(
                           label: kind == ItemKind.chemical ? 'use' : 'damage',
                           color: context.marginRedColor,
-                          onTap: selecting ? onTap : onConsume,
+                          onTap: selecting
+                              ? onTap
+                              : () => unawaited(flight.play(context, onConsume)),
                         ),
                         const SizedBox(width: 8),
                         _CardAction(
                           label: '+ stock',
                           color: context.healthyColor,
-                          onTap: selecting ? onTap : onRestock,
+                          onTap: selecting
+                              ? onTap
+                              : () => unawaited(flight.play(context, onRestock)),
                         ),
                       ],
                     ),
@@ -1723,21 +1838,22 @@ class _CompactRow extends StatelessWidget {
   final _InventoryView item;
   final ItemKind kind;
   final VoidCallback onTap;
-  final VoidCallback onConsume;
-  final VoidCallback onRestock;
+  final Future<InventoryActionResult?> Function() onConsume;
+  final Future<InventoryActionResult?> Function() onRestock;
   final bool selecting;
   final bool selected;
   final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
+    final flight = _ShelfFlight.of(context);
     final chemical = kind == ItemKind.chemical;
-    final statusColor = switch (item.status) {
+    final statusColor = switch (flight.status) {
       StockState.healthy => context.healthyColor,
       StockState.low => context.lowColor,
       StockState.empty => context.marginRedColor,
     };
-    final statusText = switch (item.status) {
+    final statusText = switch (flight.status) {
       StockState.healthy => 'in stock',
       StockState.low => 'low',
       StockState.empty => 'empty',
@@ -1746,8 +1862,8 @@ class _CompactRow extends StatelessWidget {
       item: item,
       kind: kind,
       onTap: onTap,
-      onConsume: onConsume,
-      onRestock: onRestock,
+      onConsume: () => unawaited(flight.play(context, onConsume)),
+      onRestock: () => unawaited(flight.play(context, onRestock)),
       onLongPress: onLongPress,
       selecting: selecting,
       selected: selected,
@@ -1759,9 +1875,9 @@ class _CompactRow extends StatelessWidget {
         confirmDismiss: (direction) async {
           HapticFeedback.mediumImpact();
           if (direction == DismissDirection.startToEnd) {
-            onRestock();
+            unawaited(flight.play(context, onRestock));
           } else {
-            onConsume();
+            unawaited(flight.play(context, onConsume));
           }
           return false;
         },
@@ -1802,7 +1918,7 @@ class _CompactRow extends StatelessWidget {
                         width: 11,
                         height: 11,
                         decoration: BoxDecoration(
-                          color: item.status == StockState.healthy
+                          color: flight.status == StockState.healthy
                               ? statusColor.withValues(alpha: .35)
                               : statusColor,
                           shape: BoxShape.circle,
@@ -1842,6 +1958,7 @@ class _CompactRow extends StatelessWidget {
                     // Fixed width so quantities share one column; large text
                     // scales down instead of overflowing (A11Y-02).
                     SizedBox(
+                      key: flight.quantityKey,
                       width: 88,
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
@@ -1850,7 +1967,7 @@ class _CompactRow extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             AnimatedQuantity(
-                              item.quantity,
+                              flight.shown,
                               suffix: ' ${item.unit}',
                               style: const TextStyle(
                                 fontSize: 15,
@@ -1861,7 +1978,7 @@ class _CompactRow extends StatelessWidget {
                             Text(
                               statusText,
                               style: TextStyle(
-                                color: item.status == StockState.healthy
+                                color: flight.status == StockState.healthy
                                     ? context.mutedInkColor
                                     : statusColor,
                                 fontSize: 13,
@@ -1880,7 +1997,8 @@ class _CompactRow extends StatelessWidget {
                     if (!selecting && constraints.maxWidth >= 300) ...[
                       IconButton(
                         tooltip: chemical ? 'Use' : 'Report damage',
-                        onPressed: onConsume,
+                        onPressed: () =>
+                            unawaited(flight.play(context, onConsume)),
                         iconSize: 21,
                         color: context.marginRedColor,
                         icon: Icon(
@@ -1891,7 +2009,8 @@ class _CompactRow extends StatelessWidget {
                       ),
                       IconButton(
                         tooltip: 'Restock',
-                        onPressed: onRestock,
+                        onPressed: () =>
+                            unawaited(flight.play(context, onRestock)),
                         iconSize: 21,
                         color: context.healthyColor,
                         icon: const Icon(Icons.add_circle_outline),

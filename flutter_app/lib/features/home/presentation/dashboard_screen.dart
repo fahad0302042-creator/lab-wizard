@@ -49,6 +49,7 @@ class DashboardScreen extends ConsumerWidget {
         children: [
           StaggerIn(
             index: 0,
+            onceKey: 'home-greeting',
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -173,6 +174,7 @@ class DashboardScreen extends ConsumerWidget {
           if (inventory.attentionCount > 0) ...[
             StaggerIn(
               index: 1,
+              onceKey: 'home-attention',
               child: NotebookCard(
                 accent: context.marginRedColor,
                 onTap: () => _showAttentionSheet(context, ref),
@@ -272,6 +274,7 @@ class DashboardScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: StaggerIn(
                   index: entry.key,
+                  onceKey: 'home-log-${log.id}',
                   child: _ActivityRow(log: log, inventory: inventory),
                 ),
               );
@@ -283,7 +286,7 @@ class DashboardScreen extends ConsumerWidget {
 
   void _showGlobalSearch(BuildContext context, WidgetRef ref) {
     final inventory = ref.read(visibleInventoryProvider);
-    showModalBottomSheet<void>(
+    showLabSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -347,7 +350,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ),
     ]..sort((a, b) => a.quantity.compareTo(b.quantity));
-    showModalBottomSheet<void>(
+    showLabSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -630,6 +633,7 @@ class _MetricCard extends StatelessWidget {
     return MergeSemantics(
       child: StaggerIn(
         index: index,
+        onceKey: 'home-metric-$index',
         child: NotebookCard(
           onTap: onTap,
           accent: color,

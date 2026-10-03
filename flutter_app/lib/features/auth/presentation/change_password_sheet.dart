@@ -9,7 +9,7 @@ import '../../inventory/presentation/inventory_sheets.dart';
 /// Change-password form (ACCOUNT-02). Resolves to true when the password
 /// was changed.
 Future<bool?> showChangePasswordSheet(BuildContext context) {
-  return showModalBottomSheet<bool>(
+  return showLabSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

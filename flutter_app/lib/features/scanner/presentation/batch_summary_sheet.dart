@@ -13,7 +13,7 @@ Future<bool> showBatchSummarySheet(
   BuildContext context,
   ScanBatch batch,
 ) async {
-  final result = await showModalBottomSheet<bool>(
+  final result = await showLabSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

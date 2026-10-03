@@ -29,7 +29,7 @@ Future<void> showAddItemSheet(
   WidgetRef _,
   ItemKind kind,
 ) {
-  return showModalBottomSheet<void>(
+  return showLabSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -43,7 +43,7 @@ Future<void> showEditItemSheet(
   required ItemKind kind,
   required String itemId,
 }) {
-  return showModalBottomSheet<void>(
+  return showLabSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -53,14 +53,23 @@ Future<void> showEditItemSheet(
   );
 }
 
-Future<void> showInventoryActionSheet(
+/// Returned when a use, damage, or restock is actually recorded, so the
+/// shelf can fly a chip and then tick the quantity.
+class InventoryActionResult {
+  const InventoryActionResult({required this.action, required this.amount});
+
+  final InventoryAction action;
+  final double amount;
+}
+
+Future<InventoryActionResult?> showInventoryActionSheet(
   BuildContext context,
   WidgetRef _, {
   required ItemKind kind,
   required String itemId,
   required InventoryAction action,
 }) {
-  return showModalBottomSheet<void>(
+  return showLabSheet<InventoryActionResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -76,7 +85,7 @@ Future<void> showItemDetailSheet(
   ItemKind kind,
   String itemId,
 ) {
-  return showModalBottomSheet<void>(
+  return showLabSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -88,7 +97,7 @@ Future<void> showItemDetailSheet(
 }
 
 Future<void> showBatchConsumeSheet(BuildContext context, WidgetRef _) {
-  return showModalBottomSheet<void>(
+  return showLabSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -1274,7 +1283,10 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
       );
       final messenger = ScaffoldMessenger.of(context);
       final container = ProviderScope.containerOf(context, listen: false);
-      Navigator.pop(context);
+      Navigator.pop(
+        context,
+        InventoryActionResult(action: widget.action, amount: log.amount),
+      );
       messenger.showSnackBar(
         SnackBar(
           content: Text('${widget.action.name} recorded'),

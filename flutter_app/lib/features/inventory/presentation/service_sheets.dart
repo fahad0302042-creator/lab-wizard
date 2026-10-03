@@ -17,7 +17,7 @@ Future<void> showScheduleServiceSheet(
   BuildContext context,
   String apparatusId, {
   ServiceKind kind = ServiceKind.maintenance,
-}) => showModalBottomSheet<void>(
+}) => showLabSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -28,7 +28,7 @@ Future<void> showScheduleServiceSheet(
 
 /// Records a scheduled task as done.
 Future<void> showCompleteServiceSheet(BuildContext context, String serviceId) =>
-    showModalBottomSheet<void>(
+    showLabSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

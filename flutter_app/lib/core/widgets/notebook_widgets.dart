@@ -3,7 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../features/inventory/domain/models.dart';
+import '../motion/lab_motion.dart';
 import '../theme/app_theme.dart';
+
+export '../motion/lab_motion.dart'
+    show ScanBurst, flyActionChip, labSpring, showLabSheet;
 
 enum NotebookTape { none, yellow, blue, green, pink }
 
@@ -26,26 +30,28 @@ class NotebookPage extends StatelessWidget {
     // The shadow stays on a DecoratedBox; the paper colour is a Material so
     // list tiles and ink splashes on a page paint on the paper (Flutter
     // asserts when a coloured box sits between a tile and its Material).
-    final content = DecoratedBox(
-      decoration: const BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x35000000),
-            blurRadius: 22,
-            offset: Offset(0, 8),
+    final content = SheetStage(
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x35000000),
+              blurRadius: 22,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          color: context.paperColor,
+          child: CustomPaint(
+            painter: _PaperPainter(
+              ruled: context.ruledColor,
+              margin: context.marginLineColor,
+              desk: Theme.of(context).scaffoldBackgroundColor,
+              ink: context.inkColor,
+            ),
+            child: child,
           ),
-        ],
-      ),
-      child: Material(
-        color: context.paperColor,
-        child: CustomPaint(
-          painter: _PaperPainter(
-            ruled: context.ruledColor,
-            margin: context.marginLineColor,
-            desk: Theme.of(context).scaffoldBackgroundColor,
-            ink: context.inkColor,
-          ),
-          child: child,
         ),
       ),
     );
@@ -288,7 +294,9 @@ class NotebookCard extends StatelessWidget {
             bottomRight: Radius.elliptical(3, 9),
           );
 
-    final card = Stack(
+    final card = _CardPress(
+      enabled: onTap != null || onLongPress != null,
+      child: Stack(
       fit: StackFit.passthrough,
       clipBehavior: Clip.none,
       children: [
@@ -335,6 +343,7 @@ class NotebookCard extends StatelessWidget {
             ),
           ),
       ],
+      ),
     );
     return rotation == 0
         ? card
@@ -348,6 +357,75 @@ class NotebookCard extends StatelessWidget {
     NotebookTape.pink => LabColors.tapePink,
     NotebookTape.none => Colors.transparent,
   };
+}
+
+/// Presses the card in, then springs back. Still cards (no tap) are left
+/// alone so a sitting screen does not keep a ticker.
+class _CardPress extends StatefulWidget {
+  const _CardPress({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  State<_CardPress> createState() => _CardPressState();
+}
+
+class _CardPressState extends State<_CardPress>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _press;
+
+  @override
+  void initState() {
+    super.initState();
+    _press = AnimationController(
+      vsync: this,
+      lowerBound: 0.9,
+      upperBound: 1.08,
+      value: 1,
+      duration: const Duration(milliseconds: 280),
+    );
+  }
+
+  @override
+  void dispose() {
+    _press.dispose();
+    super.dispose();
+  }
+
+  void _down(PointerDownEvent _) {
+    if (!widget.enabled || MediaQuery.disableAnimationsOf(context)) return;
+    _press.animateTo(
+      0.965,
+      duration: const Duration(milliseconds: 90),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _up(PointerEvent _) {
+    if (!widget.enabled) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _press.value = 1;
+      return;
+    }
+    _press.animateTo(1, curve: labSpring);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+    return Listener(
+      onPointerDown: _down,
+      onPointerUp: _up,
+      onPointerCancel: _up,
+      child: AnimatedBuilder(
+        animation: _press,
+        builder: (context, child) =>
+            Transform.scale(scale: _press.value, child: child),
+        child: widget.child,
+      ),
+    );
+  }
 }
 
 class _WashiTape extends StatelessWidget {
@@ -402,32 +480,61 @@ class _PaperclipPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class StaggerIn extends StatelessWidget {
-  const StaggerIn({required this.index, required this.child, super.key});
+class StaggerIn extends StatefulWidget {
+  const StaggerIn({
+    required this.index,
+    required this.child,
+    this.onceKey,
+    super.key,
+  });
 
   final int index;
   final Widget child;
 
+  /// When set, the rise plays once per app launch. Scrolling a row off and
+  /// back does not play it again.
+  final Object? onceKey;
+
+  @override
+  State<StaggerIn> createState() => _StaggerInState();
+}
+
+class _StaggerInState extends State<StaggerIn> {
+  static final Set<Object> _played = <Object>{};
+  late final bool _skip;
+
+  @override
+  void initState() {
+    super.initState();
+    final key = widget.onceKey;
+    _skip = key != null && _played.contains(key);
+    if (key != null) _played.add(key);
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return child;
+    if (_skip || MediaQuery.disableAnimationsOf(context)) return widget.child;
+    final index = math.min(widget.index, 8);
     return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 240 + math.min(index, 7) * 38),
-      curve: Curves.easeOutCubic,
+      duration: Duration(milliseconds: 220 + index * 40),
+      curve: labSpring,
       tween: Tween(begin: 0, end: 1),
-      builder: (context, value, child) => Opacity(
-        opacity: value,
-        child: Transform.translate(
-          offset: Offset(0, 10 * (1 - value)),
-          child: child,
-        ),
-      ),
-      child: child,
+      builder: (context, value, child) {
+        final travel = value.clamp(0.0, 1.2);
+        return Opacity(
+          opacity: travel.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, 16 * (1 - travel)),
+            child: child,
+          ),
+        );
+      },
+      child: widget.child,
     );
   }
 }
 
-class AnimatedQuantity extends StatelessWidget {
+class AnimatedQuantity extends StatefulWidget {
   const AnimatedQuantity(this.value, {this.suffix = '', this.style, super.key});
 
   final double value;
@@ -435,26 +542,91 @@ class AnimatedQuantity extends StatelessWidget {
   final TextStyle? style;
 
   @override
+  State<AnimatedQuantity> createState() => _AnimatedQuantityState();
+}
+
+class _AnimatedQuantityState extends State<AnimatedQuantity>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _roll;
+  late double _from;
+  late double _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = widget.value;
+    _to = widget.value;
+    _roll = AnimationController(
+      vsync: this,
+      value: 1,
+      duration: const Duration(milliseconds: 380),
+    );
+  }
+
+  @override
+  void didUpdateWidget(AnimatedQuantity oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value == _to) return;
+    _from = _sample(_roll.value);
+    _to = widget.value;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _roll.value = 1;
+      return;
+    }
+    _roll.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _roll.dispose();
+    super.dispose();
+  }
+
+  double _sample(double t) {
+    final curved = labSpring.transform(t.clamp(0.0, 1.0));
+    return _from + (_to - _from) * curved;
+  }
+
+  String _label() {
+    if (_roll.value >= 1) return '${formatQuantity(_to)}${widget.suffix}';
+    var animated = _sample(_roll.value);
+    if (_to >= 0 && _from >= 0 && animated < 0) animated = 0;
+    final whole = _to == _to.roundToDouble();
+    if (!whole) return '${formatQuantity(animated)}${widget.suffix}';
+    final past = animated - _to;
+    final overshooting = _to >= _from ? past > 0.001 : past < -0.001;
+    if (overshooting && past.abs() < 1) {
+      final shown = _to.round() + (past > 0 ? 1 : -1);
+      if (shown < 0 && _to >= 0) return '0${widget.suffix}';
+      return '$shown${widget.suffix}';
+    }
+    return '${animated.round()}${widget.suffix}';
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Screen readers get the final value straight away instead of the
     // intermediate numbers of the count-up animation.
     return Semantics(
-      label: '${formatQuantity(value)}$suffix',
+      label: '${formatQuantity(widget.value)}${widget.suffix}',
       excludeSemantics: true,
-      child: TweenAnimationBuilder<double>(
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 480),
-        curve: Curves.easeOutCubic,
-        tween: Tween(end: value),
-        builder: (_, animated, _) =>
-            Text('${formatQuantity(animated)}$suffix', style: style),
+      child: AnimatedBuilder(
+        animation: _roll,
+        builder: (context, _) {
+          final pulse = _roll.value >= 1
+              ? 1.0
+              : 1 + 0.05 * math.sin(_roll.value * math.pi);
+          return Transform.scale(
+            scale: pulse,
+            child: Text(_label(), style: widget.style),
+          );
+        },
       ),
     );
   }
 }
 
-class StockBar extends StatelessWidget {
+class StockBar extends StatefulWidget {
   const StockBar({
     required this.progress,
     required this.status,
@@ -467,34 +639,81 @@ class StockBar extends StatelessWidget {
   final double height;
 
   @override
+  State<StockBar> createState() => _StockBarState();
+}
+
+class _StockBarState extends State<StockBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _tint;
+  Color? _from;
+
+  @override
+  void initState() {
+    super.initState();
+    _tint = AnimationController(
+      vsync: this,
+      value: 1,
+      duration: const Duration(milliseconds: 280),
+    );
+  }
+
+  @override
+  void didUpdateWidget(StockBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.status == widget.status) return;
+    _from = _statusColor(context, oldWidget.status);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _tint.value = 1;
+      return;
+    }
+    _tint.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _tint.dispose();
+    super.dispose();
+  }
+
+  Color _statusColor(BuildContext context, StockState status) =>
+      switch (status) {
+        StockState.healthy => context.healthyColor,
+        StockState.low => context.lowColor,
+        StockState.empty => context.marginRedColor,
+      };
+
+  @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
-      StockState.healthy => context.healthyColor,
-      StockState.low => context.lowColor,
-      StockState.empty => context.marginRedColor,
-    };
+    final target = widget.progress.clamp(0.0, 1.0);
+    final live = _statusColor(context, widget.status);
     return Semantics(
       label:
-          '${stockSpoken(status)}, '
-          '${(progress.clamp(0, 1) * 100).round()} percent of the '
+          '${stockSpoken(widget.status)}, '
+          '${(target * 100).round()} percent of the '
           'starting amount',
       child: TweenAnimationBuilder<double>(
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 650),
-        curve: Curves.easeOutCubic,
-        tween: Tween(end: progress.clamp(0, 1)),
-        builder: (_, value, _) => SizedBox(
-          height: height,
-          width: double.infinity,
-          child: CustomPaint(
-            painter: _HatchedBarPainter(
-              progress: value,
-              color: color,
-              ink: context.inkColor,
-              status: status,
-            ),
-          ),
+        duration: context.motion(const Duration(milliseconds: 420)),
+        curve: labSpring,
+        tween: Tween(end: target),
+        builder: (_, value, _) => AnimatedBuilder(
+          animation: _tint,
+          builder: (context, _) {
+            final color = _from == null || _tint.value >= 1
+                ? live
+                : Color.lerp(_from, live, _tint.value) ?? live;
+            return SizedBox(
+              height: widget.height,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _HatchedBarPainter(
+                  progress: value.clamp(0.0, 1.08),
+                  color: color,
+                  ink: context.inkColor,
+                  status: widget.status,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

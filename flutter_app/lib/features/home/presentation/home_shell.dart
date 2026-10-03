@@ -295,68 +295,97 @@ class NotebookBottomNavigation extends StatelessWidget {
           top: false,
           child: SizedBox(
             height: 70 + 17 * (labelScale - 1),
-            child: Row(
-              children: List.generate(_items.length, (index) {
-                final item = _items[index];
-                final selected = selectedIndex == index;
-                final scan = index == 2;
-                return Expanded(
-                  child: Semantics(
-                    button: true,
-                    selected: selected,
-                    label: item.label,
-                    child: InkResponse(
-                      onTap: () => onSelected(index),
-                      radius: 34,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (scan)
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: context.cardColor,
-                                border: Border.all(
-                                  color: context.inkColor,
-                                  width: 1.6,
-                                ),
-                                shape: BoxShape.circle,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final slot = constraints.maxWidth / _items.length;
+                final reduce = MediaQuery.disableAnimationsOf(context);
+                return ClipRect(
+                  child: Stack(
+                  children: [
+                    Row(
+                      children: List.generate(_items.length, (index) {
+                        final item = _items[index];
+                        final selected = selectedIndex == index;
+                        final scan = index == 2;
+                        return Expanded(
+                          child: Semantics(
+                            button: true,
+                            selected: selected,
+                            label: item.label,
+                            child: InkResponse(
+                              onTap: () => onSelected(index),
+                              radius: 34,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (scan)
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: context.cardColor,
+                                        border: Border.all(
+                                          color: context.inkColor,
+                                          width: 1.6,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        item.icon,
+                                        color: context.inkColor,
+                                        size: 22,
+                                      ),
+                                    )
+                                  else
+                                    Icon(
+                                      item.icon,
+                                      color: context.inkColor,
+                                      size: 24,
+                                    ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    item.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: selected
+                                          ? context.inkColor
+                                          : context.mutedInkColor,
+                                      fontFamily: 'Kalam',
+                                      fontSize: 13,
+                                      height: 1.1,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: Icon(
-                                item.icon,
-                                color: context.inkColor,
-                                size: 22,
-                              ),
-                            )
-                          else
-                            Icon(item.icon, color: context.inkColor, size: 24),
-                          const SizedBox(height: 1),
-                          Text(
-                            item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: selected
-                                  ? context.inkColor
-                                  : context.mutedInkColor,
-                              fontFamily: 'Kalam',
-                              fontSize: 13,
-                              height: 1.1,
-                              fontWeight: FontWeight.w700,
-                              decoration: selected
-                                  ? TextDecoration.underline
-                                  : null,
-                              decorationColor: context.marginRedColor,
-                              decorationThickness: 1.6,
                             ),
                           ),
-                        ],
+                        );
+                      }),
+                    ),
+                    AnimatedPositioned(
+                      duration: reduce
+                          ? Duration.zero
+                          : const Duration(milliseconds: 320),
+                      curve: labSpring,
+                      left: slot * selectedIndex + slot * 0.28,
+                      width: slot * 0.44,
+                      bottom: 6,
+                      height: 3,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: context.marginRedColor,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                       ),
                     ),
+                  ],
                   ),
                 );
-              }),
+              },
             ),
           ),
         ),

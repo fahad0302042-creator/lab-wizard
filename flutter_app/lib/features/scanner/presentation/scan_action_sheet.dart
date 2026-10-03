@@ -31,7 +31,7 @@ Future<ScanActionResult?> showScanActionSheet(
   required ItemKind kind,
   required String itemId,
 }) {
-  return showModalBottomSheet<ScanActionResult>(
+  return showLabSheet<ScanActionResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

@@ -16,7 +16,7 @@ Future<void> showBatchRestockSheet(
   BuildContext context, {
   required ItemKind kind,
   required Set<String> itemIds,
-}) => showModalBottomSheet<void>(
+}) => showLabSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -30,7 +30,7 @@ Future<void> showBatchThresholdSheet(
   BuildContext context, {
   required ItemKind kind,
   required Set<String> itemIds,
-}) => showModalBottomSheet<void>(
+}) => showLabSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -46,7 +46,7 @@ Future<void> showBatchFieldSheet(
   BuildContext context, {
   required ItemKind kind,
   required Set<String> itemIds,
-}) => showModalBottomSheet<void>(
+}) => showLabSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -61,7 +61,7 @@ Future<void> showBatchDeleteSheet(
   BuildContext context, {
   required ItemKind kind,
   required Set<String> itemIds,
-}) => showModalBottomSheet<void>(
+}) => showLabSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

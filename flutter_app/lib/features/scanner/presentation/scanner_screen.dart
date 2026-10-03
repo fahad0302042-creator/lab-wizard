@@ -40,6 +40,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   ScanBatch _batch = const ScanBatch();
   String? _lastRaw;
   DateTime? _lastRawAt;
+  int _burst = 0;
 
   @override
   void initState() {
@@ -242,12 +243,25 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                     ],
                   ),
                 ),
+                Positioned.fill(child: ScanBurst(token: _burst)),
                 Positioned(
                   left: 14,
                   right: 14,
                   bottom: 14,
                   child: AnimatedSwitcher(
-                    duration: context.motion(const Duration(milliseconds: 220)),
+                    duration: context.motion(const Duration(milliseconds: 320)),
+                    switchInCurve: labSpring,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, animation) {
+                      final travel = animation.value;
+                      return FractionalTranslation(
+                        translation: Offset(0, 0.55 * (1 - travel)),
+                        child: Opacity(
+                          opacity: travel.clamp(0.0, 1.0),
+                          child: child,
+                        ),
+                      );
+                    },
                     child: Container(
                       key: ValueKey(_message),
                       padding: const EdgeInsets.symmetric(
@@ -410,8 +424,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   void _flash(
     String text, {
     Duration duration = const Duration(milliseconds: 1600),
+    bool celebrate = false,
   }) {
-    setState(() => _message = text);
+    setState(() {
+      _message = text;
+      if (celebrate) _burst++;
+    });
     _messageTimer?.cancel();
     _messageTimer = Timer(duration, () {
       if (mounted) setState(() => _message = null);
@@ -469,7 +487,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       switch (outcome) {
         case ScanBatchOutcome.added:
           HapticFeedback.mediumImpact();
-          _flash('Added ${match!.name}');
+          _flash('Added ${match!.name}', celebrate: true);
         case ScanBatchOutcome.duplicate:
           HapticFeedback.lightImpact();
           final item = match!;
@@ -478,7 +496,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                 (entry) => entry.key == '${item.kind.name}:${item.id}',
               )
               .count;
-          _flash('${item.name} already in batch (×$count)');
+          _flash('${item.name} already in batch (×$count)', celebrate: true);
         case ScanBatchOutcome.unknown:
           HapticFeedback.heavyImpact();
           _flash('Not in your notebook · kept in the summary');
@@ -510,7 +528,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       unawaited(
         history.record(RecentScan.found(item, raw.trim(), DateTime.now())),
       );
+      setState(() => _burst++);
+      // Ring and check first, then the result card slides up, then the sheet.
+      if (!MediaQuery.disableAnimationsOf(context)) {
+        await Future<void>.delayed(const Duration(milliseconds: 240));
+      }
+      if (!mounted) return;
       setState(() => _message = 'Found ${item.name}');
+      if (!MediaQuery.disableAnimationsOf(context)) {
+        await Future<void>.delayed(const Duration(milliseconds: 180));
+      }
+      if (!mounted) return;
       // SCAN-03: quick amount + action first; the full sheet is one tap away.
       final result = await showScanActionSheet(
         context,

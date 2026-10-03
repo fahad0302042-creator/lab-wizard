@@ -12,7 +12,7 @@ import 'inventory_sheets.dart';
 
 /// Lends pieces of an apparatus to a person (GEAR-02).
 Future<void> showCheckoutSheet(BuildContext context, String apparatusId) =>
-    showModalBottomSheet<void>(
+    showLabSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -22,7 +22,7 @@ Future<void> showCheckoutSheet(BuildContext context, String apparatusId) =>
 
 /// Takes pieces back from an open loan.
 Future<void> showReturnSheet(BuildContext context, String checkoutId) =>
-    showModalBottomSheet<void>(
+    showLabSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/notebook_widgets.dart';
 import '../../inventory/presentation/inventory_sheets.dart';
 import 'organization_providers.dart';
 
 Future<void> showLabSwitcherSheet(BuildContext context) {
-  return showModalBottomSheet(
+  return showLabSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
