@@ -903,7 +903,10 @@ class _ConsumptionTable extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'We have + added = now we have. Now we have − used = left.',
-                    style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+                    style: TextStyle(
+                      color: context.mutedInkColor,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
