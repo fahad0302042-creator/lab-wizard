@@ -482,10 +482,7 @@ class _HatchedBarPainter extends CustomPainter {
       Offset.zero & size,
       Radius.circular(size.height / 2),
     );
-    canvas.drawRRect(
-      shape,
-      Paint()..color = ink.withValues(alpha: .1),
-    );
+    canvas.drawRRect(shape, Paint()..color = ink.withValues(alpha: .1));
     final fillWidth = math.max(0.0, size.width * progress.clamp(0.0, 1.08));
     if (fillWidth > 0) {
       canvas.save();

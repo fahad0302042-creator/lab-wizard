@@ -64,10 +64,8 @@ abstract final class AppTheme {
     );
     const radius = BorderRadius.all(Radius.circular(12));
 
-    final baseText = ThemeData(brightness: brightness).textTheme.apply(
-      bodyColor: ink,
-      displayColor: ink,
-    );
+    final baseText = ThemeData(brightness: brightness).textTheme
+        .apply(bodyColor: ink, displayColor: ink);
 
     return ThemeData(
       useMaterial3: true,

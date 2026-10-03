@@ -36,10 +36,7 @@ class OrganizationCard extends ConsumerWidget {
               const Expanded(
                 child: Text(
                   'organization & labs',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                 ),
               ),
               Container(

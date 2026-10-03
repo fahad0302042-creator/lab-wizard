@@ -225,10 +225,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     'Lab Wizard is locked',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 4),

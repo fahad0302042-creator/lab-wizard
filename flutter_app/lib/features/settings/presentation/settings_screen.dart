@@ -354,9 +354,8 @@ class SettingsScreen extends ConsumerWidget {
                       onPressed: () async {
                         final deleted = await showDeleteAccountSheet(context);
                         if (deleted == true && context.mounted) {
-                          Navigator.of(
-                            context,
-                          ).popUntil((route) => route.isFirst);
+                          Navigator.of(context)
+                              .popUntil((route) => route.isFirst);
                         }
                       },
                       style: OutlinedButton.styleFrom(
@@ -486,10 +485,7 @@ class _CardTitle extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
         ),
       ],
     );

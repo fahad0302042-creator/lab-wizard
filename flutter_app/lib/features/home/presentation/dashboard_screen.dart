@@ -994,30 +994,31 @@ class _StockSnapshot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lines = <_StockLine>[
-      for (final item in inventory.chemicals)
-        _StockLine(
-          kind: ItemKind.chemical,
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          unit: item.unit,
-          status: item.stockState,
-        ),
-      for (final item in inventory.apparatus)
-        _StockLine(
-          kind: ItemKind.apparatus,
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          unit: 'pcs',
-          status: item.stockState,
-        ),
-    ]..sort((a, b) {
-      final rank = _rank(a.status).compareTo(_rank(b.status));
-      if (rank != 0) return rank;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
+    final lines =
+        <_StockLine>[
+          for (final item in inventory.chemicals)
+            _StockLine(
+              kind: ItemKind.chemical,
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              status: item.stockState,
+            ),
+          for (final item in inventory.apparatus)
+            _StockLine(
+              kind: ItemKind.apparatus,
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              unit: 'pcs',
+              status: item.stockState,
+            ),
+        ]..sort((a, b) {
+          final rank = _rank(a.status).compareTo(_rank(b.status));
+          if (rank != 0) return rank;
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        });
     final shown = lines.take(6).toList();
     return Column(
       children: [

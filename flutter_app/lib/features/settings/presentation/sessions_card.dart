@@ -90,10 +90,7 @@ class _SessionsCardState extends ConsumerState<SessionsCard> {
               const SizedBox(width: 8),
               const Text(
                 'sessions & devices',
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
               ),
             ],
           ),

@@ -29,10 +29,7 @@ class BackgroundSyncCard extends ConsumerWidget {
               SizedBox(width: 8),
               Text(
                 'background sync',
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
               ),
             ],
           ),

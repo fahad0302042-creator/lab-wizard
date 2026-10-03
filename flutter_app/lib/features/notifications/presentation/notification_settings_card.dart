@@ -50,10 +50,7 @@ class NotificationSettingsCard extends ConsumerWidget {
               const SizedBox(width: 8),
               const Text(
                 'notifications',
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
               ),
               const Spacer(),
               if (status.busy)
