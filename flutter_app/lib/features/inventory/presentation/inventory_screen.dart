@@ -1564,22 +1564,27 @@ class _ShelfFlightState extends State<_ShelfFlight> {
       _pinnedStatus ??= widget.status;
     });
     InventoryActionResult? result;
+    Object? failure;
+    StackTrace? stack;
     try {
       result = await action();
-    } finally {
-      if (mounted && result != null && origin.mounted) {
+    } catch (error, trace) {
+      failure = error;
+      stack = trace;
+    }
+    if (mounted && result != null && origin.mounted) {
+      try {
         final added = result.action == InventoryAction.restock;
-        try {
-          await flyActionChip(
-            context: origin,
-            label: '${added ? '+' : '-'}${formatQuantity(result.amount)}',
-            destination: quantityKey,
-          );
-        } catch (_) {
-          // The number still has to land if the overlay cannot take the chip.
-        }
+        await flyActionChip(
+          context: origin,
+          label: '${added ? '+' : '-'}${formatQuantity(result.amount)}',
+          destination: quantityKey,
+        );
+      } catch (_) {
+        // The number still has to land if the overlay cannot take the chip.
       }
-      if (!mounted) return;
+    }
+    if (mounted) {
       setState(() {
         _busy--;
         if (_busy <= 0) {
@@ -1589,6 +1594,9 @@ class _ShelfFlightState extends State<_ShelfFlight> {
           _pinnedStatus = null;
         }
       });
+    }
+    if (failure != null) {
+      Error.throwWithStackTrace(failure, stack!);
     }
   }
 

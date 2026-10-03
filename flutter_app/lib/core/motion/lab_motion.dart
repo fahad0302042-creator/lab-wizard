@@ -15,15 +15,15 @@ class SheetStageController extends ChangeNotifier {
   int _depth = 0;
   bool _disposed = false;
 
-  bool get open => _depth > 0;
+  bool get isOpen => _depth > 0;
 
-  void open() {
+  void begin() {
     if (_disposed) return;
     _depth++;
     notifyListeners();
   }
 
-  void close() {
+  void end() {
     if (_disposed || _depth == 0) return;
     _depth--;
     notifyListeners();
@@ -66,7 +66,7 @@ class _SheetStageState extends State<SheetStage> {
         animation: _controller,
         builder: (context, child) {
           final reduce = MediaQuery.disableAnimationsOf(context);
-          final open = _controller.open && !reduce;
+          final open = _controller.isOpen && !reduce;
           return AnimatedScale(
             scale: open ? 0.97 : 1,
             alignment: Alignment.topCenter,
@@ -102,7 +102,7 @@ Future<T?> showLabSheet<T>({
 }) async {
   final reduce = MediaQuery.disableAnimationsOf(context);
   final stage = SheetStage.maybeOf(context);
-  stage?.open();
+  stage?.begin();
   try {
     return await showModalBottomSheet<T>(
       context: context,
@@ -122,7 +122,7 @@ Future<T?> showLabSheet<T>({
       builder: builder,
     );
   } finally {
-    stage?.close();
+    stage?.end();
   }
 }
 
