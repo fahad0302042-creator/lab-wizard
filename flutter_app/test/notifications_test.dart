@@ -150,6 +150,22 @@ final _seed = InventoryState(
 
 const _allOn = NotificationPreferences(enabled: true, weeklySummary: true);
 
+/// The alert list otherwise follows the runner's clock, so a loan that was
+/// still open on [_now] becomes overdue later and the expected counts drift.
+Override get _frozenAlerts => alertsProvider.overrideWith((ref) {
+  final inventory = ref.watch(inventoryProvider);
+  final preferences = ref.watch(notificationPreferencesProvider);
+  return buildAlerts(
+    preferences: preferences,
+    chemicals: inventory.chemicals,
+    apparatus: inventory.apparatus,
+    checkouts: inventory.checkouts,
+    services: inventory.services,
+    outbox: inventory.outbox,
+    now: _now,
+  );
+});
+
 List<AppAlert> _alerts([NotificationPreferences preferences = _allOn]) =>
     buildAlerts(
       preferences: preferences,
@@ -393,6 +409,7 @@ void main() {
         overrides: [
           inventoryProvider.overrideWith(() => _FakeInventory(_seed)),
           notificationGatewayProvider.overrideWithValue(gateway),
+          _frozenAlerts,
         ],
       );
       addTearDown(container.dispose);
@@ -443,14 +460,15 @@ void main() {
     test('few new alerts are shown individually with item payloads', () async {
       SharedPreferences.setMockInitialValues({});
       final small = ProviderContainer(
-        overrides: [
-          inventoryProvider.overrideWith(
-            () => _FakeInventory(
-              InventoryState(chemicals: [_chem('acid', 'Acid', quantity: 1)]),
+          overrides: [
+            inventoryProvider.overrideWith(
+              () => _FakeInventory(
+                InventoryState(chemicals: [_chem('acid', 'Acid', quantity: 1)]),
+              ),
             ),
-          ),
-          notificationGatewayProvider.overrideWithValue(gateway),
-        ],
+            notificationGatewayProvider.overrideWithValue(gateway),
+            _frozenAlerts,
+          ],
       );
       addTearDown(small.dispose);
       final coordinator = small.read(notificationCoordinatorProvider.notifier);
@@ -510,6 +528,7 @@ void main() {
           overrides: [
             inventoryProvider.overrideWith(() => _FakeInventory(seed ?? _seed)),
             notificationGatewayProvider.overrideWithValue(gateway),
+            _frozenAlerts,
           ],
           child: MaterialApp(theme: AppTheme.light(), home: child),
         ),
