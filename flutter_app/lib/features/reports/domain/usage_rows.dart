@@ -78,11 +78,9 @@ List<PeriodUsageRow> periodUsageRows({
       if (row != null) rows.add(row);
     }
   }
-  rows.sort((a, b) {
-    if (b.used != a.used) return b.used.compareTo(a.used);
-    if (b.restocked != a.restocked) return b.restocked.compareTo(a.restocked);
-    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-  });
+  rows.sort(
+    (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+  );
   return rows;
 }
 

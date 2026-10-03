@@ -85,7 +85,7 @@ export function ReportsScreen() {
         };
       })
       .filter((r): r is ReportRow => r !== null)
-      .sort((a, b) => b.used - a.used);
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   }, [chemicals, apparatus, monthLogs, tab]);
 
   const totalUsed = rows.reduce((s, r) => s + r.used, 0);

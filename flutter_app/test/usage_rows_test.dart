@@ -46,10 +46,10 @@ void main() {
       ],
     );
 
-    expect(rows.map((row) => row.id), ['used', 'spent', 'restocked']);
+    expect(rows.map((row) => row.id), ['restocked', 'spent', 'used']);
     expect(rows.any((row) => row.restocked > 0), isTrue);
 
-    final used = rows.first;
+    final used = rows.singleWhere((row) => row.id == 'used');
     expect(used.opening, 80);
     expect(used.restocked, 20);
     expect(used.initial, 100);
@@ -57,14 +57,14 @@ void main() {
     expect(used.finalQuantity, 85);
     expect(used.opening + used.restocked - used.used, used.finalQuantity);
 
-    final spent = rows[1];
+    final spent = rows.singleWhere((row) => row.id == 'spent');
     expect(spent.opening, 10);
     expect(spent.restocked, 0);
     expect(spent.initial, spent.opening);
     expect(spent.used, 3);
     expect(spent.finalQuantity, 7);
 
-    final restocked = rows.last;
+    final restocked = rows.singleWhere((row) => row.id == 'restocked');
     expect(restocked.opening, 20);
     expect(restocked.restocked, 10);
     expect(restocked.used, 0);
