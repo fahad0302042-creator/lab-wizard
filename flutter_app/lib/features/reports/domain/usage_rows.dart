@@ -78,9 +78,7 @@ List<PeriodUsageRow> periodUsageRows({
       if (row != null) rows.add(row);
     }
   }
-  rows.sort(
-    (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-  );
+  rows.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   return rows;
 }
 
