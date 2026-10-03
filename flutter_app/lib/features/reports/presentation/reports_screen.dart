@@ -965,10 +965,7 @@ class _ConsumptionTable extends StatelessWidget {
           ),
           number(increase, color: header ? null : increaseColor),
           number(afterIncrease),
-          number(
-            consumption,
-            color: header ? null : context.lowColor,
-          ),
+          number(consumption, color: header ? null : context.lowColor),
           number(afterConsumption),
         ],
       ),
