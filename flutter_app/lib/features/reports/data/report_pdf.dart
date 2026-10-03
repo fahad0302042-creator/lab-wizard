@@ -110,9 +110,10 @@ const _red = PdfColor.fromInt(0xFFB23A2E);
 const _amber = PdfColor.fromInt(0xFFD89A3E);
 
 /// Builds the A4 consumption report: branded header, 3 KPI cards,
-/// and the consumption table. Columns are name, increase, stock after
-/// increase, consumption, and stock after consumption. Run-out estimates
-/// and damage or incident sections are not included.
+/// and the consumption table. Each row reads name, how much we had,
+/// how much was added, how much we have after that, how much was used,
+/// and how much is left. Run-out estimates and damage or incident
+/// sections are not included.
 Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final generated = input.generatedAt ?? DateTime.now();
   final profile = input.profile;
@@ -383,11 +384,12 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
         else ...[
           pw.Table(
             columnWidths: const {
-              0: pw.FlexColumnWidth(2.4),
+              0: pw.FlexColumnWidth(2.2),
               1: pw.FlexColumnWidth(1.3),
-              2: pw.FlexColumnWidth(1.7),
+              2: pw.FlexColumnWidth(1.2),
               3: pw.FlexColumnWidth(1.5),
-              4: pw.FlexColumnWidth(1.8),
+              4: pw.FlexColumnWidth(1.2),
+              5: pw.FlexColumnWidth(1.3),
             },
             children: [
               pw.TableRow(
@@ -398,10 +400,11 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                 ),
                 children: [
                   usageHead('NAME', left: true),
-                  usageHead('INCREASE'),
-                  usageHead('STOCK AFTER INCREASE'),
-                  usageHead('CONSUMPTION'),
-                  usageHead('STOCK AFTER CONSUMPTION'),
+                  usageHead('WE HAVE'),
+                  usageHead('ADDED'),
+                  usageHead('NOW WE HAVE'),
+                  usageHead('USED'),
+                  usageHead('LEFT'),
                 ],
               ),
               for (final row in usageRows)
@@ -441,6 +444,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                         ],
                       ),
                     ),
+                    usageQty('${formatQuantity(row.startStock)} ${row.unit}'),
                     usageQty(
                       row.added > 0
                           ? '+${formatQuantity(row.added)} ${row.unit}'
@@ -450,6 +454,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                     ),
                     usageQty(
                       '${formatQuantity(row.startStock + row.added)} ${row.unit}',
+                      emphasize: true,
                     ),
                     usageQty(
                       '-${formatQuantity(row.used)} ${row.unit}',
@@ -467,7 +472,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           ),
           pw.SizedBox(height: 8),
           note(
-            'Stock after increase − consumption = stock after consumption. '
+            'We have + added = now we have. Now we have − used = left. '
             'Only used and restocked items are listed.',
           ),
         ],

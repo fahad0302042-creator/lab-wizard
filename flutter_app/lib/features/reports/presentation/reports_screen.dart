@@ -865,53 +865,69 @@ class _ConsumptionTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _tableRow(
-          context,
-          name: 'Name',
-          increase: 'Increase',
-          afterIncrease: 'Stock after increase',
-          consumption: 'Consumption',
-          afterConsumption: 'Stock after consumption',
-          header: true,
-        ),
-        for (final row in rows)
-          _tableRow(
-            context,
-            name: row.name,
-            detail: row.formulaOrCategory,
-            increase: row.added > 0 ? '+${formatQuantity(row.added)}' : '0',
-            afterIncrease:
-                '${formatQuantity(row.startStock + row.added)} ${row.unit}',
-            consumption: '-${formatQuantity(row.used)}',
-            afterConsumption: '${formatQuantity(row.left)} ${row.unit}',
-            increaseColor: row.added > 0 ? context.healthyColor : null,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth < 680 ? 680.0 : constraints.maxWidth;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: width,
+            child: Column(
+              children: [
+                _tableRow(
+                  context,
+                  name: 'Name',
+                  had: 'We have',
+                  added: 'Added',
+                  nowHave: 'Now we have',
+                  used: 'Used',
+                  left: 'Left',
+                  header: true,
+                ),
+                for (final row in rows)
+                  _tableRow(
+                    context,
+                    name: row.name,
+                    detail: row.formulaOrCategory,
+                    had: '${formatQuantity(row.startStock)} ${row.unit}',
+                    added: row.added > 0
+                        ? '+${formatQuantity(row.added)}'
+                        : '0',
+                    nowHave:
+                        '${formatQuantity(row.startStock + row.added)} ${row.unit}',
+                    used: '-${formatQuantity(row.used)}',
+                    left: '${formatQuantity(row.left)} ${row.unit}',
+                    addedColor: row.added > 0 ? context.healthyColor : null,
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'We have + added = now we have. Now we have − used = left.',
+                    style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
           ),
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            'Stock after increase − consumption = stock after consumption.',
-            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
   Widget _tableRow(
     BuildContext context, {
     required String name,
-    required String increase,
-    required String afterIncrease,
-    required String consumption,
-    required String afterConsumption,
+    required String had,
+    required String added,
+    required String nowHave,
+    required String used,
+    required String left,
     String detail = '',
     bool header = false,
-    Color? increaseColor,
+    Color? addedColor,
   }) {
     final style = TextStyle(
-      fontSize: header ? 11 : 13,
+      fontSize: header ? 12 : 13,
       height: 1.15,
       fontWeight: FontWeight.w700,
       color: header ? context.mutedInkColor : context.inkColor,
@@ -921,7 +937,7 @@ class _ConsumptionTable extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.right,
-        maxLines: header ? 3 : 2,
+        maxLines: header ? 2 : 2,
         overflow: TextOverflow.ellipsis,
         style: style.copyWith(color: color ?? style.color),
       ),
@@ -963,10 +979,11 @@ class _ConsumptionTable extends StatelessWidget {
               ],
             ),
           ),
-          number(increase, color: header ? null : increaseColor),
-          number(afterIncrease),
-          number(consumption, color: header ? null : context.lowColor),
-          number(afterConsumption),
+          number(had),
+          number(added, color: header ? null : addedColor),
+          number(nowHave),
+          number(used, color: header ? null : context.lowColor),
+          number(left),
         ],
       ),
     );
