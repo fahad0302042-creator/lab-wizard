@@ -45,7 +45,6 @@ class _LabSwitcherContent extends ConsumerWidget {
         const Text(
           'switch active lab',
           style: TextStyle(
-            fontFamily: 'Caveat',
             fontSize: 26,
             fontWeight: FontWeight.w700,
           ),
@@ -61,7 +60,7 @@ class _LabSwitcherContent extends ConsumerWidget {
         // 1. Personal Lab option (always available)
         _LabListTile(
           title: 'Personal Lab',
-          subtitle: 'Your private inventory notebook',
+          subtitle: 'Private inventory',
           icon: Icons.person_pin_outlined,
           isSelected: activeLab == null,
           onTap: () async {

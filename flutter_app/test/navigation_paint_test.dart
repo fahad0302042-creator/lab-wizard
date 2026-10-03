@@ -121,7 +121,7 @@ void main() {
     expect(_ticking(tester, find.byType(DashboardScreen)), isTrue);
 
     // Switching tabs flips all of the above.
-    await tester.tap(find.text('chems'));
+    await tester.tap(find.text('Chems'));
     await tester.pumpAndSettle();
     expect(_page(tester, 1).debugLayer, isNotNull);
     expect(_page(tester, 3).debugLayer, isNull, reason: 'gear still unpainted');

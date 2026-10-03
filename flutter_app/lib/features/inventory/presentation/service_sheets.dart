@@ -142,7 +142,6 @@ class ServiceSection extends ConsumerWidget {
           Text(
             'completed',
             style: TextStyle(
-              fontFamily: 'Caveat',
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: context.mutedInkColor,

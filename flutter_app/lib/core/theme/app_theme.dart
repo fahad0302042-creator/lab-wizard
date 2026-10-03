@@ -2,34 +2,36 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Shared notebook palette. These values intentionally mirror the web app so
-/// both clients feel like the same physical lab notebook.
+/// Clinical palette. Text colours meet WCAG AA (4.5:1) on paper, card and
+/// the gray metric tile, in both themes (A11Y-04). [green] is also a fill:
+/// white on it is 6.6:1, so buttons and the scan circle can use it in either
+/// theme. [highlighter] is kept for the contrast audit; the UI no longer
+/// paints a marker.
 abstract final class LabColors {
-  static const paper = Color(0xFFFBF7EC);
-  static const paperDark = Color(0xFF221E18);
-  static const desk = Color(0xFFD9D2BE);
-  static const deskDark = Color(0xFF15120E);
-  static const ink = Color(0xFF2B2A28);
-  static const inkDark = Color(0xFFEDE6D6);
-  static const mutedInk = Color(0xFF6B6559);
-  static const mutedInkDark = Color(0xFFA89E89);
-  static const card = Color(0xFFFEFCF5);
-  static const cardDark = Color(0xFF2B2621);
-  static const marginRed = Color(0xFFB23A2E);
-  // Status colours double as text colours, so they meet WCAG AA (4.5:1)
-  // on paper and card in their own theme (A11Y-04): amber 5.2:1, green
-  // 5.5:1, red 5.6:1 light; red 5.1:1 on the dark card.
-  static const marginRedDark = Color(0xFFE07A6C);
-  static const amber = Color(0xFF8F5E0E);
+  static const paper = Color(0xFFFFFFFF);
+  static const paperDark = Color(0xFF111113);
+  static const desk = Color(0xFFF6F6F7);
+  static const deskDark = Color(0xFF0C0C0E);
+  static const ink = Color(0xFF171717);
+  static const inkDark = Color(0xFFF3F3F4);
+  static const mutedInk = Color(0xFF5C5C66);
+  static const mutedInkDark = Color(0xFFC8C8CC);
+  static const card = Color(0xFFFFFFFF);
+  static const cardDark = Color(0xFF1C1C1F);
+  static const tile = Color(0xFFECECEE);
+  static const tileDark = Color(0xFF2A2A2E);
+  static const marginRed = Color(0xFFB42318);
+  static const marginRedDark = Color(0xFFF0A098);
+  static const amber = Color(0xFF8A5A08);
   static const amberDark = Color(0xFFE8B558);
-  static const green = Color(0xFF3F6F3B);
-  static const greenDark = Color(0xFF7BAE74);
-  static const blue = Color(0xFF4A5C8A);
-  static const blueDark = Color(0xFF9AADD4);
-  static const ruled = Color(0xFFD8D2C0);
-  static const ruledDark = Color(0xFF3D362E);
-  static const marginLine = Color(0xFFE6B8AE);
-  static const marginLineDark = Color(0xFF6B4A44);
+  static const green = Color(0xFF0E6A43);
+  static const greenDark = Color(0xFF8ED4AE);
+  static const blue = Color(0xFF3E4F86);
+  static const blueDark = Color(0xFFB7C4E6);
+  static const ruled = Color(0xFFE4E4E7);
+  static const ruledDark = Color(0xFF3A3A3E);
+  static const marginLine = Color(0xFFE4E4E7);
+  static const marginLineDark = Color(0xFF3A3A3E);
   static const highlighter = Color(0xFFF3D96B);
 
   static const tapePink = Color(0x8CE89FA8);
@@ -48,40 +50,46 @@ abstract final class AppTheme {
     final paper = dark ? LabColors.paperDark : LabColors.paper;
     final card = dark ? LabColors.cardDark : LabColors.card;
     final red = dark ? LabColors.marginRedDark : LabColors.marginRed;
+    final green = dark ? LabColors.greenDark : LabColors.green;
+    final muted = dark ? LabColors.mutedInkDark : LabColors.mutedInk;
+    final tile = dark ? LabColors.tileDark : LabColors.tile;
+    final line = dark ? LabColors.ruledDark : LabColors.ruled;
     final scheme = ColorScheme.fromSeed(
-      seedColor: red,
+      seedColor: LabColors.green,
       brightness: brightness,
       surface: paper,
-      primary: ink,
-      secondary: red,
+      primary: green,
+      secondary: green,
       error: red,
     );
+    const radius = BorderRadius.all(Radius.circular(12));
 
-    final baseText = ThemeData(brightness: brightness).textTheme
-        .apply(bodyColor: ink, displayColor: ink, fontFamily: 'Kalam');
+    final baseText = ThemeData(brightness: brightness).textTheme.apply(
+      bodyColor: ink,
+      displayColor: ink,
+    );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: dark ? LabColors.deskDark : LabColors.desk,
-      fontFamily: 'Kalam',
       textTheme: baseText.copyWith(
         bodyLarge: baseText.bodyLarge?.copyWith(fontSize: 16, height: 1.35),
         bodyMedium: baseText.bodyMedium?.copyWith(fontSize: 15, height: 1.35),
-        labelLarge: baseText.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+        labelLarge: baseText.labelLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: false,
+        centerTitle: true,
         backgroundColor: Colors.transparent,
         foregroundColor: ink,
         titleTextStyle: TextStyle(
           color: ink,
-          fontFamily: 'Caveat',
           fontWeight: FontWeight.w700,
-          fontSize: 28,
+          fontSize: 18,
+          letterSpacing: -0.2,
         ),
       ),
       cardTheme: CardThemeData(
@@ -89,52 +97,42 @@ abstract final class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          side: BorderSide(
-            color: dark ? const Color(0xFF5A5247) : const Color(0xFF3A362E),
-            width: 1.4,
-          ),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.elliptical(3, 9),
-            topRight: Radius.elliptical(9, 3),
-            bottomLeft: Radius.elliptical(8, 3),
-            bottomRight: Radius.elliptical(3, 9),
-          ),
+          side: BorderSide(color: line),
+          borderRadius: radius,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        filled: false,
+        filled: true,
+        fillColor: tile,
         labelStyle: TextStyle(
-          color: dark ? LabColors.mutedInkDark : LabColors.mutedInk,
-          fontFamily: 'Kalam',
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
+          color: muted,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
         ),
-        hintStyle: TextStyle(
-          color: (dark ? LabColors.mutedInkDark : LabColors.mutedInk)
-              .withValues(alpha: .65),
-          fontFamily: 'Kalam',
+        hintStyle: TextStyle(color: muted.withValues(alpha: .8)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
-        border: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: dark ? LabColors.ruledDark : LabColors.ruled,
-            width: 1.5,
-          ),
+        border: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: line),
         ),
-        enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: dark ? LabColors.ruledDark : LabColors.ruled,
-            width: 1.5,
-          ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: line),
         ),
-        focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: red, width: 2),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: LabColors.green, width: 1.5),
         ),
-        errorBorder: UnderlineInputBorder(
+        errorBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: red),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: radius,
           borderSide: BorderSide(color: red, width: 1.5),
-        ),
-        focusedErrorBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: red, width: 2),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
@@ -142,91 +140,62 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: ink,
-          foregroundColor: card,
-          textStyle: const TextStyle(
-            fontFamily: 'Kalam',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-          shape: const StadiumBorder(),
+          backgroundColor: LabColors.green,
+          foregroundColor: Colors.white,
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: const RoundedRectangleBorder(borderRadius: radius),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: ink,
-          side: BorderSide(color: ink, width: 1.8),
-          textStyle: const TextStyle(
-            fontFamily: 'Kalam',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-          shape: const StadiumBorder(),
+          side: BorderSide(color: line),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: const RoundedRectangleBorder(borderRadius: radius),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: red,
-          textStyle: const TextStyle(
-            fontFamily: 'Kalam',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            decoration: TextDecoration.underline,
-          ),
+          foregroundColor: green,
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: Colors.transparent,
-        selectedColor: Colors.transparent,
-        side: BorderSide.none,
+        backgroundColor: tile,
+        selectedColor: tile,
+        side: BorderSide(color: line),
         labelStyle: TextStyle(
-          color: dark ? LabColors.mutedInkDark : LabColors.mutedInk,
-          fontFamily: 'Kalam',
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
+          color: muted,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
         ),
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         shape: const StadiumBorder(),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: card,
-        contentTextStyle: TextStyle(color: ink, fontFamily: 'Kalam'),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(3),
-            topRight: Radius.circular(10),
-            bottomLeft: Radius.circular(9),
-            bottomRight: Radius.circular(3),
-          ),
-        ),
+        contentTextStyle: TextStyle(color: ink),
+        shape: const RoundedRectangleBorder(borderRadius: radius),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         // Sheets stay a readable column on tablets and in landscape
         // (A11Y-03); Material 3's default, made explicit.
         constraints: const BoxConstraints(maxWidth: 640),
         showDragHandle: true,
-        dragHandleColor: dark ? LabColors.mutedInkDark : LabColors.mutedInk,
+        dragHandleColor: muted,
         backgroundColor: Colors.transparent,
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: card,
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: ink, width: 1.4),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(3),
-            topRight: Radius.circular(12),
-            bottomLeft: Radius.circular(10),
-            bottomRight: Radius.circular(4),
-          ),
-        ),
+        shape: const RoundedRectangleBorder(borderRadius: radius),
         titleTextStyle: TextStyle(
           color: ink,
-          fontFamily: 'Caveat',
-          fontSize: 26,
+          fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
       ),
+      dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
@@ -245,6 +214,7 @@ extension LabThemeX on BuildContext {
       MediaQuery.disableAnimationsOf(this) ? Duration.zero : duration;
   Color get paperColor => isDark ? LabColors.paperDark : LabColors.paper;
   Color get cardColor => isDark ? LabColors.cardDark : LabColors.card;
+  Color get tileColor => isDark ? LabColors.tileDark : LabColors.tile;
   Color get inkColor => isDark ? LabColors.inkDark : LabColors.ink;
   Color get mutedInkColor =>
       isDark ? LabColors.mutedInkDark : LabColors.mutedInk;

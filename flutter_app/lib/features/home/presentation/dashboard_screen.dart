@@ -50,35 +50,51 @@ class DashboardScreen extends ConsumerWidget {
           StaggerIn(
             index: 0,
             onceKey: 'home-greeting',
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        DateFormat('EEEE, MMMM d').format(now),
-                        style: TextStyle(color: context.mutedInkColor),
+                Row(
+                  children: [
+                    const SizedBox(width: 48),
+                    const Expanded(
+                      child: Text(
+                        'Lab Wizard',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
                       ),
-                      const SizedBox(height: 3),
-                      PageHeading('${_greeting(now)}, $firstName'),
-                      const SizedBox(height: 5),
-                      _LabChip(
-                        activeLab: ref.watch(activeLabProvider),
-                        onTap: () => showLabSwitcherSheet(context),
-                      ),
-                    ],
-                  ),
+                    ),
+                    _HeaderSyncButton(
+                      state: inventory,
+                      onPressed: ref.read(inventoryProvider.notifier).refresh,
+                    ),
+                    IconButton(
+                      tooltip: 'Settings',
+                      onPressed: onSettings,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                  ],
                 ),
-                _HeaderSyncButton(
-                  state: inventory,
-                  onPressed: ref.read(inventoryProvider.notifier).refresh,
+                Text(
+                  '${_greeting(now)}, $firstName',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: context.mutedInkColor, fontSize: 13),
                 ),
-                IconButton(
-                  tooltip: 'Settings',
-                  onPressed: onSettings,
-                  icon: const Icon(Icons.settings_outlined),
+                const SizedBox(height: 2),
+                Text(
+                  DateFormat('EEEE, MMMM d').format(now),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                _LabChip(
+                  activeLab: ref.watch(activeLabProvider),
+                  onTap: () => showLabSwitcherSheet(context),
                 ),
               ],
             ),
@@ -90,44 +106,33 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(height: 14),
           NotebookCard(
             onTap: () => _showGlobalSearch(context, ref),
+            color: context.tileColor,
+            bordered: false,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(Icons.search, color: context.mutedInkColor),
-                const SizedBox(width: 10),
+                Icon(Icons.search, color: context.mutedInkColor, size: 20),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'search the notebook',
-                    style: TextStyle(
-                      color: context.inkColor,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    'Search the lab',
+                    style: TextStyle(color: context.mutedInkColor),
                   ),
-                ),
-                Icon(
-                  Icons.arrow_forward,
-                  color: context.mutedInkColor,
-                  size: 18,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           if (!inventory.loading &&
               inventory.chemicals.isEmpty &&
               inventory.apparatus.isEmpty) ...[
             NotebookCard(
-              tape: NotebookTape.yellow,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'your lab notebook is ready',
-                    style: TextStyle(
-                      fontFamily: 'Caveat',
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    'Your lab is ready',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
                   const _GettingStartedStep(
@@ -213,49 +218,53 @@ class DashboardScreen extends ConsumerWidget {
             // never clip at large text (A11Y-02).
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               // Four tiles in one row on tablets and landscape (A11Y-03).
-              crossAxisCount: MediaQuery.sizeOf(context).width >= 600 ? 4 : 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              // A normal phone matches the clinical row; large text and a
+              // 320 px phone drop to two so the captions do not clip.
+              crossAxisCount: _metricColumns(context),
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
               mainAxisExtent:
-                  60 + 46 * (MediaQuery.textScalerOf(context).scale(10) / 10),
+                  64 + 40 * (MediaQuery.textScalerOf(context).scale(10) / 10),
             ),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _MetricCard(
                 index: 2,
-                icon: Icons.science_outlined,
                 value: inventory.chemicals.length.toDouble(),
-                label: 'chemicals',
-                color: context.blueColor,
+                label: 'Chemicals',
                 onTap: () => onNavigate(1),
               ),
               _MetricCard(
                 index: 3,
-                icon: Icons.precision_manufacturing_outlined,
                 value: inventory.apparatus.length.toDouble(),
-                label: 'apparatus',
-                color: context.healthyColor,
+                label: 'Apparatus',
                 onTap: () => onNavigate(3),
               ),
               _MetricCard(
                 index: 4,
-                icon: Icons.warning_amber_rounded,
                 value: inventory.attentionCount.toDouble(),
-                label: 'need attention',
-                color: context.marginRedColor,
+                label: 'Attention',
                 onTap: () => _showAttentionSheet(context, ref),
               ),
               _MetricCard(
                 index: 5,
-                icon: Icons.history,
                 value: weeklyLogs.length.toDouble(),
-                label: 'actions this week',
-                color: context.lowColor,
+                label: 'This week',
                 onTap: () => onNavigate(4),
               ),
             ],
           ),
+          if (inventory.chemicals.isNotEmpty ||
+              inventory.apparatus.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _StockSnapshot(
+              inventory: inventory,
+              onOpen: (kind, id) {
+                showItemDetailSheet(context, ref, kind, id);
+              },
+            ),
+          ],
           const SizedBox(height: 26),
           const PageHeading('7-day activity'),
           NotebookCard(child: _WeekActivity(logs: weeklyLogs)),
@@ -390,10 +399,10 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   static String _greeting(DateTime now) => switch (now.hour) {
-    < 12 => 'good morning',
-    < 17 => 'good afternoon',
-    < 21 => 'good evening',
-    _ => 'working late',
+    < 12 => 'Good morning',
+    < 17 => 'Good afternoon',
+    < 21 => 'Good evening',
+    _ => 'Working late',
   };
 }
 
@@ -460,7 +469,7 @@ class _GlobalSearchSheetState extends State<_GlobalSearchSheet> {
           padding: const EdgeInsets.fromLTRB(24, 6, 24, 8),
           child: Column(
             children: [
-              const PageHeading('search the notebook'),
+              const PageHeading('Search the lab'),
               TextField(
                 controller: _controller,
                 autofocus: true,
@@ -610,52 +619,57 @@ class _ResultList extends StatelessWidget {
   }
 }
 
+int _metricColumns(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  final scale = MediaQuery.textScalerOf(context).scale(1);
+  if (width >= 600) return 4;
+  if (width >= 360 && scale <= 1.15) return 4;
+  return 2;
+}
+
 class _MetricCard extends StatelessWidget {
   const _MetricCard({
     required this.index,
-    required this.icon,
     required this.value,
     required this.label,
-    required this.color,
     required this.onTap,
   });
 
   final int index;
-  final IconData icon;
   final double value;
   final String label;
-  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // Value and caption are one spoken item ("3, low stock, button").
+    // Value and caption are one spoken item ("3, Attention, button").
     return MergeSemantics(
       child: StaggerIn(
         index: index,
         onceKey: 'home-metric-$index',
         child: NotebookCard(
           onTap: onTap,
-          accent: color,
-          padding: const EdgeInsets.all(13),
+          color: context.tileColor,
+          bordered: false,
+          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 21),
-              AnimatedQuantity(
-                value,
-                style: const TextStyle(
-                  fontSize: 28,
-                  height: 1.1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: context.mutedInkColor, fontSize: 12),
+              ),
+              AnimatedQuantity(
+                value,
+                style: const TextStyle(
+                  fontSize: 26,
+                  height: 1.05,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
               ),
             ],
           ),
@@ -693,6 +707,7 @@ class _HeaderSyncButton extends StatelessWidget {
         : 'Inventory synced';
     return IconButton(
       tooltip: '$label — tap to refresh',
+      visualDensity: VisualDensity.compact,
       onPressed: state.refreshing ? null : onPressed,
       icon: state.refreshing
           ? SizedBox.square(
@@ -855,7 +870,7 @@ class _WeekActivity extends StatelessWidget {
                       height: 68 * value + 5,
                       width: 13,
                       decoration: BoxDecoration(
-                        color: context.marginRedColor.withValues(alpha: .78),
+                        color: context.healthyColor.withValues(alpha: .85),
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(8),
                         ),
@@ -950,6 +965,145 @@ extension<T> on Iterable<T> {
   T? get firstOrNull {
     final iterator = this.iterator;
     return iterator.moveNext() ? iterator.current : null;
+  }
+}
+
+class _StockLine {
+  const _StockLine({
+    required this.kind,
+    required this.id,
+    required this.name,
+    required this.quantity,
+    required this.unit,
+    required this.status,
+  });
+
+  final ItemKind kind;
+  final String id;
+  final String name;
+  final double quantity;
+  final String unit;
+  final StockState status;
+}
+
+class _StockSnapshot extends StatelessWidget {
+  const _StockSnapshot({required this.inventory, required this.onOpen});
+
+  final InventoryState inventory;
+  final void Function(ItemKind kind, String id) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = <_StockLine>[
+      for (final item in inventory.chemicals)
+        _StockLine(
+          kind: ItemKind.chemical,
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          status: item.stockState,
+        ),
+      for (final item in inventory.apparatus)
+        _StockLine(
+          kind: ItemKind.apparatus,
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: 'pcs',
+          status: item.stockState,
+        ),
+    ]..sort((a, b) {
+      final rank = _rank(a.status).compareTo(_rank(b.status));
+      if (rank != 0) return rank;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    final shown = lines.take(6).toList();
+    return Column(
+      children: [
+        for (final entry in shown.asMap().entries)
+          StaggerIn(
+            index: entry.key,
+            onceKey: 'home-stock-${entry.value.id}',
+            child: _StockRow(
+              line: entry.value,
+              onTap: () => onOpen(entry.value.kind, entry.value.id),
+            ),
+          ),
+      ],
+    );
+  }
+
+  static int _rank(StockState status) => switch (status) {
+    StockState.empty => 0,
+    StockState.low => 1,
+    StockState.healthy => 2,
+  };
+}
+
+class _StockRow extends StatelessWidget {
+  const _StockRow({required this.line, required this.onTap});
+
+  final _StockLine line;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final healthy = line.status == StockState.healthy;
+    final empty = line.status == StockState.empty;
+    final word = switch (line.status) {
+      StockState.healthy => 'healthy',
+      StockState.low => 'low',
+      StockState.empty => 'empty',
+    };
+    final dot = empty
+        ? context.inkColor
+        : context.mutedInkColor.withValues(alpha: healthy ? .45 : .8);
+    final trailing = empty
+        ? word
+        : '${formatQuantity(line.quantity)} ${line.unit} $word';
+    final trailingColor = healthy ? context.healthyColor : context.inkColor;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                line.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 132,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  trailing,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: trailingColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

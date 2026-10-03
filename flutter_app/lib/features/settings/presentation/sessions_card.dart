@@ -91,7 +91,6 @@ class _SessionsCardState extends ConsumerState<SessionsCard> {
               const Text(
                 'sessions & devices',
                 style: TextStyle(
-                  fontFamily: 'Kalam',
                   fontSize: 21,
                   fontWeight: FontWeight.bold,
                 ),

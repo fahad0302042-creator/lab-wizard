@@ -269,11 +269,11 @@ class NotebookBottomNavigation extends StatelessWidget {
   final ValueChanged<int> onSelected;
 
   static const _items = <({String label, IconData icon})>[
-    (label: 'home', icon: Icons.home_outlined),
-    (label: 'chems', icon: Icons.science_outlined),
-    (label: 'scan', icon: Icons.center_focus_weak),
-    (label: 'gear', icon: Icons.precision_manufacturing_outlined),
-    (label: 'reports', icon: Icons.insights_outlined),
+    (label: 'Home', icon: Icons.home_outlined),
+    (label: 'Chems', icon: Icons.description_outlined),
+    (label: 'Scan', icon: Icons.circle),
+    (label: 'Gear', icon: Icons.precision_manufacturing_outlined),
+    (label: 'Reports', icon: Icons.bar_chart_outlined),
   ];
 
   @override
@@ -284,17 +284,18 @@ class NotebookBottomNavigation extends StatelessWidget {
     final labelScale =
         MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3).scale(17) /
         17;
+    final accent = context.healthyColor;
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.3,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: context.cardColor,
-          border: Border(top: BorderSide(color: context.inkColor, width: 1.35)),
+          border: Border(top: BorderSide(color: context.ruledColor)),
         ),
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 70 + 17 * (labelScale - 1),
+            height: 68 + 16 * (labelScale - 1),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final slot = constraints.maxWidth / _items.length;
@@ -307,6 +308,9 @@ class NotebookBottomNavigation extends StatelessWidget {
                           final item = _items[index];
                           final selected = selectedIndex == index;
                           final scan = index == 2;
+                          final color = selected
+                              ? accent
+                              : context.mutedInkColor;
                           return Expanded(
                             child: Semantics(
                               button: true,
@@ -320,41 +324,27 @@ class NotebookBottomNavigation extends StatelessWidget {
                                   children: [
                                     if (scan)
                                       Container(
-                                        width: 40,
-                                        height: 40,
+                                        width: 28,
+                                        height: 28,
                                         decoration: BoxDecoration(
-                                          color: context.cardColor,
-                                          border: Border.all(
-                                            color: context.inkColor,
-                                            width: 1.6,
-                                          ),
+                                          color: accent,
                                           shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          item.icon,
-                                          color: context.inkColor,
-                                          size: 22,
                                         ),
                                       )
                                     else
-                                      Icon(
-                                        item.icon,
-                                        color: context.inkColor,
-                                        size: 24,
-                                      ),
-                                    const SizedBox(height: 1),
+                                      Icon(item.icon, color: color, size: 22),
+                                    const SizedBox(height: 2),
                                     Text(
                                       item.label,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: selected
-                                            ? context.inkColor
-                                            : context.mutedInkColor,
-                                        fontFamily: 'Kalam',
-                                        fontSize: 13,
+                                        color: scan ? accent : color,
+                                        fontSize: 11,
                                         height: 1.1,
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: selected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
                                       ),
                                     ),
                                   ],
@@ -369,14 +359,14 @@ class NotebookBottomNavigation extends StatelessWidget {
                             ? Duration.zero
                             : const Duration(milliseconds: 320),
                         curve: labSpring,
-                        left: slot * selectedIndex + slot * 0.28,
-                        width: slot * 0.44,
-                        bottom: 6,
-                        height: 3,
+                        left: slot * selectedIndex + slot * 0.32,
+                        width: slot * 0.36,
+                        bottom: 4,
+                        height: 2,
                         child: IgnorePointer(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: context.marginRedColor,
+                              color: accent,
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),

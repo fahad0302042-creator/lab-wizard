@@ -115,7 +115,6 @@ class _LabProfileCardState extends ConsumerState<LabProfileCard> {
               const Text(
                 'report branding',
                 style: TextStyle(
-                  fontFamily: 'Kalam',
                   fontSize: 21,
                   fontWeight: FontWeight.bold,
                 ),

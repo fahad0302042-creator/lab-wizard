@@ -33,7 +33,6 @@ class AppLockCard extends ConsumerWidget {
               Text(
                 'app lock',
                 style: TextStyle(
-                  fontFamily: 'Kalam',
                   fontSize: 21,
                   fontWeight: FontWeight.bold,
                 ),

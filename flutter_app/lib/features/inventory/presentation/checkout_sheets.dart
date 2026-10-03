@@ -125,7 +125,6 @@ class CheckoutSection extends ConsumerWidget {
           Text(
             'recently returned',
             style: TextStyle(
-              fontFamily: 'Caveat',
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: context.mutedInkColor,

@@ -93,11 +93,11 @@ void main() {
           size: size,
         );
         await tester.scrollUntilVisible(
-          find.text('actions this week'),
+          find.text('This week'),
           200,
           scrollable: find.byType(Scrollable).first,
         );
-        expect(find.text('actions this week'), findsOneWidget);
+        expect(find.text('This week'), findsOneWidget);
       });
 
       testWidgets('${entry.key}: reports', (tester) async {
@@ -206,12 +206,12 @@ void main() {
         size: _sizes['small tablet']!,
       );
       await tester.scrollUntilVisible(
-        find.text('need attention'),
+        find.text('Attention'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       final tops = [
-        for (final label in ['chemicals', 'apparatus', 'need attention'])
+        for (final label in ['Chemicals', 'Apparatus', 'Attention'])
           tester.getTopLeft(find.text(label).first).dy,
       ];
       // A few pixels of slack for text metrics; the four counts share one row.

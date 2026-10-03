@@ -140,7 +140,7 @@ void main() {
       );
       expect(find.textContaining('Aisha'), findsWidgets);
       await tester.scrollUntilVisible(
-        find.text('actions this week'),
+        find.text('This week'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
@@ -232,7 +232,7 @@ void main() {
         ),
         scale: maxTextScale,
       );
-      expect(find.text('reports'), findsOneWidget);
+      expect(find.text('Reports'), findsOneWidget);
     });
   });
 }

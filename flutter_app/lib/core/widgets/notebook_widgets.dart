@@ -11,9 +11,8 @@ export '../motion/lab_motion.dart'
 
 enum NotebookTape { none, yellow, blue, green, pink }
 
-/// Content starts just past the red margin line. The gutter used to be 54px,
-/// which ate the name column on a phone.
-const double notebookGutter = 26;
+/// Page inset. Wide enough for a thumb, narrow enough that names still fit.
+const double notebookGutter = 20;
 
 class NotebookPage extends StatelessWidget {
   const NotebookPage({
@@ -27,100 +26,14 @@ class NotebookPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The shadow stays on a DecoratedBox; the paper colour is a Material so
-    // list tiles and ink splashes on a page paint on the paper (Flutter
-    // asserts when a coloured box sits between a tile and its Material).
+    // A Material, not a coloured box, so list tiles and ink splashes paint
+    // on the page (Flutter asserts when a box sits between a tile and its
+    // Material).
     final content = SheetStage(
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x35000000),
-              blurRadius: 22,
-              offset: Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Material(
-          color: context.paperColor,
-          child: CustomPaint(
-            painter: _PaperPainter(
-              ruled: context.ruledColor,
-              margin: context.marginLineColor,
-              desk: Theme.of(context).scaffoldBackgroundColor,
-              ink: context.inkColor,
-            ),
-            child: child,
-          ),
-        ),
-      ),
+      child: Material(color: context.paperColor, child: child),
     );
     return includeSafeArea ? SafeArea(child: content) : content;
   }
-}
-
-class _PaperPainter extends CustomPainter {
-  const _PaperPainter({
-    required this.ruled,
-    required this.margin,
-    required this.desk,
-    required this.ink,
-  });
-
-  final Color ruled;
-  final Color margin;
-  final Color desk;
-  final Color ink;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.width <= 0 || size.height <= 0) return;
-    final linePaint = Paint()
-      ..color = ruled
-      ..strokeWidth = 1;
-    for (double y = 36; y < size.height; y += 27) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
-    }
-    canvas.drawLine(
-      const Offset(10, 16),
-      Offset(10, size.height),
-      Paint()
-        ..color = margin
-        ..strokeWidth = 1.6,
-    );
-
-    // Desk colour shows through a jagged tear, with an ink edge and shadow.
-    const depth = 13.0;
-    final tear = Path()..moveTo(0, 0);
-    var x = 0.0;
-    var dip = true;
-    while (x < size.width) {
-      final next = math.min(x + 12, size.width);
-      tear.lineTo(next, dip ? depth : 3);
-      x = next;
-      dip = !dip;
-      if (next >= size.width) break;
-    }
-    tear
-      ..lineTo(size.width, 0)
-      ..close();
-    canvas.drawShadow(tear, ink.withValues(alpha: .5), 3.5, false);
-    canvas.drawPath(tear, Paint()..color = desk);
-    canvas.drawPath(
-      tear,
-      Paint()
-        ..color = ink.withValues(alpha: .75)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _PaperPainter oldDelegate) =>
-      oldDelegate.ruled != ruled ||
-      oldDelegate.margin != margin ||
-      oldDelegate.desk != desk ||
-      oldDelegate.ink != ink;
 }
 
 class PageHeading extends StatelessWidget {
@@ -135,7 +48,7 @@ class PageHeading extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: SketchTitle(text, fontSize: fontSize ?? 26)),
+        Expanded(child: SketchTitle(text, fontSize: fontSize ?? 22)),
         // Flexible so a wide trailing button wraps its label under large
         // text instead of pushing past the edge.
         if (trailing != null) Flexible(child: trailing!),
@@ -144,110 +57,34 @@ class PageHeading extends StatelessWidget {
   }
 }
 
-class SketchTitle extends StatefulWidget {
-  const SketchTitle(this.text, {this.fontSize = 26, super.key});
+class SketchTitle extends StatelessWidget {
+  const SketchTitle(this.text, {this.fontSize = 22, super.key});
 
   final String text;
   final double fontSize;
 
   @override
-  State<SketchTitle> createState() => _SketchTitleState();
-}
-
-class _SketchTitleState extends State<SketchTitle>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 480),
-    )..forward();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Reduced motion: the underline is simply drawn, no ticker runs.
-    if (MediaQuery.disableAnimationsOf(context)) _controller.value = 1;
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     // A heading for screen readers so TalkBack's heading navigation works.
     return Semantics(
       header: true,
-      child: RepaintBoundary(
-        child: Transform.rotate(
-          angle: -.012,
-          alignment: Alignment.centerLeft,
-          child: CustomPaint(
-            painter: _UnderlinePainter(
-              progress: reduceMotion
-                  ? const AlwaysStoppedAnimation(1)
-                  : _controller,
-              color: context.marginRedColor,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(
-                widget.text,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'Caveat',
-                  fontSize: widget.fontSize,
-                  height: .98,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -.4,
-                ),
-              ),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: fontSize,
+            height: 1.15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: context.inkColor,
           ),
         ),
       ),
     );
   }
-}
-
-class _UnderlinePainter extends CustomPainter {
-  _UnderlinePainter({required this.progress, required this.color})
-    : super(repaint: progress);
-
-  final Animation<double> progress;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final width = math.min(size.width * .68, 150.0) * progress.value;
-    if (width <= 0) return;
-    final y = size.height - 3;
-    final path = Path()
-      ..moveTo(1, y)
-      ..cubicTo(width * .18, y - 5, width * .34, y + 3, width * .51, y)
-      ..cubicTo(width * .68, y - 4, width * .82, y + 3, width, y - 1);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _UnderlinePainter oldDelegate) =>
-      oldDelegate.color != color;
 }
 
 class NotebookCard extends StatelessWidget {
@@ -261,6 +98,8 @@ class NotebookCard extends StatelessWidget {
     this.tape = NotebookTape.none,
     this.paperclip = false,
     this.alternate = false,
+    this.color,
+    this.bordered = true,
     super.key,
   });
 
@@ -269,94 +108,45 @@ class NotebookCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Color? accent;
+
+  /// Kept so existing call sites compile. The clinical surface does not
+  /// tilt, tape, or clip a card.
   final double rotation;
   final NotebookTape tape;
   final bool paperclip;
   final bool alternate;
+  final Color? color;
+  final bool bordered;
 
   @override
   Widget build(BuildContext context) {
-    final ink = context.inkColor;
-    final borderColor = accent == null
-        ? ink.withValues(alpha: .88)
-        : Color.lerp(ink, accent, .34)!;
-    final radius = alternate
-        ? const BorderRadius.only(
-            topLeft: Radius.elliptical(9, 3),
-            topRight: Radius.elliptical(3, 9),
-            bottomLeft: Radius.elliptical(3, 9),
-            bottomRight: Radius.elliptical(9, 3),
-          )
-        : const BorderRadius.only(
-            topLeft: Radius.elliptical(3, 9),
-            topRight: Radius.elliptical(9, 3),
-            bottomLeft: Radius.elliptical(8, 3),
-            bottomRight: Radius.elliptical(3, 9),
-          );
-
-    final card = _CardPress(
+    const radius = BorderRadius.all(Radius.circular(12));
+    return _CardPress(
       enabled: onTap != null || onLongPress != null,
-      child: Stack(
-        fit: StackFit.passthrough,
-        clipBehavior: Clip.none,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x24000000),
-                  blurRadius: 6,
-                  offset: Offset(2, 3),
-                ),
-              ],
-            ),
-            child: Material(
-              color: context.cardColor,
-              shape: RoundedRectangleBorder(
-                side: BorderSide(color: borderColor, width: 1.45),
-                borderRadius: radius,
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onTap,
-                onLongPress: onLongPress,
-                child: Padding(padding: padding, child: child),
-              ),
-            ),
+      child: Material(
+        color: color ?? context.cardColor,
+        shape: RoundedRectangleBorder(
+          side: bordered
+              ? BorderSide(color: context.ruledColor)
+              : BorderSide.none,
+          borderRadius: radius,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: DecoratedBox(
+            decoration: accent == null
+                ? const BoxDecoration()
+                : BoxDecoration(
+                    border: Border(left: BorderSide(color: accent!, width: 3)),
+                  ),
+            child: Padding(padding: padding, child: child),
           ),
-          if (tape != NotebookTape.none)
-            Positioned(
-              top: -10,
-              left: alternate ? null : 28,
-              right: alternate ? 32 : null,
-              child: _WashiTape(color: _tapeColor(tape)),
-            ),
-          if (paperclip)
-            const Positioned(
-              top: -15,
-              right: 22,
-              child: SizedBox(
-                width: 28,
-                height: 46,
-                child: CustomPaint(painter: _PaperclipPainter()),
-              ),
-            ),
-        ],
+        ),
       ),
     );
-    return rotation == 0
-        ? card
-        : Transform.rotate(angle: rotation, child: card);
   }
-
-  static Color _tapeColor(NotebookTape tape) => switch (tape) {
-    NotebookTape.yellow => LabColors.tapeYellow,
-    NotebookTape.blue => LabColors.tapeBlue,
-    NotebookTape.green => LabColors.tapeGreen,
-    NotebookTape.pink => LabColors.tapePink,
-    NotebookTape.none => Colors.transparent,
-  };
 }
 
 /// Presses the card in, then springs back. Still cards (no tap) are left
@@ -428,58 +218,6 @@ class _CardPressState extends State<_CardPress>
       ),
     );
   }
-}
-
-class _WashiTape extends StatelessWidget {
-  const _WashiTape({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: .065,
-      child: Container(
-        width: 60,
-        height: 22,
-        decoration: BoxDecoration(
-          color: color,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x22000000),
-              blurRadius: 2,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PaperclipPainter extends CustomPainter {
-  const _PaperclipPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(8, 8)
-      ..cubicTo(8, 3, 20, 3, 20, 10)
-      ..lineTo(20, 32)
-      ..cubicTo(20, 38, 12, 38, 12, 32)
-      ..lineTo(12, 14);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = const Color(0xFF8A8578)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class StaggerIn extends StatefulWidget {
@@ -722,10 +460,8 @@ class _StockBarState extends State<StockBar>
   }
 }
 
-/// Stock bar fill. The hatch pattern changes with the status as well as the
-/// colour (A11Y-04): sparse diagonal stripes when healthy, dense stripes when
-/// low, and a cross-hatch when empty, so the state is readable without
-/// colour vision.
+/// Rounded stock track. Status is also spoken and written beside the bar;
+/// an empty track keeps a hairline so "empty" is not a missing widget.
 class _HatchedBarPainter extends CustomPainter {
   const _HatchedBarPainter({
     required this.progress,
@@ -741,54 +477,35 @@ class _HatchedBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final shape = RRect.fromRectAndCorners(
-      rect.deflate(1),
-      topLeft: const Radius.elliptical(10, 4),
-      topRight: const Radius.elliptical(4, 10),
-      bottomLeft: const Radius.elliptical(4, 10),
-      bottomRight: const Radius.elliptical(10, 4),
+    if (size.width <= 0 || size.height <= 0) return;
+    final shape = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(size.height / 2),
     );
-    canvas.save();
-    canvas.clipRRect(shape);
-    final fillWidth = math.max(0.0, (size.width - 2) * progress);
-    final fill = Rect.fromLTWH(1, 1, fillWidth, size.height - 2);
-    canvas.drawRect(fill, Paint()..color = color);
-    canvas.save();
-    canvas.clipRect(fill);
-    final stripe = Paint()
-      ..color = Color.lerp(color, Colors.black, .18)!
-      ..strokeWidth = status == StockState.healthy ? 3.2 : 2.4;
-    final gap = status == StockState.healthy ? 12.0 : 6.0;
-    for (double x = -size.height; x < fillWidth + size.height; x += gap) {
-      canvas.drawLine(Offset(x, size.height), Offset(x + 9, 0), stripe);
-      if (status == StockState.empty) {
-        canvas.drawLine(Offset(x, 0), Offset(x + 9, size.height), stripe);
-      }
-    }
-    // An empty bar still shows a faint cross-hatch across the whole track
-    // so "empty" is not just "nothing".
-    if (progress <= 0) {
-      canvas.restore();
-      canvas.save();
-      canvas.clipRRect(shape);
-      final ghost = Paint()
-        ..color = ink.withValues(alpha: .18)
-        ..strokeWidth = 1.2;
-      for (double x = -size.height; x < size.width + size.height; x += 7) {
-        canvas.drawLine(Offset(x, size.height), Offset(x + 9, 0), ghost);
-        canvas.drawLine(Offset(x, 0), Offset(x + 9, size.height), ghost);
-      }
-    }
-    canvas.restore();
-    canvas.restore();
     canvas.drawRRect(
       shape,
-      Paint()
-        ..color = ink
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8,
+      Paint()..color = ink.withValues(alpha: .1),
     );
+    final fillWidth = math.max(0.0, size.width * progress.clamp(0.0, 1.08));
+    if (fillWidth > 0) {
+      canvas.save();
+      canvas.clipRRect(shape);
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, fillWidth, size.height),
+        Paint()..color = color,
+      );
+      canvas.restore();
+    } else if (status == StockState.empty) {
+      final y = size.height / 2;
+      canvas.drawLine(
+        Offset(4, y),
+        Offset(size.width - 4, y),
+        Paint()
+          ..color = ink.withValues(alpha: .28)
+          ..strokeWidth = 1.2
+          ..strokeCap = StrokeCap.round,
+      );
+    }
   }
 
   @override
@@ -839,29 +556,24 @@ class StatusBadge extends StatelessWidget {
     return Semantics(
       label: stockSpoken(status),
       excludeSemantics: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: status == StockState.empty
-              ? LabColors.highlighter.withValues(alpha: .75)
-              : color.withValues(alpha: .12),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(2),
-            topRight: Radius.circular(9),
-            bottomLeft: Radius.circular(8),
-            bottomRight: Radius.circular(3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-          child: Text(
+          const SizedBox(width: 6),
+          Text(
             stockCaption(status),
             style: TextStyle(
-              color: status == StockState.empty ? context.inkColor : color,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -899,13 +611,12 @@ class NotebookFilterWord extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: selected ? context.inkColor : context.mutedInkColor,
+                  color: selected
+                      ? context.healthyColor
+                      : context.mutedInkColor,
                   fontSize: fontSize,
                   height: 1,
-                  fontWeight: FontWeight.w700,
-                  decoration: selected ? TextDecoration.underline : null,
-                  decorationColor: context.marginRedColor,
-                  decorationThickness: 2,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                 ),
               ),
             ),
@@ -957,8 +668,7 @@ class DetailsToggle extends StatelessWidget {
                     TextSpan(
                       text: title,
                       style: TextStyle(
-                        fontFamily: 'Caveat',
-                        fontSize: 22,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: context.inkColor,
                       ),
@@ -1003,7 +713,6 @@ class CircledNotebookButton extends StatelessWidget {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         foregroundColor: foreground,
-        side: BorderSide(color: foreground, width: 1.8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
@@ -1020,22 +729,18 @@ class MarginNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: -.12,
-      // Lives in a narrow margin: shrinks rather than clips with large text.
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Text(
-          text,
-          maxLines: 2,
-          style: TextStyle(
-            color: context.marginRedColor,
-            fontFamily: 'Caveat',
-            fontSize: 16,
-            height: .9,
-            fontWeight: FontWeight.w700,
-          ),
+    // Lives in a narrow margin: shrinks rather than clips with large text.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        maxLines: 2,
+        style: TextStyle(
+          color: context.marginRedColor,
+          fontSize: 13,
+          height: 1.1,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -1075,11 +780,7 @@ class EmptyNotebookState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Caveat',
-              fontSize: 27,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
           Text(

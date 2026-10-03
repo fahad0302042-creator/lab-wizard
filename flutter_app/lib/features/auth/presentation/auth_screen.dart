@@ -66,15 +66,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           'Lab Wizard',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontFamily: 'Kalam',
                             fontSize: 36,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           _signUp
-                              ? 'start a new lab notebook'
-                              : 'open your lab notebook',
+                              ? 'Create a lab account'
+                              : 'Sign in to your lab',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: context.mutedInkColor),
                         ),

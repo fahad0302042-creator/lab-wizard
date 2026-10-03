@@ -14,7 +14,7 @@ class OrganizationCard extends ConsumerWidget {
     final activeLab = ref.watch(activeLabProvider);
     final isPersonal = activeLab == null;
     final access = activeLab == null
-        ? 'Your inventory is stored privately in your personal lab notebook.'
+        ? 'Your inventory is stored privately in Personal Lab.'
         : activeLab.userRole.isReadOnly
         ? 'Your role can look, not change stock.'
         : 'New items are saved here.';
@@ -37,7 +37,6 @@ class OrganizationCard extends ConsumerWidget {
                 child: Text(
                   'organization & labs',
                   style: TextStyle(
-                    fontFamily: 'Caveat',
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                   ),

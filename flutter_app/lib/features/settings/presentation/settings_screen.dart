@@ -328,63 +328,50 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 13),
             const DiagnosticsCard(),
             const SizedBox(height: 13),
-            // Pulls left onto the page's red margin line. Other cards stay
-            // in the writing column.
-            Container(
-              margin: const EdgeInsets.only(left: -(notebookGutter - 10)),
-              child: NotebookCard(
-                accent: context.marginRedColor,
-                padding: EdgeInsets.zero,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(color: context.marginRedColor, width: 6),
+            NotebookCard(
+              accent: context.marginRedColor,
+              padding: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _CardTitle(
+                      icon: Icons.warning_amber_outlined,
+                      title: 'danger zone',
+                      color: context.marginRedColor,
                     ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _CardTitle(
-                          icon: Icons.warning_amber_outlined,
-                          title: 'danger zone',
-                          color: context.marginRedColor,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Deleting the account removes all chemicals, apparatus and '
-                          'history from Lab Wizard for good. You can export '
-                          'everything first.',
-                          style: TextStyle(color: context.mutedInkColor),
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          key: const Key('delete-account'),
-                          onPressed: () async {
-                            final deleted = await showDeleteAccountSheet(
-                              context,
-                            );
-                            if (deleted == true && context.mounted) {
-                              Navigator.of(context)
-                                  .popUntil((route) => route.isFirst);
-                            }
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: context.marginRedColor,
-                          ),
-                          icon: const Icon(Icons.delete_forever_outlined),
-                          label: const Text('Delete account…'),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Deleting the account removes all chemicals, apparatus and '
+                      'history from Lab Wizard for good. You can export '
+                      'everything first.',
+                      style: TextStyle(color: context.mutedInkColor),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      key: const Key('delete-account'),
+                      onPressed: () async {
+                        final deleted = await showDeleteAccountSheet(context);
+                        if (deleted == true && context.mounted) {
+                          Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst);
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: context.marginRedColor,
+                      ),
+                      icon: const Icon(Icons.delete_forever_outlined),
+                      label: const Text('Delete account…'),
+                    ),
+                  ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              'Lab Wizard for Android · modern notebook edition',
+              'Lab Wizard for Android',
               textAlign: TextAlign.center,
               style: TextStyle(color: context.mutedInkColor, fontSize: 12),
             ),
@@ -500,7 +487,6 @@ class _CardTitle extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            fontFamily: 'Kalam',
             fontSize: 21,
             fontWeight: FontWeight.bold,
           ),

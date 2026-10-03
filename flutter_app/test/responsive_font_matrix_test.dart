@@ -54,11 +54,11 @@ void main() {
           scale: scale,
         );
         await tester.scrollUntilVisible(
-          find.text('actions this week'),
+          find.text('This week'),
           200,
           scrollable: find.byType(Scrollable).first,
         );
-        expect(find.text('actions this week'), findsOneWidget);
+        expect(find.text('This week'), findsOneWidget);
       });
 
       testWidgets('$label: item detail sheet', (tester) async {

@@ -178,13 +178,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 heroTag: 'add-${widget.kind.name}',
                 tooltip: _isChemical ? 'Add chemical' : 'Add apparatus',
                 onPressed: () => showAddItemSheet(context, ref, widget.kind),
-                elevation: 2,
-                backgroundColor: context.cardColor,
-                foregroundColor: context.inkColor,
-                shape: CircleBorder(
-                  side: BorderSide(color: context.inkColor, width: 2),
-                ),
-                child: const Icon(Icons.add, size: 27),
+                elevation: 1,
+                backgroundColor: LabColors.green,
+                foregroundColor: Colors.white,
+                shape: const CircleBorder(),
+                child: const Icon(Icons.add, size: 26),
               ),
         body: LayoutBuilder(
           builder: (context, constraints) => Column(
@@ -1190,7 +1188,7 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                                     fontWeight: FontWeight.w700,
                                     color: widget.available.contains(letter)
                                         ? (letter == _active
-                                              ? context.marginRedColor
+                                              ? context.healthyColor
                                               : context.inkColor)
                                         : context.mutedInkColor.withValues(
                                             alpha: .32,
@@ -1216,23 +1214,15 @@ class _AlphabetIndexState extends State<AlphabetIndex> {
                         width: 44,
                         height: 44,
                         alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: context.marginRedColor,
+                        decoration: const BoxDecoration(
+                          color: LabColors.green,
                           shape: BoxShape.circle,
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x33000000),
-                              blurRadius: 6,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
                         ),
                         child: Text(
                           _active!,
-                          style: TextStyle(
-                            color: context.cardColor,
-                            fontFamily: 'Caveat',
-                            fontSize: 26,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
                             height: 1,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1797,9 +1787,6 @@ class _InventoryCard extends StatelessWidget {
                               fontSize: 15,
                               height: 1,
                               fontWeight: FontWeight.w700,
-                              backgroundColor: flight.status == StockState.empty
-                                  ? LabColors.highlighter.withValues(alpha: .72)
-                                  : null,
                             ),
                           ),
                         ),
@@ -2042,7 +2029,7 @@ class _CompactRow extends StatelessWidget {
   }
 }
 
-/// Hand-drawn style check circle used while selecting items.
+/// Selection mark. Green fill keeps the check at 6.6:1 in both themes.
 class _SelectionMark extends StatelessWidget {
   const _SelectionMark({required this.selected, super.key});
 
@@ -2050,6 +2037,7 @@ class _SelectionMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final border = selected ? LabColors.green : context.mutedInkColor;
     return Semantics(
       label: selected ? 'selected' : 'not selected',
       child: AnimatedContainer(
@@ -2057,12 +2045,12 @@ class _SelectionMark extends StatelessWidget {
         width: 24,
         height: 24,
         decoration: BoxDecoration(
-          color: selected ? context.inkColor : Colors.transparent,
+          color: selected ? LabColors.green : Colors.transparent,
           shape: BoxShape.circle,
-          border: Border.all(color: context.inkColor, width: 1.8),
+          border: Border.all(color: border),
         ),
         child: selected
-            ? Icon(Icons.check, size: 16, color: context.paperColor)
+            ? const Icon(Icons.check, size: 16, color: Colors.white)
             : null,
       ),
     );
@@ -2301,23 +2289,14 @@ class _AddDoodle extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: context.cardColor,
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: LabColors.green,
                   shape: BoxShape.circle,
-                  border: Border.all(color: context.inkColor, width: 2.3),
                 ),
                 alignment: Alignment.center,
-                child: const Text(
-                  '+',
-                  style: TextStyle(
-                    fontFamily: 'Caveat',
-                    fontSize: 36,
-                    height: .9,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 26),
               ),
               const SizedBox(height: 4),
               Text(

@@ -51,7 +51,6 @@ class NotificationSettingsCard extends ConsumerWidget {
               const Text(
                 'notifications',
                 style: TextStyle(
-                  fontFamily: 'Kalam',
                   fontSize: 21,
                   fontWeight: FontWeight.bold,
                 ),

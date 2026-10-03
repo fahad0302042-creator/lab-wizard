@@ -75,7 +75,6 @@ class AlertsScreen extends ConsumerWidget {
                       const Text(
                         'this week',
                         style: TextStyle(
-                          fontFamily: 'Kalam',
                           fontSize: 21,
                           fontWeight: FontWeight.bold,
                         ),
@@ -106,7 +105,6 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          fontFamily: 'Kalam',
           fontSize: 19,
           fontWeight: FontWeight.bold,
           color: context.mutedInkColor,
