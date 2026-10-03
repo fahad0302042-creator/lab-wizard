@@ -297,52 +297,52 @@ class NotebookCard extends StatelessWidget {
     final card = _CardPress(
       enabled: onTap != null || onLongPress != null,
       child: Stack(
-      fit: StackFit.passthrough,
-      clipBehavior: Clip.none,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x24000000),
-                blurRadius: 6,
-                offset: Offset(2, 3),
-              ),
-            ],
-          ),
-          child: Material(
-            color: context.cardColor,
-            shape: RoundedRectangleBorder(
-              side: BorderSide(color: borderColor, width: 1.45),
+        fit: StackFit.passthrough,
+        clipBehavior: Clip.none,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
               borderRadius: radius,
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x24000000),
+                  blurRadius: 6,
+                  offset: Offset(2, 3),
+                ),
+              ],
             ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap,
-              onLongPress: onLongPress,
-              child: Padding(padding: padding, child: child),
-            ),
-          ),
-        ),
-        if (tape != NotebookTape.none)
-          Positioned(
-            top: -10,
-            left: alternate ? null : 28,
-            right: alternate ? 32 : null,
-            child: _WashiTape(color: _tapeColor(tape)),
-          ),
-        if (paperclip)
-          const Positioned(
-            top: -15,
-            right: 22,
-            child: SizedBox(
-              width: 28,
-              height: 46,
-              child: CustomPaint(painter: _PaperclipPainter()),
+            child: Material(
+              color: context.cardColor,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: borderColor, width: 1.45),
+                borderRadius: radius,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap,
+                onLongPress: onLongPress,
+                child: Padding(padding: padding, child: child),
+              ),
             ),
           ),
-      ],
+          if (tape != NotebookTape.none)
+            Positioned(
+              top: -10,
+              left: alternate ? null : 28,
+              right: alternate ? 32 : null,
+              child: _WashiTape(color: _tapeColor(tape)),
+            ),
+          if (paperclip)
+            const Positioned(
+              top: -15,
+              right: 22,
+              child: SizedBox(
+                width: 28,
+                height: 46,
+                child: CustomPaint(painter: _PaperclipPainter()),
+              ),
+            ),
+        ],
       ),
     );
     return rotation == 0

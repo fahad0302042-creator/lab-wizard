@@ -513,20 +513,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           index: index,
           onceKey: '${widget.kind.name}:${item.id}',
           child: _InventoryCard(
-          item: item,
-          index: index,
-          tape: index == 0 ? NotebookTape.yellow : NotebookTape.none,
-          kind: widget.kind,
-          selecting: _selectionMode,
-          selected: _selected.contains(item.id),
-          onTap: () =>
-              _selectionMode ? _toggleSelected(item.id) : _openDetail(item.id),
-          onLongPress: () => _selectionMode
-              ? _toggleSelected(item.id)
-              : _enterSelection(item.id),
-          onConsume: () => _openAction(item.id, _primaryAction),
-          onRestock: () => _openAction(item.id, InventoryAction.restock),
-        ),
+            item: item,
+            index: index,
+            tape: index == 0 ? NotebookTape.yellow : NotebookTape.none,
+            kind: widget.kind,
+            selecting: _selectionMode,
+            selected: _selected.contains(item.id),
+            onTap: () => _selectionMode
+                ? _toggleSelected(item.id)
+                : _openDetail(item.id),
+            onLongPress: () => _selectionMode
+                ? _toggleSelected(item.id)
+                : _enterSelection(item.id),
+            onConsume: () => _openAction(item.id, _primaryAction),
+            onRestock: () => _openAction(item.id, InventoryAction.restock),
+          ),
         ),
       ),
     );
@@ -545,17 +546,18 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           index: index,
           onceKey: '${widget.kind.name}:${item.id}',
           child: _CompactRow(
-        item: item,
-        kind: widget.kind,
-        selecting: _selectionMode,
-        selected: _selected.contains(item.id),
-        onTap: () =>
-            _selectionMode ? _toggleSelected(item.id) : _openDetail(item.id),
-        onLongPress: () => _selectionMode
-            ? _toggleSelected(item.id)
-            : _enterSelection(item.id),
-        onConsume: () => _openAction(item.id, _primaryAction),
-        onRestock: () => _openAction(item.id, InventoryAction.restock),
+            item: item,
+            kind: widget.kind,
+            selecting: _selectionMode,
+            selected: _selected.contains(item.id),
+            onTap: () => _selectionMode
+                ? _toggleSelected(item.id)
+                : _openDetail(item.id),
+            onLongPress: () => _selectionMode
+                ? _toggleSelected(item.id)
+                : _enterSelection(item.id),
+            onConsume: () => _openAction(item.id, _primaryAction),
+            onRestock: () => _openAction(item.id, InventoryAction.restock),
           ),
         ),
       ),
@@ -570,14 +572,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   void _openDetail(String id) =>
       showItemDetailSheet(context, ref, widget.kind, id);
 
-  Future<InventoryActionResult?> _openAction(String id, InventoryAction action) =>
-      showInventoryActionSheet(
-        context,
-        ref,
-        kind: widget.kind,
-        itemId: id,
-        action: action,
-      );
+  Future<InventoryActionResult?> _openAction(
+    String id,
+    InventoryAction action,
+  ) => showInventoryActionSheet(
+    context,
+    ref,
+    kind: widget.kind,
+    itemId: id,
+    action: action,
+  );
 
   void _handleMenu(_ShelfMenu value, InventoryState state) {
     switch (value) {
@@ -1797,7 +1801,8 @@ class _InventoryCard extends StatelessWidget {
                           color: context.marginRedColor,
                           onTap: selecting
                               ? onTap
-                              : () => unawaited(flight.play(context, onConsume)),
+                              : () =>
+                                    unawaited(flight.play(context, onConsume)),
                         ),
                         const SizedBox(width: 8),
                         _CardAction(
@@ -1805,7 +1810,8 @@ class _InventoryCard extends StatelessWidget {
                           color: context.healthyColor,
                           onTap: selecting
                               ? onTap
-                              : () => unawaited(flight.play(context, onRestock)),
+                              : () =>
+                                    unawaited(flight.play(context, onRestock)),
                         ),
                       ],
                     ),
