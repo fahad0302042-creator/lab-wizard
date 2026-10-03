@@ -1019,11 +1019,8 @@ class _ShelfControls extends StatelessWidget {
                               child: Text('sort by ${value.name}'),
                             ),
                         ],
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 4,
-                          ),
+                        child: SizedBox(
+                          height: 48,
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Row(
