@@ -970,42 +970,37 @@ class _ShelfControls extends StatelessWidget {
               ? const SizedBox(width: double.infinity)
               : Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      NotebookFilterWord(
+                        label: 'all',
+                        selected: filter == _StockFilter.all,
+                        onTap: () => onFilter(_StockFilter.all),
+                        fontSize: 15,
+                      ),
+                      NotebookFilterWord(
+                        label: 'low',
+                        selected: filter == _StockFilter.low,
+                        onTap: () => onFilter(_StockFilter.low),
+                        fontSize: 15,
+                      ),
+                      NotebookFilterWord(
+                        label: 'critical',
+                        selected: filter == _StockFilter.critical,
+                        onTap: () => onFilter(_StockFilter.critical),
+                        fontSize: 15,
+                      ),
+                      if (kind == ItemKind.chemical)
                         NotebookFilterWord(
-                          label: 'all',
-                          selected: filter == _StockFilter.all,
-                          onTap: () => onFilter(_StockFilter.all),
-                          fontSize: 19,
+                          key: const Key('filter-expiring'),
+                          label: 'expiring',
+                          selected: filter == _StockFilter.expiring,
+                          onTap: () => onFilter(_StockFilter.expiring),
+                          fontSize: 15,
                         ),
-                        const SizedBox(width: 8),
-                        NotebookFilterWord(
-                          label: 'low',
-                          selected: filter == _StockFilter.low,
-                          onTap: () => onFilter(_StockFilter.low),
-                          fontSize: 19,
-                        ),
-                        const SizedBox(width: 8),
-                        NotebookFilterWord(
-                          label: 'critical',
-                          selected: filter == _StockFilter.critical,
-                          onTap: () => onFilter(_StockFilter.critical),
-                          fontSize: 19,
-                        ),
-                        if (kind == ItemKind.chemical) ...[
-                          const SizedBox(width: 8),
-                          NotebookFilterWord(
-                            key: const Key('filter-expiring'),
-                            label: 'expiring',
-                            selected: filter == _StockFilter.expiring,
-                            onTap: () => onFilter(_StockFilter.expiring),
-                            fontSize: 19,
-                          ),
-                        ],
-                        const SizedBox(width: 10),
                         Container(
                           width: 1,
                           height: 16,
@@ -1029,43 +1024,44 @@ class _ShelfControls extends StatelessWidget {
                               horizontal: 4,
                               vertical: 4,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.sort,
-                                  size: 16,
-                                  color: context.mutedInkColor,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'sort: ${sort.name}',
-                                  style: TextStyle(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.sort,
+                                    size: 16,
                                     color: context.mutedInkColor,
-                                    fontSize: 16,
-                                    height: 1,
-                                    fontWeight: FontWeight.w700,
                                   ),
-                                ),
-                                Icon(
-                                  Icons.arrow_drop_down,
-                                  size: 16,
-                                  color: context.mutedInkColor,
-                                ),
-                              ],
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'sort: ${sort.name}',
+                                    style: TextStyle(
+                                      color: context.mutedInkColor,
+                                      fontSize: 14,
+                                      height: 1,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    size: 16,
+                                    color: context.mutedInkColor,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$shown of $total',
-                          style: TextStyle(
-                            color: context.mutedInkColor,
-                            fontSize: 11,
-                          ),
+                      Text(
+                        '$shown of $total',
+                        style: TextStyle(
+                          color: context.mutedInkColor,
+                          fontSize: 11,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
         ),
@@ -1791,22 +1787,39 @@ class _InventoryCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _CardAction(
-                          label: kind == ItemKind.chemical ? 'use' : 'damage',
-                          color: context.marginRedColor,
-                          onTap: selecting
-                              ? onTap
-                              : () =>
-                                    unawaited(flight.play(context, onConsume)),
-                        ),
-                        const SizedBox(width: 8),
-                        _CardAction(
-                          label: '+ stock',
-                          color: context.healthyColor,
-                          onTap: selecting
-                              ? onTap
-                              : () =>
-                                    unawaited(flight.play(context, onRestock)),
+                        // Sans labels are wider than the old handwriting, so
+                        // the actions shrink instead of overflowing (A11Y-02).
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _CardAction(
+                                  label: kind == ItemKind.chemical
+                                      ? 'use'
+                                      : 'damage',
+                                  color: context.marginRedColor,
+                                  onTap: selecting
+                                      ? onTap
+                                      : () => unawaited(
+                                          flight.play(context, onConsume),
+                                        ),
+                                ),
+                                const SizedBox(width: 8),
+                                _CardAction(
+                                  label: '+ stock',
+                                  color: context.healthyColor,
+                                  onTap: selecting
+                                      ? onTap
+                                      : () => unawaited(
+                                          flight.play(context, onRestock),
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),

@@ -108,7 +108,7 @@ void main() {
     testWidgets('the dashboard settles at once', (tester) async {
       await pumpReduced(tester, dashboard());
       expect(tester.hasRunningAnimations, isFalse);
-      expect(find.text('chemicals'), findsWidgets);
+      expect(find.text('Chemicals'), findsWidgets);
     });
 
     testWidgets('the shelf settles at once', (tester) async {

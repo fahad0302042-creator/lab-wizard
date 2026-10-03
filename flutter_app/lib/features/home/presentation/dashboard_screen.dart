@@ -54,7 +54,7 @@ class DashboardScreen extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    const SizedBox(width: 48),
+                    const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
                         'Lab Wizard',
@@ -75,7 +75,6 @@ class DashboardScreen extends ConsumerWidget {
                     IconButton(
                       tooltip: 'Settings',
                       onPressed: onSettings,
-                      visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.settings_outlined),
                     ),
                   ],
@@ -108,7 +107,7 @@ class DashboardScreen extends ConsumerWidget {
             onTap: () => _showGlobalSearch(context, ref),
             color: context.tileColor,
             bordered: false,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
             child: Row(
               children: [
                 Icon(Icons.search, color: context.mutedInkColor, size: 20),
@@ -707,7 +706,6 @@ class _HeaderSyncButton extends StatelessWidget {
         : 'Inventory synced';
     return IconButton(
       tooltip: '$label — tap to refresh',
-      visualDensity: VisualDensity.compact,
       onPressed: state.refreshing ? null : onPressed,
       icon: state.refreshing
           ? SizedBox.square(
@@ -1067,9 +1065,11 @@ class _StockRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
           children: [
             Container(
               width: 8,
@@ -1102,6 +1102,7 @@ class _StockRow extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
