@@ -865,15 +865,15 @@ class _ConsumptionTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showIncrease = rows.any((row) => row.added > 0);
     return Column(
       children: [
         _tableRow(
           context,
           name: 'Name',
-          increase: showIncrease ? 'Increase' : null,
-          used: 'Used',
-          left: 'Left',
+          increase: 'Increase',
+          afterIncrease: 'Stock after increase',
+          consumption: 'Consumption',
+          afterConsumption: 'Stock after consumption',
           header: true,
         ),
         for (final row in rows)
@@ -881,21 +881,20 @@ class _ConsumptionTable extends StatelessWidget {
             context,
             name: row.name,
             detail: row.formulaOrCategory,
-            increase: showIncrease
-                ? (row.added > 0 ? '+${formatQuantity(row.added)}' : '0')
-                : null,
-            used: '-${formatQuantity(row.used)}',
-            left: '${formatQuantity(row.left)} ${row.unit}',
+            increase: row.added > 0 ? '+${formatQuantity(row.added)}' : '0',
+            afterIncrease:
+                '${formatQuantity(row.startStock + row.added)} ${row.unit}',
+            consumption: '-${formatQuantity(row.used)}',
+            afterConsumption: '${formatQuantity(row.left)} ${row.unit}',
             increaseColor: row.added > 0 ? context.healthyColor : null,
           ),
-        if (showIncrease)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'Start + increase − used = left.',
-              style: TextStyle(color: context.mutedInkColor, fontSize: 12),
-            ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'Stock after increase − consumption = stock after consumption.',
+            style: TextStyle(color: context.mutedInkColor, fontSize: 12),
           ),
+        ),
       ],
     );
   }
@@ -903,25 +902,26 @@ class _ConsumptionTable extends StatelessWidget {
   Widget _tableRow(
     BuildContext context, {
     required String name,
-    required String used,
-    required String left,
-    String? increase,
+    required String increase,
+    required String afterIncrease,
+    required String consumption,
+    required String afterConsumption,
     String detail = '',
     bool header = false,
     Color? increaseColor,
   }) {
     final style = TextStyle(
-      fontSize: header ? 13 : 14,
-      height: 1.2,
+      fontSize: header ? 11 : 13,
+      height: 1.15,
       fontWeight: FontWeight.w700,
       color: header ? context.mutedInkColor : context.inkColor,
     );
     Widget number(String text, {Color? color}) => Expanded(
-      flex: 2,
+      flex: 3,
       child: Text(
         text,
         textAlign: TextAlign.right,
-        maxLines: 1,
+        maxLines: header ? 3 : 2,
         overflow: TextOverflow.ellipsis,
         style: style.copyWith(color: color ?? style.color),
       ),
@@ -946,7 +946,7 @@ class _ConsumptionTable extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  maxLines: 1,
+                  maxLines: header ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                   style: style,
                 ),
@@ -963,9 +963,13 @@ class _ConsumptionTable extends StatelessWidget {
               ],
             ),
           ),
-          if (increase != null) number(increase, color: increaseColor),
-          number(used, color: header ? null : context.lowColor),
-          number(left),
+          number(increase, color: header ? null : increaseColor),
+          number(afterIncrease),
+          number(
+            consumption,
+            color: header ? null : context.lowColor,
+          ),
+          number(afterConsumption),
         ],
       ),
     );

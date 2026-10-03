@@ -110,8 +110,9 @@ const _red = PdfColor.fromInt(0xFFB23A2E);
 const _amber = PdfColor.fromInt(0xFFD89A3E);
 
 /// Builds the A4 consumption report: branded header, 3 KPI cards,
-/// and the consumption table. The increase column is added only when
-/// something was restocked; otherwise the original columns stay.
+/// and the consumption table. Columns are name, increase, stock after
+/// increase, consumption, and stock after consumption. Run-out estimates
+/// and damage or incident sections are not included.
 Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final generated = input.generatedAt ?? DateTime.now();
   final profile = input.profile;
@@ -290,11 +291,9 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
   final expiry = input.expiry;
   final loans = input.loans;
   final services = input.services;
-  final estimates = input.runOut.estimates.take(10).toList();
 
   // Usage stats for KPI boxes. Same cards as the original report.
   final usageRows = input.usageRows;
-  final showIncrease = usageRows.any((row) => row.added > 0);
   final itemsUsedCount =
       input.itemsUsedCount ?? usageRows.where((row) => row.used > 0).length;
   final totalUsesCount = input.logs
@@ -314,10 +313,10 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
       child: pw.Text(
         label,
         style: pw.TextStyle(
-          fontSize: 9.5,
+          fontSize: 8,
           fontWeight: pw.FontWeight.bold,
           color: _muted,
-          letterSpacing: 0.5,
+          letterSpacing: 0.2,
         ),
       ),
     ),
@@ -371,7 +370,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           ),
         ),
 
-        // Used items, plus restocked items when the increase column is shown.
+        // Used items and restocked items only.
         if (usageRows.isEmpty)
           pw.Padding(
             padding: const pw.EdgeInsets.symmetric(vertical: 24),
@@ -381,12 +380,14 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
               ),
             ),
           )
-        else
+        else ...[
           pw.Table(
-            columnWidths: {
-              0: const pw.FlexColumnWidth(3.4),
-              for (var column = 1; column < (showIncrease ? 5 : 4); column++)
-                column: const pw.FlexColumnWidth(1.6),
+            columnWidths: const {
+              0: pw.FlexColumnWidth(2.4),
+              1: pw.FlexColumnWidth(1.3),
+              2: pw.FlexColumnWidth(1.7),
+              3: pw.FlexColumnWidth(1.5),
+              4: pw.FlexColumnWidth(1.8),
             },
             children: [
               pw.TableRow(
@@ -397,10 +398,10 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                 ),
                 children: [
                   usageHead('NAME', left: true),
-                  usageHead('START STOCK'),
-                  if (showIncrease) usageHead('INCREASE'),
-                  usageHead('CONSUMED'),
-                  usageHead('REMAINING'),
+                  usageHead('INCREASE'),
+                  usageHead('STOCK AFTER INCREASE'),
+                  usageHead('CONSUMPTION'),
+                  usageHead('STOCK AFTER CONSUMPTION'),
                 ],
               ),
               for (final row in usageRows)
@@ -440,15 +441,16 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                         ],
                       ),
                     ),
-                    usageQty('${formatQuantity(row.startStock)} ${row.unit}'),
-                    if (showIncrease)
-                      usageQty(
-                        row.added > 0
-                            ? '+${formatQuantity(row.added)} ${row.unit}'
-                            : '0 ${row.unit}',
-                        color: row.added > 0 ? _green : _muted,
-                        emphasize: row.added > 0,
-                      ),
+                    usageQty(
+                      row.added > 0
+                          ? '+${formatQuantity(row.added)} ${row.unit}'
+                          : '0 ${row.unit}',
+                      color: row.added > 0 ? _green : _muted,
+                      emphasize: row.added > 0,
+                    ),
+                    usageQty(
+                      '${formatQuantity(row.startStock + row.added)} ${row.unit}',
+                    ),
                     usageQty(
                       '-${formatQuantity(row.used)} ${row.unit}',
                       color: _amber,
@@ -463,35 +465,11 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
                 ),
             ],
           ),
-        if (showIncrease) ...[
           pw.SizedBox(height: 8),
           note(
-            'Start stock + increase − consumed = remaining. '
+            'Stock after increase − consumption = stock after consumption. '
             'Only used and restocked items are listed.',
           ),
-        ],
-
-        // 3. Run-out estimates
-        if (estimates.isNotEmpty) ...[
-          heading('Run-out estimates'),
-          table(
-            const ['Item', 'Left', 'Runs out', 'Basis'],
-            [
-              for (final estimate in estimates)
-                [
-                  estimate.name,
-                  '${formatQuantity(estimate.quantity)} ${estimate.unit}',
-                  estimate.headline,
-                  '${estimate.entries} uses, '
-                      '${formatQuantity(estimate.consumedTotal)} '
-                      '${estimate.unit} in ${estimate.historyDays} days',
-                ],
-            ],
-          ),
-          if (input.runOut.withoutEstimate > 0) ...[
-            pw.SizedBox(height: 4),
-            note(input.runOut.gapSummary),
-          ],
         ],
 
         // 5. Expiry
@@ -512,28 +490,7 @@ Future<Uint8List> buildReportPdf(ReportPdfInput input) async {
           ),
         ],
 
-        // 6. Damage in this range
-        if (!input.damage.isEmpty) ...[
-          heading('Damage in this range'),
-          table(
-            const ['Item', 'Incidents', 'Amount', 'Last'],
-            [
-              for (final row in input.damage.rows)
-                [
-                  row.name,
-                  '${row.incidents}',
-                  '${formatQuantity(row.amount)} ${row.unit}'.trim(),
-                  day.format(row.lastAt.toLocal()),
-                ],
-            ],
-            alignments: const {
-              1: pw.Alignment.centerRight,
-              2: pw.Alignment.centerRight,
-            },
-          ),
-        ],
-
-        // 7. Overdue loans
+        // Overdue loans
         if (loans != null && !loans.isEmpty) ...[
           heading('Overdue loans'),
           table(
