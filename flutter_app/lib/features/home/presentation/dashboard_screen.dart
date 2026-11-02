@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -222,7 +223,7 @@ class DashboardScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 26),
-          const PageHeading('quick actions', trailing: SizedBox.shrink()),
+          const PageHeading('quick actions'),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -903,9 +904,3 @@ class _ActivityRow extends StatelessWidget {
   }
 }
 
-extension<T> on Iterable<T> {
-  T? get firstOrNull {
-    final iterator = this.iterator;
-    return iterator.moveNext() ? iterator.current : null;
-  }
-}

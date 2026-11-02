@@ -1,9 +1,11 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../domain/models.dart';
@@ -350,7 +352,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+          .showSnackBar(SnackBar(content: Text(friendlyError(error))));
       setState(() => _saving = false);
     }
   }
@@ -581,7 +583,7 @@ class _EditItemFormState extends ConsumerState<_EditItemForm> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+          .showSnackBar(SnackBar(content: Text(friendlyError(error))));
     }
   }
 }
@@ -780,7 +782,7 @@ class _BatchConsumeFormState extends ConsumerState<_BatchConsumeForm> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+          .showSnackBar(SnackBar(content: Text(friendlyError(error))));
     }
   }
 }
@@ -1017,7 +1019,7 @@ class _ActionFormState extends ConsumerState<_ActionForm> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+          .showSnackBar(SnackBar(content: Text(friendlyError(error))));
     }
   }
 }
@@ -1246,7 +1248,7 @@ class _ItemDetail extends ConsumerWidget {
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+          .showSnackBar(SnackBar(content: Text(friendlyError(error))));
     }
   }
 }
@@ -1333,30 +1335,5 @@ class _QuantityPreview extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-String _friendlyError(Object error) {
-  final message = error.toString().replaceFirst(
-    RegExp(r'^[A-Za-z]+Exception:\s*'),
-    '',
-  );
-  final lower = message.toLowerCase();
-  if (lower.contains('socket') ||
-      lower.contains('network') ||
-      lower.contains('connection') ||
-      lower.contains('host lookup')) {
-    return 'You appear to be offline. The change will sync when possible.';
-  }
-  if (lower.contains('permission') || lower.contains('row-level security')) {
-    return 'This account does not have permission to change that item.';
-  }
-  return message.isEmpty ? 'Something went wrong. Please try again.' : message;
-}
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull {
-    final iterator = this.iterator;
-    return iterator.moveNext() ? iterator.current : null;
   }
 }

@@ -265,16 +265,19 @@ class NotebookCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Material(
-            color: context.cardColor,
-            shape: RoundedRectangleBorder(
-              side: BorderSide(color: borderColor, width: 1.45),
-              borderRadius: radius,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap,
-              child: Padding(padding: padding, child: child),
+          child: Semantics(
+            button: onTap != null,
+            child: Material(
+              color: context.cardColor,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: borderColor, width: 1.45),
+                borderRadius: radius,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap,
+                child: Padding(padding: padding, child: child),
+              ),
             ),
           ),
         ),
@@ -579,19 +582,28 @@ class NotebookFilterWord extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? context.marginRedColor : context.mutedInkColor,
-              fontFamily: 'Caveat',
-              fontSize: fontSize,
-              height: 1,
-              fontWeight: FontWeight.w700,
-              decoration: selected ? TextDecoration.underline : null,
-              decorationColor: context.marginRedColor,
-              decorationThickness: 2,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected
+                      ? context.marginRedColor
+                      : context.mutedInkColor,
+                  fontFamily: 'Caveat',
+                  fontSize: fontSize,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  decoration: selected ? TextDecoration.underline : null,
+                  decorationColor: context.marginRedColor,
+                  decorationThickness: 2,
+                ),
+              ),
             ),
           ),
         ),
@@ -623,7 +635,6 @@ class CircledNotebookButton extends StatelessWidget {
         foregroundColor: foreground,
         side: BorderSide(color: foreground, width: 1.8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       icon: icon == null ? const SizedBox.shrink() : Icon(icon, size: 18),
       label: Text(label),
