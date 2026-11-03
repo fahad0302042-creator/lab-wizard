@@ -8,7 +8,7 @@ on:
     paths:
       - "flutter_app/**"
       - "flutter_app_v2/**"
-      - ".github/workflows/flutter-checks.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
@@ -20,6 +20,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A malformed workflow file creates zero jobs and fails silently: the run
+  # goes red with no steps, no APK and nothing to read. That is exactly how a
+  # stray newline inside a run block cost a build. This job parses every
+  # workflow file so the mistake is caught by name instead.
+  workflow-files:
+    name: Check workflow files parse
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate YAML
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import glob, sys, yaml
+          failed = []
+          for path in sorted(glob.glob(".github/workflows/*.yml")):
+              try:
+                  document = yaml.safe_load(open(path))
+              except Exception as error:
+                  failed.append(f"{path}: {error}")
+                  continue
+              if not isinstance(document, dict) or "jobs" not in document:
+                  failed.append(f"{path}: no jobs:")
+                  continue
+              for job in document["jobs"].values():
+                  steps = job.get("steps")
+                  if not steps:
+                      failed.append(f"{path}: a job has no steps")
+          if failed:
+              print("\n".join(failed))
+              sys.exit(1)
+          print("all workflow files parse")
+          PY
+
   checks:
     name: Check ${{ matrix.app }}
     runs-on: ubuntu-latest
