@@ -156,7 +156,7 @@ class SettingsScreen extends ConsumerWidget {
         ...state.logs.map(
           (log) => [
             DateFormat('yyyy-MM-dd').format(log.loggedAt.toLocal()),
-            log.itemId,
+            _nameOf(state, log.itemId),
             log.action.name,
             formatQuantity(log.amount),
             log.note,
@@ -179,6 +179,18 @@ class SettingsScreen extends ConsumerWidget {
         context,
       ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
     }
+  }
+
+  /// A CSV is read by people, so history rows name the item rather than
+  /// quoting a database id.
+  String _nameOf(InventoryState state, String itemId) {
+    for (final item in state.chemicals) {
+      if (item.id == itemId) return item.name;
+    }
+    for (final item in state.apparatus) {
+      if (item.id == itemId) return item.name;
+    }
+    return 'Removed item';
   }
 
   /// Formula would be evaluated by a spreadsheet, so a leading operator is

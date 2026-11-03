@@ -188,3 +188,20 @@ Proper log deletion needs the repository work below.
 **Still to do from the review, carried as design constraints:** keep the outbox across
 sign-out, merge rather than replace on refresh, make batch actions atomic, and make
 deletes transactional.
+
+---
+
+## Status: feature-complete
+
+| Area | State |
+|---|---|
+| Shelf (chemicals) | done — jars, swipes, long-press, undo, add, item sheet, QR labels |
+| Shelf (apparatus) | done — same implementation, whole-piece ticks, "damage" instead of "use" |
+| Scanner | done — QR for both kinds, torch, manual search |
+| Reports | done — month picker, daily bars, most-used, shareable PDF |
+| Settings | done — appearance, sync, CSV export, sign out |
+| Navigation | done — four text-only tabs plus settings |
+
+**Data safety:** sign-out keeps the outbox; refresh merges instead of replacing; undo restores the quantity and deletes the log (queued when offline); item deletion runs item-first so a failure can't leave a ghost row.
+
+**Not built** (deliberate, listed so it isn't mistaken for done): multi-item batch consume, editing an individual log entry, and clearing a whole month. Those are the three remaining features the old app had that this one doesn't.
