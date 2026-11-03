@@ -20,7 +20,6 @@ class NotificationService {
 
   /// The daily nudge. Separate from [_channelId] so it can be silenced without
   /// silencing the immediate low-stock warnings.
-  static const _reminderId = 'low_stock_daily';
   static const _reminderChannelId = 'low_stock_daily';
   static const _dailyId = 90001;
 
@@ -100,7 +99,7 @@ class NotificationService {
           description:
               'One quiet reminder a day when something is below its order '
               'level.',
-          importance: Importance.lowImportance,
+          importance: Importance.low,
         ),
       );
       _channelCreated = true;
@@ -137,11 +136,13 @@ class NotificationService {
             channelDescription:
                 'One quiet reminder a day when something is below its order '
                 'level.',
-            importance: Importance.lowImportance,
+            importance: Importance.low,
             priority: Priority.low,
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
         payload: 'daily',
       );
