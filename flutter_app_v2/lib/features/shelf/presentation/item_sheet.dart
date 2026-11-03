@@ -6,7 +6,6 @@ import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass_jar.dart';
-import '../../../core/widgets/jar_metrics.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
 import 'action_sheet.dart';
