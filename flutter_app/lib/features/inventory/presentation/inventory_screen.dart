@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/notebook_widgets.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -220,7 +221,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           onPressed: () => showBatchConsumeSheet(context, ref),
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: const Text('batch consume (multiple)'),
                         ),
@@ -231,7 +231,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           style: TextButton.styleFrom(
                             foregroundColor: context.mutedInkColor,
                             padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           icon: _printingLabels
                               ? const SizedBox.square(
@@ -386,6 +385,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         name: 'Lab-Wizard-QR-Labels.pdf',
         onLayout: (_) => document.save(),
       );
+    } catch (error) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(SnackBar(content: Text(friendlyError(error))));
     } finally {
       if (mounted) setState(() => _printingLabels = false);
     }
@@ -605,9 +608,7 @@ class _InventoryCard extends StatelessWidget {
                       ),
                       _CardAction(
                         label: kind == ItemKind.chemical ? 'use' : 'damage',
-                        color: kind == ItemKind.chemical
-                            ? context.marginRedColor
-                            : context.marginRedColor,
+                        color: context.marginRedColor,
                         onTap: onConsume,
                       ),
                       const SizedBox(width: 10),
@@ -641,18 +642,28 @@ class _CardAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontFamily: 'Caveat',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            decoration: TextDecoration.underline,
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontFamily: 'Caveat',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
           ),
         ),
       ),

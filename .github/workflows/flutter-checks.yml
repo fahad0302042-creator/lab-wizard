@@ -1,0 +1,54 @@
+name: Flutter checks
+
+# The APK workflow only runs after a Flutter change reaches main, so a broken
+# file was previously discovered after the merge. This runs the same checks on
+# every pull request, for both apps while the rebuild is in progress.
+on:
+  pull_request:
+    paths:
+      - "flutter_app/**"
+      - "flutter_app_v2/**"
+      - ".github/workflows/flutter-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Check ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [flutter_app, flutter_app_v2]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze source
+        run: flutter analyze --fatal-infos
+
+      - name: Run tests
+        run: flutter test

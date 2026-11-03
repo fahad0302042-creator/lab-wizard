@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -225,7 +226,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           ),
         ),
         const SizedBox(height: 24),
-        const PageHeading('or search manually', trailing: SizedBox.shrink()),
+        const PageHeading('or search manually'),
         TextField(
           controller: _search,
           onChanged: (_) => setState(() {}),
@@ -428,9 +429,3 @@ class _ScanSearchResult {
   final String unit;
 }
 
-extension<T> on Iterable<T> {
-  T? get firstOrNull {
-    final iterator = this.iterator;
-    return iterator.moveNext() ? iterator.current : null;
-  }
-}
