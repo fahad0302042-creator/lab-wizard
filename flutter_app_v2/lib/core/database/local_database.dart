@@ -155,7 +155,12 @@ class LocalDatabase {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  Future<void> clearUser(String userId) async {
+  /// Removes this user's private data from the device.
+  ///
+  /// [keepOutbox] keeps queued operations, because those are the user's
+  /// unsynced work — signing out should never silently destroy it. The outbox
+  /// is keyed by user id, so it cannot leak into another account.
+  Future<void> clearUser(String userId, {bool keepOutbox = false}) async {
     final db = await database;
     await db.transaction((txn) async {
       await txn.delete(
@@ -163,7 +168,9 @@ class LocalDatabase {
         where: 'user_id = ?',
         whereArgs: [userId],
       );
-      await txn.delete('outbox', where: 'user_id = ?', whereArgs: [userId]);
+      if (!keepOutbox) {
+        await txn.delete('outbox', where: 'user_id = ?', whereArgs: [userId]);
+      }
     });
   }
 

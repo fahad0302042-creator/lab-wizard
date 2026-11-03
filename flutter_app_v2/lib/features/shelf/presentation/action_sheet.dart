@@ -8,50 +8,33 @@ import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass_jar.dart';
 import '../../../core/widgets/jar_metrics.dart';
+import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
-
-/// What just happened, so the shelf can offer to undo it.
-class LoggedAction {
-  const LoggedAction({
-    required this.chemical,
-    required this.action,
-    required this.amount,
-  });
-
-  final Chemical chemical;
-  final InventoryAction action;
-  final double amount;
-
-  InventoryAction get inverse => switch (action) {
-    InventoryAction.consume || InventoryAction.breakage =>
-      InventoryAction.restock,
-    InventoryAction.restock => InventoryAction.consume,
-  };
-}
 
 /// Records use or restock for one item.
 ///
-/// The amount is pre-filled with the last amount logged for that item, because
-/// a lab tends to use the same amount repeatedly — one tap usually does it.
-Future<LoggedAction?> showActionSheet(
+/// The amount is pre-filled with the amount most often logged for this item,
+/// because a lab tends to use the same amount repeatedly — one tap usually does
+/// it. Returns the log so the shelf can offer a real undo.
+Future<ConsumptionLog?> showActionSheet(
   BuildContext context,
   WidgetRef ref, {
-  required Chemical chemical,
+  required ItemView item,
   required InventoryAction action,
 }) {
-  return showModalBottomSheet<LoggedAction>(
+  return showModalBottomSheet<ConsumptionLog>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _ActionSheet(chemical: chemical, action: action),
+    builder: (_) => _ActionSheet(item: item, action: action),
   );
 }
 
 class _ActionSheet extends ConsumerStatefulWidget {
-  const _ActionSheet({required this.chemical, required this.action});
+  const _ActionSheet({required this.item, required this.action});
 
-  final Chemical chemical;
+  final ItemView item;
   final InventoryAction action;
 
   @override
@@ -66,17 +49,11 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
 
   bool get _isUse => widget.action != InventoryAction.restock;
 
-  /// The most common amount for this item, from its own history.
   double _suggestedAmount() {
     final logs = ref
         .read(inventoryProvider)
         .logs
-        .where(
-          (log) =>
-              log.itemId == widget.chemical.id &&
-              (log.action == InventoryAction.consume ||
-                  log.action == InventoryAction.breakage),
-        )
+        .where((log) => log.itemId == widget.item.id)
         .toList();
     if (logs.isEmpty) return 1;
     final counts = <double, int>{};
@@ -108,9 +85,9 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
   String? get _error {
     final value = _parsed;
     if (value == null || value <= 0) return 'Enter an amount above zero';
-    if (_isUse && value > widget.chemical.quantity) {
-      return 'Only ${formatQuantity(widget.chemical.quantity)} '
-          '${widget.chemical.unit} left';
+    if (_isUse && value > widget.item.quantity) {
+      return 'Only ${formatQuantity(widget.item.quantity)} '
+          '${widget.item.unit} left';
     }
     return null;
   }
@@ -118,26 +95,20 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
   Future<void> _save() async {
     if (_error != null) return;
     setState(() => _saving = true);
-    final amount = _parsed!;
     try {
-      await ref
+      final log = await ref
           .read(inventoryProvider.notifier)
           .applyAction(
-            itemId: widget.chemical.id,
-            itemType: ItemKind.chemical,
+            itemId: widget.item.id,
+            itemType: widget.item.kind,
             action: widget.action,
-            amount: amount,
+            amount: _parsed!,
             note: _note.text,
             date: _date,
           );
       HapticFeedback.mediumImpact();
       if (!mounted) return;
-      final result = LoggedAction(
-        chemical: widget.chemical,
-        action: widget.action,
-        amount: amount,
-      );
-      Navigator.of(context).pop(result);
+      Navigator.of(context).pop(log);
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -152,7 +123,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
       initialDate: _date,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      helpText: 'When was it used?',
+      helpText: 'When was it logged?',
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -160,22 +131,22 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
-    final chemical = widget.chemical;
+    final item = widget.item;
     final after = switch (widget.action) {
-      InventoryAction.restock => chemical.quantity + (_parsed ?? 0),
-      _ => (chemical.quantity - (_parsed ?? 0)).clamp(0, double.infinity)
+      InventoryAction.restock => item.quantity + (_parsed ?? 0),
+      _ => (item.quantity - (_parsed ?? 0))
+          .clamp(0, double.infinity)
           .toDouble(),
     };
     final metrics = jarMetrics(
       quantity: after,
-      initialQuantity: chemical.initialQuantity,
-      threshold: chemical.lowStockThreshold,
+      initialQuantity: item.initialQuantity,
+      threshold: item.threshold,
+      piecewise: item.piecewise,
     );
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
           color: lab.bone,
@@ -205,7 +176,9 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _isUse ? 'Log use' : 'Restock',
+                        _isUse
+                            ? (item.isChemical ? 'Log use' : 'Log breakage')
+                            : 'Restock',
                         style: TextStyle(
                           fontFamily: 'Caveat',
                           fontSize: 30,
@@ -215,12 +188,10 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(chemical.name, style: context.itemName),
+                      Text(item.name, style: context.itemName),
                     ],
                   ),
                 ),
-                // Live preview: the jar updates as you type, so you see the
-                // level before you commit.
                 GlassJar(metrics: metrics, width: 40, height: 50),
               ],
             ),
@@ -239,8 +210,8 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                     onChanged: (_) => setState(() {}),
                     style: context.figure.copyWith(fontSize: 24),
                     decoration: InputDecoration(
-                      labelText: _isUse ? 'Amount used' : 'Amount added',
-                      suffixText: chemical.unit,
+                      labelText: _isUse ? 'Amount' : 'Amount added',
+                      suffixText: item.unit,
                       errorText: _amount.text.isEmpty ? null : _error,
                     ),
                   ),
@@ -249,7 +220,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    '${formatQuantity(chemical.quantity)} → '
+                    '${formatQuantity(item.quantity)} → '
                     '${formatQuantity(after)}',
                     style: context.label,
                   ),
@@ -285,7 +256,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                           dimension: 17,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(_isUse ? 'Record use' : 'Add to stock'),
+                      : Text(_isUse ? 'Record' : 'Add to stock'),
                 ),
               ],
             ),

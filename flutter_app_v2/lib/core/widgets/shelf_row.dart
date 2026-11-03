@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../features/inventory/domain/item_view.dart';
 import '../../features/inventory/domain/models.dart';
 import '../motion.dart';
 import '../theme/app_theme.dart';
@@ -10,17 +11,15 @@ import 'jar_metrics.dart';
 /// Which way a row was swiped.
 enum RowSwipe { use, restock }
 
-/// One reagent on the shelf, in direction C's layout: jar, name and level, then
-/// the quantity and its flag on the right.
+/// One item on the shelf: jar, name and level, then the quantity and its flag.
 ///
-/// Swiping right logs use, swiping left restocks. Crossing roughly 40% of the
-/// row's width fires a selection tick so the gesture is felt before release;
+/// Swiping right logs use (or damage, for apparatus), swiping left restocks.
+/// Crossing 40% fires a haptic tick so the gesture is felt before release;
 /// dragging most of the way commits immediately, otherwise the sheet opens with
-/// the last amount pre-filled.
+/// the amount this item is usually logged at.
 class ShelfRow extends StatefulWidget {
   const ShelfRow({
-    required this.chemical,
-    required this.index,
+    required this.item,
     required this.onTap,
     required this.onUse,
     required this.onRestock,
@@ -29,15 +28,11 @@ class ShelfRow extends StatefulWidget {
     super.key,
   });
 
-  final Chemical chemical;
-  final int index;
+  final ItemView item;
   final VoidCallback onTap;
   final VoidCallback onUse;
   final VoidCallback onRestock;
   final ValueChanged<RowSwipe> onFullSwipe;
-
-  /// Opens the action wheel. Long-press is the discoverable alternative to
-  /// swiping, and the only way to reach "set order level" from the shelf.
   final VoidCallback? onLongPress;
 
   @override
@@ -51,17 +46,13 @@ class _ShelfRowState extends State<ShelfRow> {
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
-    final chemical = widget.chemical;
-    final metrics = jarMetrics(
-      quantity: chemical.quantity,
-      initialQuantity: chemical.initialQuantity,
-      threshold: chemical.lowStockThreshold,
-    );
+    final item = widget.item;
+    final metrics = item.metrics;
     final color = lab.forState(metrics.signal);
-    final caption = stockCaption(metrics, piecewiseUnit: false);
+    final caption = stockCaption(metrics, piecewiseUnit: item.piecewise);
 
     return Dismissible(
-      key: ValueKey('shelf-${chemical.id}'),
+      key: ValueKey('row-${item.id}'),
       direction: DismissDirection.horizontal,
       dismissThresholds: const {
         DismissDirection.startToEnd: .42,
@@ -70,7 +61,6 @@ class _ShelfRowState extends State<ShelfRow> {
       onUpdate: (details) {
         if (!mounted) return;
         setState(() => _progress = details.progress);
-        // Feel the threshold before letting go.
         if (!_ticked && details.progress >= .42) {
           _ticked = true;
           HapticFeedback.selectionClick();
@@ -91,13 +81,13 @@ class _ShelfRowState extends State<ShelfRow> {
           widget.onRestock();
         }
         if (mounted) setState(() => _progress = 0);
-        // The action opens a sheet; the row itself always snaps back so the
-        // shelf doesn't jump around underneath it.
+        // The action opens a sheet, so the row always snaps back rather than
+        // leaving a hole underneath it.
         return false;
       },
       background: _SwipeHint(
         alignment: Alignment.centerLeft,
-        label: 'use',
+        label: item.useLabel,
         color: lab.sage,
         progress: _progress,
       ),
@@ -126,8 +116,8 @@ class _ShelfRowState extends State<ShelfRow> {
                   metrics: metrics,
                   onTap: widget.onTap,
                   semanticLabel:
-                      '${chemical.name}, '
-                      '${formatQuantity(chemical.quantity)} ${chemical.unit}'
+                      '${item.name}, ${formatQuantity(item.quantity)} '
+                      '${item.unit}'
                       '${caption.isEmpty ? '' : ', $caption'}',
                 ),
                 const SizedBox(width: 12),
@@ -136,15 +126,15 @@ class _ShelfRowState extends State<ShelfRow> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        chemical.name,
+                        item.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: context.itemName,
                       ),
-                      if (chemical.formula.isNotEmpty)
+                      if (item.subtitle.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 1),
-                          child: Text(chemical.formula, style: context.formula),
+                          child: Text(item.subtitle, style: context.formula),
                         ),
                       const SizedBox(height: 7),
                       JarTicks(count: metrics.ticks, color: color),
@@ -156,7 +146,7 @@ class _ShelfRowState extends State<ShelfRow> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     CountUp(
-                      value: chemical.quantity,
+                      value: item.quantity,
                       builder: (context, value) => Text(
                         formatQuantity(value),
                         style: context.figure,
@@ -165,7 +155,7 @@ class _ShelfRowState extends State<ShelfRow> {
                     Padding(
                       padding: const EdgeInsets.only(top: 1),
                       child: Text(
-                        chemical.unit.toUpperCase(),
+                        item.unit.toUpperCase(),
                         style: context.label.copyWith(fontSize: 9),
                       ),
                     ),
@@ -194,7 +184,6 @@ class _ShelfRowState extends State<ShelfRow> {
   }
 }
 
-/// The colour that appears underneath a row as it's dragged.
 class _SwipeHint extends StatelessWidget {
   const _SwipeHint({
     required this.alignment,
@@ -210,8 +199,6 @@ class _SwipeHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Fade in with the drag and firm up past the threshold, so the row tells
-    // you when releasing will actually do something.
     final armed = progress >= .42;
     final opacity = (progress * 2.2).clamp(0.0, 1.0);
     return Container(
@@ -227,11 +214,7 @@ class _SwipeHint extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (alignment == Alignment.centerLeft)
-              Icon(
-                Icons.remove_circle_outline,
-                size: 18,
-                color: color,
-              ),
+              Icon(Icons.remove_circle_outline, size: 18, color: color),
             Text(
               label,
               style: context.aside.copyWith(

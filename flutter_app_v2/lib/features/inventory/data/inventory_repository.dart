@@ -68,16 +68,67 @@ class InventoryRepository {
     final apparatusMaps = _mapList(responses[1]);
     final logMaps = _mapList(responses[2]);
 
+    // Anything with an operation still in the outbox is newer than the server
+    // copy, so the local row wins. Without this, a pull-to-refresh after a
+    // failed upload quietly reverts the user's own changes.
+    final pending = await local.pendingOperations(userId);
+    final protectedChemicals = <String>{};
+    final protectedApparatus = <String>{};
+    final protectedLogs = <String>{};
+    for (final operation in pending) {
+      final payload = operation.payload;
+      final itemId = payload['item_id'] ?? payload['id'];
+      if (itemId is String) {
+        if (payload['item_type'] == 'apparatus' ||
+            operation.type == 'add_apparatus') {
+          protectedApparatus.add(itemId);
+        } else {
+          protectedChemicals.add(itemId);
+        }
+      }
+      final logId = payload['local_log_id'];
+      if (logId is String) protectedLogs.add(logId);
+    }
+
+    Future<List<Map<String, dynamic>>> merged(
+      String kind,
+      List<Map<String, dynamic>> fromServer,
+      Set<String> protected,
+    ) async {
+      if (protected.isEmpty) return fromServer;
+      final cached = await local.loadRecords(userId, kind);
+      final keep = cached
+          .where((row) => protected.contains(row['id'] as String?))
+          .toList();
+      final keptIds = keep.map((row) => row['id']).toSet();
+      return [
+        ...keep,
+        ...fromServer.where((row) => !keptIds.contains(row['id'])),
+      ];
+    }
+
+    final chemicals = await merged(
+      'chemical',
+      chemicalMaps,
+      protectedChemicals,
+    );
+    final apparatus = await merged(
+      'apparatus',
+      apparatusMaps,
+      protectedApparatus,
+    );
+    final logs = await merged('log', logMaps, protectedLogs);
+
     await Future.wait([
-      local.replaceRecords(userId, 'chemical', chemicalMaps),
-      local.replaceRecords(userId, 'apparatus', apparatusMaps),
-      local.replaceRecords(userId, 'log', logMaps),
+      local.replaceRecords(userId, 'chemical', chemicals),
+      local.replaceRecords(userId, 'apparatus', apparatus),
+      local.replaceRecords(userId, 'log', logs),
     ]);
 
     return InventorySnapshot(
-      chemicals: chemicalMaps.map(Chemical.fromMap).toList(),
-      apparatus: apparatusMaps.map(Apparatus.fromMap).toList(),
-      logs: logMaps.map(ConsumptionLog.fromMap).toList(),
+      chemicals: chemicals.map(Chemical.fromMap).toList(),
+      apparatus: apparatus.map(Apparatus.fromMap).toList(),
+      logs: logs.map(ConsumptionLog.fromMap).toList(),
       pendingCount: await local.pendingCount(userId),
       fromCache: false,
     );
@@ -378,6 +429,59 @@ class InventoryRepository {
     });
   }
 
+  /// Reverses a logged action: the quantity is restored and the log removed.
+  /// Queued for later if the phone is offline, so undo works on a bad signal.
+  Future<double> revertAction({
+    required String userId,
+    required ConsumptionLog log,
+    required double currentQuantity,
+  }) async {
+    final restored = switch (log.action) {
+      InventoryAction.restock => (currentQuantity - log.amount)
+          .clamp(0, double.infinity)
+          .toDouble(),
+      InventoryAction.consume ||
+      InventoryAction.breakage => currentQuantity + log.amount,
+    };
+    final table = log.itemType == ItemKind.chemical ? 'chemicals' : 'apparatus';
+
+    try {
+      if (remote == null) throw const _OfflineException();
+      await remote!
+          .from(table)
+          .update({'quantity': restored})
+          .eq('id', log.itemId);
+      await remote!.from('consumption_logs').delete().eq('id', log.id);
+    } catch (error) {
+      if (!_isConnectivityError(error) && error is! _OfflineException) rethrow;
+      await local.enqueue(
+        PendingOperation(
+          id: _uuid.v4(),
+          userId: userId,
+          type: 'undo_action',
+          payload: {
+            'log': log.toMap(),
+            'restored_quantity': restored,
+          },
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+
+    final rows = await local.loadRecords(userId, log.itemType.name);
+    final current = rows
+        .where((row) => row['id'] == log.itemId)
+        .firstOrNull;
+    if (current != null) {
+      await local.upsertRecord(userId, log.itemType.name, {
+        ...current,
+        'quantity': restored,
+      });
+    }
+    await local.deleteRecord(userId, 'log', log.id);
+    return restored;
+  }
+
   Future<void> deleteItem({
     required String userId,
     required ItemKind type,
@@ -387,12 +491,17 @@ class InventoryRepository {
     if (remote == null) {
       throw StateError('Deleting items requires a connection.');
     }
-    await remote!
-        .from('consumption_logs')
-        .delete()
-        .eq('item_id', id)
-        .eq('item_type', type.name);
     await remote!.from(table).delete().eq('id', id);
+    try {
+      await remote!
+          .from('consumption_logs')
+          .delete()
+          .eq('item_id', id)
+          .eq('item_type', type.name);
+    } catch (_) {
+      // Orphaned log rows are harmless: they are filtered out by item id. An
+      // item left behind after its history was deleted would not be.
+    }
     await local.deleteRecord(userId, type.name, id);
   }
 
@@ -407,6 +516,21 @@ class InventoryRepository {
           await remote!.from('apparatus').upsert(operation.payload);
         } else if (operation.type == 'inventory_action') {
           await _applyRemoteAction(userId, operation.payload);
+        } else if (operation.type == 'undo_action') {
+          final logMap = Map<String, dynamic>.from(
+            operation.payload['log'] as Map,
+          );
+          final log = ConsumptionLog.fromMap(logMap);
+          final table = log.itemType == ItemKind.chemical
+              ? 'chemicals'
+              : 'apparatus';
+          await remote!
+              .from(table)
+              .update({
+                'quantity': operation.payload['restored_quantity'],
+              })
+              .eq('id', log.itemId);
+          await remote!.from('consumption_logs').delete().eq('id', log.id);
         } else if (operation.type == 'update_item') {
           final table = operation.payload['item_type'] == 'chemical'
               ? 'chemicals'
