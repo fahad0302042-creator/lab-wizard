@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/build_info.dart';
 import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../inventory/domain/models.dart';
@@ -129,9 +130,18 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           Center(
-            child: Text(
-              'Lab Wizard 2 · the store room',
-              style: context.aside.copyWith(fontSize: 14),
+            child: Column(
+              children: [
+                Text(
+                  'Lab Wizard 2 · the store room',
+                  style: context.aside.copyWith(fontSize: 14),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  buildStamp,
+                  style: context.label.copyWith(fontSize: 9, letterSpacing: 1),
+                ),
+              ],
             ),
           ),
         ],

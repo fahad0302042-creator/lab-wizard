@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../app/home_tabs.dart';
 import '../../../app/providers.dart';
+import '../../../core/build_info.dart';
 import '../../../core/motion.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass_jar.dart';
@@ -166,6 +167,13 @@ class DashboardScreen extends ConsumerWidget {
             ),
           const SizedBox(height: 22),
           const _AlertsCard(),
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              'Lab Wizard 2 · $buildStamp',
+              style: context.label.copyWith(fontSize: 8.5, letterSpacing: 1),
+            ),
+          ),
         ],
       ),
     );

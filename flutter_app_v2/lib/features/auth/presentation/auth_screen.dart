@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/build_info.dart';
 import '../../../core/theme/app_theme.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -198,6 +199,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         _signUp
                             ? 'I already have an account'
                             : 'Create a new account',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Text(
+                      'Lab Wizard 2 · $buildStamp',
+                      style: context.label.copyWith(
+                        fontSize: 8.5,
+                        letterSpacing: 1,
                       ),
                     ),
                   ),
