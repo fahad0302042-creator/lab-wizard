@@ -55,6 +55,28 @@ class SettingsScreen extends ConsumerWidget {
             value: preferences.reduceMotion,
             onChanged: ref.read(preferencesProvider.notifier).setReduceMotion,
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Low-stock alerts'),
+            subtitle: const Text(
+              'A notification when a shelf reaches its order level',
+            ),
+            value: preferences.lowStockAlerts,
+            onChanged: (value) async {
+              final ok = await ref
+                  .read(preferencesProvider.notifier)
+                  .setLowStockAlerts(value);
+              if (!context.mounted || ok || !value) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Notifications are blocked for this app. Allow them in '
+                    'Android settings, then try again.',
+                  ),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 22),
           Text('SYNC', style: context.label),
           const SizedBox(height: 8),

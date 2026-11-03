@@ -35,6 +35,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
   Timer? _undoTimer;
   bool _searching = false;
   bool _printing = false;
+  int _undoToken = 0;
 
   bool get _isChemical => widget.kind == ItemKind.chemical;
 
@@ -144,21 +145,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
                         child: ShelfRow(
                           item: item,
                           onTap: () => _openDetail(context, item),
-                          onUse: () => _log(
-                            context,
-                            ref,
-                            item,
-                            _isChemical
-                                ? InventoryAction.consume
-                                : InventoryAction.breakage,
-                          ),
-                          onRestock: () => _log(
-                            context,
-                            ref,
-                            item,
-                            InventoryAction.restock,
-                          ),
-                          onFullSwipe: (swipe) => _quickLog(
+                          onSwipe: (swipe) => _log(
                             context,
                             ref,
                             item,
@@ -220,66 +207,26 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
     if (log != null) _offerUndo(log);
   }
 
-  /// Full swipe: commit the amount this item is usually logged at, no sheet.
-  Future<void> _quickLog(
-    BuildContext context,
-    WidgetRef ref,
-    ItemView item,
-    InventoryAction action,
-  ) async {
-    final logs = ref
-        .read(inventoryProvider)
-        .logs
-        .where((log) => log.itemId == item.id)
-        .toList();
-    final amount = action == InventoryAction.restock
-        ? 1.0
-        : (logs.isNotEmpty ? logs.first.amount : 1.0);
-    if (action != InventoryAction.restock && amount > item.quantity) {
-      return _log(context, ref, item, action);
-    }
-    try {
-      final log = await ref
-          .read(inventoryProvider.notifier)
-          .applyAction(
-            itemId: item.id,
-            itemType: item.kind,
-            action: action,
-            amount: amount,
-            note: '',
-            date: DateTime.now(),
-          );
-      _offerUndo(log);
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
-    }
-  }
-
+  /// Five seconds to take it back, with the row's own undo — the log is removed
+  /// and the quantity restored, rather than a compensating entry being written.
   void _offerUndo(ConsumptionLog log) {
-    _undoTimer?.cancel();
+    _undoToken++;
+    final token = _undoToken;
     setState(() => _undo = log);
-    _undoTimer = Timer(LabMotion.undoWindow, () {
-      if (mounted) setState(() => _undo = null);
+    Timer(const Duration(seconds: 5), () {
+      if (!mounted || token != _undoToken) return;
+      setState(() => _undo = null);
     });
   }
 
-  /// A real undo: the log is removed and the quantity goes back, rather than
-  /// recording a second entry that leaves the pair in the reports.
   Future<void> _performUndo() async {
     final log = _undo;
     if (log == null) return;
-    _undoTimer?.cancel();
+    _undoToken++;
     setState(() => _undo = null);
-    HapticFeedback.selectionClick();
+    HapticFeedback.mediumImpact();
     try {
       await ref.read(inventoryProvider.notifier).undoAction(log);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Undone')));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(

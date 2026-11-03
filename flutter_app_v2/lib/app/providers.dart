@@ -9,7 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
 import '../core/database/local_database.dart';
+import '../core/notifications/notification_service.dart';
+import '../core/theme/app_theme.dart';
 import '../features/inventory/data/inventory_repository.dart';
+import '../features/inventory/domain/item_view.dart';
 import '../features/inventory/domain/models.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
@@ -151,16 +154,25 @@ class AppPreferences {
   const AppPreferences({
     this.themeMode = ThemeMode.system,
     this.reduceMotion = false,
+    this.lowStockAlerts = false,
   });
 
   final ThemeMode themeMode;
   final bool reduceMotion;
 
-  AppPreferences copyWith({ThemeMode? themeMode, bool? reduceMotion}) =>
-      AppPreferences(
-        themeMode: themeMode ?? this.themeMode,
-        reduceMotion: reduceMotion ?? this.reduceMotion,
-      );
+  /// Off until the user says yes, and off again if they switch it off. The
+  /// phone's own permission is the second gate, checked before every send.
+  final bool lowStockAlerts;
+
+  AppPreferences copyWith({
+    ThemeMode? themeMode,
+    bool? reduceMotion,
+    bool? lowStockAlerts,
+  }) => AppPreferences(
+    themeMode: themeMode ?? this.themeMode,
+    reduceMotion: reduceMotion ?? this.reduceMotion,
+    lowStockAlerts: lowStockAlerts ?? this.lowStockAlerts,
+  );
 }
 
 final preferencesProvider =
@@ -185,6 +197,7 @@ class PreferencesController extends Notifier<AppPreferences> {
         _ => ThemeMode.system,
       },
       reduceMotion: preferences.getBool('reduce_motion') ?? false,
+      lowStockAlerts: preferences.getBool('low_stock_alerts') ?? false,
     );
   }
 
@@ -198,6 +211,20 @@ class PreferencesController extends Notifier<AppPreferences> {
     state = state.copyWith(reduceMotion: value);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('reduce_motion', value);
+  }
+
+  /// Turning alerts on asks the phone for permission first. If the user says no
+  /// to the system dialog, the switch stays off rather than lying about it.
+  Future<bool> setLowStockAlerts(bool value) async {
+    if (value) {
+      final service = ref.read(notificationServiceProvider);
+      final granted = await service.requestPermission();
+      if (!granted) return false;
+    }
+    state = state.copyWith(lowStockAlerts: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('low_stock_alerts', value);
+    return true;
   }
 }
 
@@ -223,6 +250,22 @@ class InventoryState {
   final int pendingCount;
   final String? error;
   final DateTime? lastUpdated;
+
+  /// Everything at or below its order level, empties first, then
+  /// alphabetically — the order someone would work down a list.
+  List<ItemView> get needsOrdering {
+    final views = <ItemView>[
+      ...chemicals.map(ItemView.fromChemical),
+      ...apparatus.map(ItemView.fromApparatus),
+    ].where((item) => item.metrics.signal != StockSignal.fine).toList();
+    views.sort((a, b) {
+      final aEmpty = a.quantity <= 0;
+      final bEmpty = b.quantity <= 0;
+      if (aEmpty != bEmpty) return aEmpty ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return views;
+  }
 
   int get attentionCount =>
       chemicals.where((item) => item.stockState != StockState.healthy).length +
@@ -412,9 +455,14 @@ class InventoryController extends Notifier<InventoryState> {
   }) async {
     if (amount <= 0) throw ArgumentError('Amount must be greater than zero.');
     final userId = _requireUser();
-    final current = itemType == ItemKind.chemical
-        ? state.chemicals.firstWhere((item) => item.id == itemId).quantity
-        : state.apparatus.firstWhere((item) => item.id == itemId).quantity;
+    final view = itemType == ItemKind.chemical
+        ? ItemView.fromChemical(
+            state.chemicals.firstWhere((item) => item.id == itemId),
+          )
+        : ItemView.fromApparatus(
+            state.apparatus.firstWhere((item) => item.id == itemId),
+          );
+    final current = view.quantity;
     if (action != InventoryAction.restock && amount > current) {
       throw StateError('Only ${formatQuantity(current)} available.');
     }
@@ -456,7 +504,38 @@ class InventoryController extends Notifier<InventoryState> {
       pendingCount: cached.pendingCount,
       fromCache: cached.pendingCount > 0,
     );
+    await _warnIfNowLow(view, after: nextQuantity);
     return log;
+  }
+
+  /// Sends a notification only when this action *crossed* the line.
+  ///
+  /// Crossing matters: a shelf that is already low must not re-notify on every
+  /// later use, and an item with no order level never warns at all — no level
+  /// means nobody has decided what low is yet. Running out always warns.
+  Future<void> _warnIfNowLow(ItemView item, {required double after}) async {
+    final preferences = ref.read(preferencesProvider);
+    if (!preferences.lowStockAlerts) return;
+    if (after < 0) return;
+
+    final wasLow = item.quantity <= 0 ||
+        (item.threshold > 0 && item.quantity <= item.threshold);
+    final isLow = after <= 0 || (item.threshold > 0 && after <= item.threshold);
+    if (!isLow || wasLow) return;
+
+    final quantity = formatQuantity(after);
+    final body = after <= 0
+        ? 'Run out. Nothing left in the store room.'
+        : 'Down to $quantity ${item.unit} — order level is '
+              '${formatQuantity(item.threshold)} ${item.unit}.';
+    final shown = await ref
+        .read(notificationServiceProvider)
+        .show(
+          title: '${item.name} is running low',
+          body: body,
+          id: item.id.hashCode & 0x7fffffff,
+        );
+    if (!shown) debugPrint('low stock alert not shown for ${item.name}');
   }
 
   /// Removes a log and puts the quantity back, rather than recording a second

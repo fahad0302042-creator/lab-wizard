@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/app_config.dart';
+import 'core/notifications/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,5 +14,9 @@ Future<void> main() async {
       publishableKey: AppConfig.supabaseAnonKey,
     );
   }
+  // Cheap and silent: creates the notification channel so the first low-stock
+  // warning isn't the one that has to warm it up.
+  await NotificationService().init();
+
   runApp(const ProviderScope(child: LabWizardApp()));
 }

@@ -1,20 +1,20 @@
-import 'dart:math' as math;
-
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../inventory/domain/models.dart';
+import '../data/report_pdf.dart';
+import '../domain/monthly_report.dart';
 
-/// What happened this month: usage per reagent, a daily bar, and a PDF you can
-/// hand to whoever orders the stock.
+/// The monthly sheet, on screen and on paper.
+///
+/// What is drawn here is what the PDF contains — the same rows, the same
+/// columns, the same order — so nobody has to wonder whether the printout
+/// matches what they were looking at.
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
 
@@ -24,300 +24,401 @@ class ReportsScreen extends ConsumerStatefulWidget {
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  ItemKind _kind = ItemKind.chemical;
   bool _exporting = false;
 
-  bool _inMonth(DateTime value) {
-    final local = value.toLocal();
-    return local.year == _month.year && local.month == _month.month;
+  void _shiftMonth(int delta) {
+    setState(() => _month = DateTime(_month.year, _month.month + delta));
   }
 
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
     final state = ref.watch(inventoryProvider);
-    final logs = state.logs.where((log) => _inMonth(log.loggedAt)).toList();
-
-    final used = logs
-        .where(
-          (log) =>
-              log.action == InventoryAction.consume ||
-              log.action == InventoryAction.breakage,
-        )
-        .toList();
-    final added = logs
-        .where((log) => log.action == InventoryAction.restock)
-        .toList();
-
-    // Sum per item so the list answers "what do I actually use up".
-    final totals = <String, double>{};
-    final kinds = <String, ItemKind>{};
-    for (final log in used) {
-      totals.update(
-        log.itemId,
-        (value) => value + log.amount,
-        ifAbsent: () => log.amount,
-      );
-      kinds[log.itemId] = log.itemType;
-    }
-    final ranked = totals.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    String nameOf(String id) {
-      final chemical = state.chemicals
-          .where((value) => value.id == id)
-          .firstOrNull;
-      if (chemical != null) return chemical.name;
-      final apparatus = state.apparatus
-          .where((value) => value.id == id)
-          .firstOrNull;
-      return apparatus?.name ?? 'Removed item';
-    }
-
-    String unitOf(String id) {
-      final chemical = state.chemicals
-          .where((value) => value.id == id)
-          .firstOrNull;
-      return chemical?.unit ?? 'pcs';
-    }
+    final report = buildMonthlyReport(
+      kind: _kind,
+      chemicals: state.chemicals,
+      apparatus: state.apparatus,
+      logs: state.logs,
+      month: _month,
+    );
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 100),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
       children: [
-        Text('Reports', style: context.aside),
-        const SizedBox(height: 4),
-        Text(
-          DateFormat('MMMM yyyy').format(_month),
-          style: TextStyle(
-            fontSize: 27,
-            height: 1.05,
-            letterSpacing: -1.2,
-            fontWeight: FontWeight.w600,
-            color: lab.ink,
-          ),
-        ),
-        const SizedBox(height: 14),
         Row(
           children: [
-            IconButton(
-              tooltip: 'Previous month',
-              onPressed: () => setState(
-                () => _month = DateTime(_month.year, _month.month - 1),
-              ),
-              icon: const Icon(Icons.chevron_left),
-            ),
             Expanded(
               child: Text(
-                '${used.length} used · ${added.length} restocked',
-                textAlign: TextAlign.center,
-                style: context.label,
+                'Reports',
+                style: TextStyle(
+                  fontSize: 28,
+                  height: 1.05,
+                  letterSpacing: -1.2,
+                  fontWeight: FontWeight.w600,
+                  color: lab.ink,
+                ),
               ),
+            ),
+            IconButton(
+              tooltip: 'Previous month',
+              onPressed: () => _shiftMonth(-1),
+              icon: const Icon(Icons.chevron_left, size: 22),
+            ),
+            Text(
+              DateFormat('MMM yyyy').format(_month),
+              style: context.figure.copyWith(fontSize: 14),
             ),
             IconButton(
               tooltip: 'Next month',
-              onPressed: () => setState(
-                () => _month = DateTime(_month.year, _month.month + 1),
-              ),
-              icon: const Icon(Icons.chevron_right),
+              onPressed: () => _shiftMonth(1),
+              icon: const Icon(Icons.chevron_right, size: 22),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Divider(color: lab.hair, height: 1),
+        const SizedBox(height: 12),
+        _ShelfTabs(
+          kind: _kind,
+          onChanged: (kind) => setState(() => _kind = kind),
+        ),
+        const SizedBox(height: 14),
+        _KpiStrip(report: report),
         const SizedBox(height: 16),
-        _DailyBars(logs: logs, month: _month),
-        const SizedBox(height: 22),
-        Text('MOST USED', style: context.label),
-        const SizedBox(height: 10),
-        if (ranked.isEmpty)
+        if (report.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Text(
-              'Nothing logged this month.',
-              style: context.aside.copyWith(fontSize: 16),
+            padding: const EdgeInsets.symmetric(vertical: 34),
+            child: Column(
+              children: [
+                Text(
+                  'Nothing logged',
+                  style: context.itemName.copyWith(fontSize: 17),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'No ${report.shelfName.toLowerCase()} were used or restocked '
+                  'in ${report.periodLabel}.',
+                  textAlign: TextAlign.center,
+                  style: context.aside.copyWith(fontSize: 16),
+                ),
+              ],
             ),
           )
         else
-          ...ranked.take(12).map((entry) {
-            final max = ranked.first.value;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          nameOf(entry.key),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.itemName,
-                        ),
-                      ),
-                      Text(
-                        '${formatQuantity(entry.value)} ${unitOf(entry.key)}',
-                        style: context.figure.copyWith(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: LinearProgressIndicator(
-                      value: max == 0 ? 0 : entry.value / max,
-                      minHeight: 4,
-                      backgroundColor: lab.hair,
-                      valueColor: AlwaysStoppedAnimation(lab.sage),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        const SizedBox(height: 26),
+          _ReportTable(report: report),
+        const SizedBox(height: 18),
+        if (!report.isEmpty)
+          Text(report.footnote, style: context.aside.copyWith(fontSize: 15)),
+        const SizedBox(height: 18),
         FilledButton.icon(
-          onPressed: _exporting || logs.isEmpty
-              ? null
-              : () => _export(state, logs, nameOf, unitOf),
+          onPressed: _exporting ? null : () => _export(state),
           icon: _exporting
               ? const SizedBox.square(
                   dimension: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-          label: Text(_exporting ? 'Preparing…' : 'Share PDF report'),
+              : const Icon(Icons.ios_share, size: 18),
+          label: Text(_exporting ? 'Preparing…' : 'Share this month as PDF'),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'The PDF has both shelves, chemicals first, each starting on its own '
+          'page.',
+          textAlign: TextAlign.center,
+          style: context.aside.copyWith(fontSize: 14),
         ),
       ],
     );
   }
 
-  Future<void> _export(
-    InventoryState state,
-    List<ConsumptionLog> logs,
-    String Function(String) nameOf,
-    String Function(String) unitOf,
-  ) async {
+  Future<void> _export(InventoryState state) async {
     setState(() => _exporting = true);
     try {
-      final theme = pw.ThemeData.withFont(
-        base: pw.Font.helvetica(),
-        bold: pw.Font.helveticaBold(),
-      );
-      final document = pw.Document(
-        title: 'Lab Wizard ${DateFormat('MMMM yyyy').format(_month)}',
-        theme: theme,
-      );
-      final used = logs
-          .where((log) => log.action != InventoryAction.restock)
-          .toList()
-        ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+      final reports = [
+        for (final kind in ItemKind.values)
+          buildMonthlyReport(
+            kind: kind,
+            chemicals: state.chemicals,
+            apparatus: state.apparatus,
+            logs: state.logs,
+            month: _month,
+          ),
+      ]..removeWhere((report) => report.isEmpty);
 
-      document.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(18 * PdfPageFormat.mm),
-          build: (_) => [
-            pw.Text(
-              'Lab Wizard — ${DateFormat('MMMM yyyy').format(_month)}',
-              style: pw.TextStyle(
-                fontSize: 20,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              '${state.chemicals.length} reagents · '
-              '${state.apparatus.length} apparatus · '
-              '${logs.length} entries this month',
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 16),
-            pw.TableHelper.fromTextArray(
-              headers: const ['Date', 'Item', 'Action', 'Amount', 'Note'],
-              data: used
-                  .map(
-                    (log) => [
-                      DateFormat('d MMM').format(log.loggedAt.toLocal()),
-                      nameOf(log.itemId),
-                      log.action.name,
-                      '${formatQuantity(log.amount)} ${unitOf(log.itemId)}',
-                      log.note,
-                    ],
-                  )
-                  .toList(),
-              headerStyle: pw.TextStyle(
-                fontSize: 9,
-                fontWeight: pw.FontWeight.bold,
-              ),
-              cellStyle: const pw.TextStyle(fontSize: 9),
-              headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.grey200,
-              ),
-              border: null,
-            ),
-          ],
-        ),
+      if (reports.isEmpty) {
+        final label = DateFormat('MMMM yyyy').format(_month);
+        throw StateError('Nothing to report for $label.');
+      }
+
+      final bytes = await ReportPdf.build(
+        reports: reports,
+        generatedAt: DateTime.now(),
       );
-      await Printing.layoutPdf(
-        name: 'lab-wizard-${DateFormat('yyyy-MM').format(_month)}.pdf',
-        onLayout: (_) => document.save(),
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'lab-wizard-${DateFormat('yyyy-MM').format(_month)}.pdf',
       );
     } catch (error) {
       if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(SnackBar(content: Text(friendlyError(error))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
   }
 }
 
-/// One bar per day of the month. Quiet by design: it shows shape, not detail.
-class _DailyBars extends StatelessWidget {
-  const _DailyBars({required this.logs, required this.month});
+class _ShelfTabs extends StatelessWidget {
+  const _ShelfTabs({required this.kind, required this.onChanged});
 
-  final List<ConsumptionLog> logs;
-  final DateTime month;
+  final ItemKind kind;
+  final ValueChanged<ItemKind> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
-    final days = DateUtils.getDaysInMonth(month.year, month.month);
-    final counts = List<int>.filled(days, 0);
-    for (final log in logs) {
-      final day = log.loggedAt.toLocal().day;
-      if (day >= 1 && day <= days) counts[day - 1]++;
-    }
-    final maxCount = math.max(1, counts.reduce(math.max));
-
-    return SizedBox(
-      height: 78,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(days, (index) {
-          final ratio = counts[index] / maxCount;
-          return Expanded(
+    return Row(
+      children: [
+        for (final value in ItemKind.values)
+          Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    height: math.max(2, ratio * 62),
+              padding: const EdgeInsets.only(right: 8),
+              child: Semantics(
+                button: true,
+                selected: kind == value,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(9),
+                  onTap: () => onChanged(value),
+                  child: Container(
+                    height: 42,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: counts[index] == 0
-                          ? lab.hair
-                          : lab.sage.withValues(alpha: .75),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(2),
+                      color: kind == value ? lab.ink : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: kind == value ? lab.ink : lab.hair,
+                      ),
+                    ),
+                    child: Text(
+                      value == ItemKind.chemical ? 'CHEMICALS' : 'APPARATUS',
+                      style: context.label.copyWith(
+                        fontSize: 10,
+                        letterSpacing: 1.1,
+                        color: kind == value ? lab.bone : lab.soft,
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          );
-        }),
+          ),
+      ],
+    );
+  }
+}
+
+class _KpiStrip extends StatelessWidget {
+  const _KpiStrip({required this.report});
+
+  final MonthlyReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _Kpi(value: '${report.itemsConsumed}', label: 'items consumed'),
+        const SizedBox(width: 8),
+        _Kpi(value: '${report.events}', label: 'events'),
+        const SizedBox(width: 8),
+        _Kpi(
+          value: '${report.lowStockCount}',
+          label: 'low stock',
+          warn: report.lowStockCount > 0,
+        ),
+      ],
+    );
+  }
+}
+
+class _Kpi extends StatelessWidget {
+  const _Kpi({required this.value, required this.label, this.warn = false});
+
+  final String value;
+  final String label;
+  final bool warn;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+        decoration: BoxDecoration(
+          border: Border.all(color: lab.hair),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                height: 1,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -1,
+                color: warn ? lab.clay : lab.ink,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label.toUpperCase(),
+              style: context.label.copyWith(fontSize: 8.5, letterSpacing: .9),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportTable extends StatelessWidget {
+  const _ReportTable({required this.report});
+
+  final MonthlyReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    final showAdded = report.hasAdditions;
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: lab.ink, width: 1.2)),
+          ),
+          child: Row(
+            children: [
+              Expanded(flex: 4, child: _Head('NAME')),
+              if (showAdded) ...[
+                Expanded(flex: 14, child: _Head('WE HAVE')),
+                Expanded(flex: 14, child: _Head('ADDED')),
+                Expanded(flex: 14, child: _Head('NOW')),
+              ] else
+                Expanded(flex: 14, child: _Head('WE HAVE')),
+              Expanded(flex: 14, child: _Head('USED')),
+              Expanded(flex: 14, child: _Head('LEFT')),
+            ],
+          ),
+        ),
+        for (final row in report.rows)
+          _ReportRowView(row: row, showAdded: showAdded),
+      ],
+    );
+  }
+}
+
+class _Head extends StatelessWidget {
+  const _Head(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      textAlign: TextAlign.right,
+      style: context.label.copyWith(fontSize: 8, letterSpacing: .7),
+    );
+  }
+}
+
+class _ReportRowView extends StatelessWidget {
+  const _ReportRowView({required this.row, required this.showAdded});
+
+  final ReportRow row;
+  final bool showAdded;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: lab.hair)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  row.name,
+                  style: context.itemName.copyWith(fontSize: 13.5),
+                ),
+                if (row.subtitle.isNotEmpty)
+                  Text(
+                    row.subtitle,
+                    style: context.formula.copyWith(
+                      fontSize: 11.5,
+                      color: lab.soft,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (showAdded) ...[
+            _Cell('${formatQuantity(row.weHave)} ${row.unit}', flex: 14),
+            _Cell('${formatQuantity(row.added)} ${row.unit}', flex: 14),
+            _Cell('${formatQuantity(row.nowHave)} ${row.unit}', flex: 14),
+          ] else
+            _Cell('${formatQuantity(row.weHave)} ${row.unit}', flex: 14),
+          _Cell(
+            '−${formatQuantity(row.used)} ${row.unit}',
+            flex: 14,
+            color: lab.clay,
+          ),
+          _Cell(
+            '${formatQuantity(row.left)} ${row.unit}',
+            flex: 14,
+            bold: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Cell extends StatelessWidget {
+  const _Cell(
+    this.text, {
+    required this.flex,
+    this.color,
+    this.bold = false,
+  });
+
+  final String text;
+  final int flex;
+  final Color? color;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        textAlign: TextAlign.right,
+        style: context.figure.copyWith(
+          fontSize: 11.5,
+          color: color ?? lab.ink,
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+        ),
       ),
     );
   }

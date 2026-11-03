@@ -13,26 +13,29 @@ enum RowSwipe { use, restock }
 
 /// One item on the shelf: jar, name and level, then the quantity and its flag.
 ///
-/// Swiping right logs use (or damage, for apparatus), swiping left restocks.
-/// Crossing 40% fires a haptic tick so the gesture is felt before release;
-/// dragging most of the way commits immediately, otherwise the sheet opens with
-/// the amount this item is usually logged at.
+/// A swipe is a *shortcut to the panel*, never a commit. Right offers use (or
+/// damage, for apparatus), left offers restock, and either one opens the sheet
+/// with the amount, date and note already filled in. Crossing 40% fires a
+/// haptic tick so the gesture is felt before release.
+///
+/// An earlier version logged straight away when the drag passed 88%, on the
+/// theory that it saved a tap. In the hand, a confident swipe always passes
+/// 88%, so every swipe silently logged a number the user never chose. Nothing
+/// is written until a button in the sheet is pressed.
 class ShelfRow extends StatefulWidget {
   const ShelfRow({
     required this.item,
     required this.onTap,
-    required this.onUse,
-    required this.onRestock,
-    required this.onFullSwipe,
+    required this.onSwipe,
     this.onLongPress,
     super.key,
   });
 
   final ItemView item;
   final VoidCallback onTap;
-  final VoidCallback onUse;
-  final VoidCallback onRestock;
-  final ValueChanged<RowSwipe> onFullSwipe;
+
+  /// Right means use, left means restock. The caller opens the matching panel.
+  final ValueChanged<RowSwipe> onSwipe;
   final VoidCallback? onLongPress;
 
   @override
@@ -69,20 +72,15 @@ class _ShelfRowState extends State<ShelfRow> {
         }
       },
       confirmDismiss: (direction) async {
-        final swipe = direction == DismissDirection.startToEnd
-            ? RowSwipe.use
-            : RowSwipe.restock;
         HapticFeedback.mediumImpact();
-        if (_progress >= .88) {
-          widget.onFullSwipe(swipe);
-        } else if (swipe == RowSwipe.use) {
-          widget.onUse();
-        } else {
-          widget.onRestock();
-        }
+        widget.onSwipe(
+          direction == DismissDirection.startToEnd
+              ? RowSwipe.use
+              : RowSwipe.restock,
+        );
         if (mounted) setState(() => _progress = 0);
-        // The action opens a sheet, so the row always snaps back rather than
-        // leaving a hole underneath it.
+        // The swipe only opens a panel, so the row always snaps back rather
+        // than leaving a hole underneath it.
         return false;
       },
       background: _SwipeHint(
