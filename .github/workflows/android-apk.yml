@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -120,10 +121,45 @@ jobs:
         run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze source
-        run: flutter analyze --fatal-infos
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze --fatal-infos > "$RUNNER_TEMP/analyze.txt" 2>&1
 
       - name: Run tests
-        run: flutter test
+        id: test
+        continue-on-error: true
+        run: flutter test > "$RUNNER_TEMP/test.txt" 2>&1
+
+      # Logs aren't always reachable, so a failure files its own report.
+      - name: File a report if the checks failed
+        if: steps.analyze.outcome == 'failure' || steps.test.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "analyze: ${{ steps.analyze.outcome }} · tests: ${{ steps.test.outcome }}"
+            echo ""
+            echo "## flutter analyze"
+            echo '```'
+            tail -c 40000 "$RUNNER_TEMP/analyze.txt" 2>/dev/null || echo none
+            echo '```'
+            echo ""
+            echo "## flutter test"
+            echo '```'
+            tail -c 40000 "$RUNNER_TEMP/test.txt" 2>/dev/null || echo none
+            echo '```'
+          } > "$RUNNER_TEMP/report.md"
+          gh issue create --repo "${{ github.repository }}" \
+            --title "Lab Wizard 2 build blocked: checks failed (run ${{ github.run_number }})" \
+            --body-file "$RUNNER_TEMP/report.md"
+
+      - name: Fail if the code does not analyze
+        if: steps.analyze.outcome == 'failure'
+        run: cat "$RUNNER_TEMP/analyze.txt" && exit 1
+
+      - name: Fail if the tests do not pass
+        if: steps.test.outcome == 'failure'
+        run: cat "$RUNNER_TEMP/test.txt" && exit 1
 
       - name: Build signed universal APK
         run: >-

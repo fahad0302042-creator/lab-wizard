@@ -1,8 +1,8 @@
 name: Flutter checks
 
-# The APK workflow only runs after a Flutter change reaches main, so a broken
-# file was previously discovered after the merge. This runs the same checks on
-# every pull request, for both apps while the rebuild is in progress.
+# Checks every pull request that touches either app, and posts the analyzer and
+# test output as a pull request comment so the exact errors are readable
+# without needing to open the Actions log.
 on:
   pull_request:
     paths:
@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: flutter-checks-${{ github.ref }}
@@ -44,11 +45,54 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Report formatting
+        continue-on-error: true
+        run: dart format --output=none --set-exit-if-changed lib test > "$RUNNER_TEMP/format.txt" 2>&1
 
       - name: Analyze source
-        run: flutter analyze --fatal-infos
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze --fatal-infos > "$RUNNER_TEMP/analyze.txt" 2>&1
 
       - name: Run tests
-        run: flutter test
+        id: test
+        continue-on-error: true
+        run: flutter test > "$RUNNER_TEMP/test.txt" 2>&1
+
+      - name: Publish the output to the pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          APP: ${{ matrix.app }}
+          ANALYZE: ${{ steps.analyze.outcome }}
+          TESTS: ${{ steps.test.outcome }}
+        run: |
+          {
+            echo "### \`$APP\` — analyze: **$ANALYZE**, tests: **$TESTS**"
+            echo ""
+            echo "<details><summary>flutter analyze</summary>"
+            echo ""
+            echo '```'
+            tail -c 40000 "$RUNNER_TEMP/analyze.txt" 2>/dev/null || echo "no output"
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "<details><summary>flutter test</summary>"
+            echo ""
+            echo '```'
+            tail -c 40000 "$RUNNER_TEMP/test.txt" 2>/dev/null || echo "no output"
+            echo '```'
+            echo ""
+            echo "</details>"
+          } > "$RUNNER_TEMP/comment.md"
+          gh pr comment "$PR" --repo "${{ github.repository }}" --body-file "$RUNNER_TEMP/comment.md"
+
+      - name: Fail if the code does not analyze
+        if: steps.analyze.outcome == 'failure'
+        run: cat "$RUNNER_TEMP/analyze.txt" && exit 1
+
+      - name: Fail if the tests do not pass
+        if: steps.test.outcome == 'failure'
+        run: cat "$RUNNER_TEMP/test.txt" && exit 1
