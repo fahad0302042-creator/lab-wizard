@@ -35,6 +35,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
   Timer? _undoTimer;
   bool _searching = false;
   bool _printing = false;
+  int _undoToken = 0;
 
   bool get _isChemical => widget.kind == ItemKind.chemical;
 
@@ -204,6 +205,34 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
       action: action,
     );
     if (log != null) _offerUndo(log);
+  }
+
+  /// Five seconds to take it back, with the row's own undo — the log is removed
+  /// and the quantity restored, rather than a compensating entry being written.
+  void _offerUndo(ConsumptionLog log) {
+    _undoToken++;
+    final token = _undoToken;
+    setState(() => _undo = log);
+    Timer(const Duration(seconds: 5), () {
+      if (!mounted || token != _undoToken) return;
+      setState(() => _undo = null);
+    });
+  }
+
+  Future<void> _performUndo() async {
+    final log = _undo;
+    if (log == null) return;
+    _undoToken++;
+    setState(() => _undo = null);
+    HapticFeedback.mediumImpact();
+    try {
+      await ref.read(inventoryProvider.notifier).undoAction(log);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
+    }
   }
 
   Future<void> _rowActions(

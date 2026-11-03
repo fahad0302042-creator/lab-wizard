@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lab_wizard_v2/features/inventory/domain/models.dart';
 import 'package:lab_wizard_v2/features/reports/domain/monthly_report.dart';
 
-const _month = DateTime(2026, 10);
+final _month = DateTime(2026, 10);
 
 Chemical _chemical(
   String id,
