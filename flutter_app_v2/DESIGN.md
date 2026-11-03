@@ -263,3 +263,25 @@ release, so the obvious download link handed back the old APK.
 The workflow now sets `--latest` on the rebuilt app's release and
 `--latest=false` on the old app's, and the old app's releases are titled
 "Lab Wizard (old app)" so the two can't be confused again.
+
+### Remembering an entry wrong, later
+
+The undo bar only covers five seconds. Memory is slower than that, so any entry
+in an item's history can be tapped and **corrected** — amount, date, note, or
+whether it was use, restock or breakage — or removed outright.
+
+The arithmetic matters more than the screen: the shelf is wound back to what it
+was before the old entry, then forward by the corrected one
+(`quantityAfterCorrection` in `domain/models.dart`, covered by
+`test/correction_math_test.dart`). The log keeps its id, so the report shows the
+corrected numbers instead of a pair of entries that cancel out. Offline, the
+correction is queued as `correct_action` and replayed later.
+
+### The manual low-stock control
+
+Nothing is flagged until an order level exists, so that level *is* the manual
+switch. It is no longer a passing caption: the item page carries an **Order
+level** row showing the current level (or "No order level set" in clay), which
+opens a sheet to set, change or clear it. The same field is in **Edit item**,
+alongside name, formula/category, unit, quantity and notes. Clearing it turns
+warnings off for that item.

@@ -482,6 +482,81 @@ class InventoryRepository {
     return restored;
   }
 
+  /// Corrects an entry that was logged wrong, days later.
+  ///
+  /// Nothing is guessed at: the quantity is first wound back to what it was
+  /// before the old entry, then wound forward by the corrected entry, so the
+  /// shelf ends up exactly where it would have been had the entry been right
+  /// the first time. The log keeps its id, so the report simply shows the
+  /// corrected numbers.
+  Future<double> correctAction({
+    required String userId,
+    required ConsumptionLog log,
+    required InventoryAction action,
+    required double amount,
+    required String note,
+    required DateTime loggedAt,
+    required double currentQuantity,
+  }) async {
+    final corrected = quantityAfterCorrection(
+      currentQuantity: currentQuantity,
+      oldAction: log.action,
+      oldAmount: log.amount,
+      newAction: action,
+      newAmount: amount,
+    );
+    final table = log.itemType == ItemKind.chemical ? 'chemicals' : 'apparatus';
+    final fields = <String, dynamic>{
+      'action': action.name,
+      'amount': amount,
+      'note': note.trim(),
+      'logged_at': localDayAtNoon(loggedAt).toUtc().toIso8601String(),
+    };
+
+    try {
+      if (remote == null) throw const _OfflineException();
+      await remote!
+          .from('consumption_logs')
+          .update(fields)
+          .eq('id', log.id);
+      await remote!
+          .from(table)
+          .update({'quantity': corrected})
+          .eq('id', log.itemId);
+    } catch (error) {
+      if (!_isConnectivityError(error) && error is! _OfflineException) rethrow;
+      await local.enqueue(
+        PendingOperation(
+          id: _uuid.v4(),
+          userId: userId,
+          type: 'correct_action',
+          payload: {
+            'log_id': log.id,
+            'item_id': log.itemId,
+            'item_type': log.itemType.name,
+            'fields': fields,
+            'quantity': corrected,
+          },
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+
+    final rows = await local.loadRecords(userId, log.itemType.name);
+    final current = rows.where((row) => row['id'] == log.itemId).firstOrNull;
+    if (current != null) {
+      await local.upsertRecord(userId, log.itemType.name, {
+        ...current,
+        'quantity': corrected,
+      });
+    }
+    await local.upsertRecord(userId, 'log', {
+      ...log.toMap(),
+      ...fields,
+    });
+    return corrected;
+  }
+
   Future<void> deleteItem({
     required String userId,
     required ItemKind type,
@@ -516,6 +591,20 @@ class InventoryRepository {
           await remote!.from('apparatus').upsert(operation.payload);
         } else if (operation.type == 'inventory_action') {
           await _applyRemoteAction(userId, operation.payload);
+        } else if (operation.type == 'correct_action') {
+          final fields = Map<String, dynamic>.from(
+            operation.payload['fields'] as Map,
+          );
+          final itemType = operation.payload['item_type'] as String;
+          final table = itemType == 'apparatus' ? 'apparatus' : 'chemicals';
+          await remote!
+              .from('consumption_logs')
+              .update(fields)
+              .eq('id', operation.payload['log_id'] as String);
+          await remote!
+              .from(table)
+              .update({'quantity': operation.payload['quantity']})
+              .eq('id', operation.payload['item_id'] as String);
         } else if (operation.type == 'undo_action') {
           final logMap = Map<String, dynamic>.from(
             operation.payload['log'] as Map,
