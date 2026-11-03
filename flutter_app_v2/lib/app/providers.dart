@@ -155,10 +155,22 @@ class AppPreferences {
     this.themeMode = ThemeMode.system,
     this.reduceMotion = false,
     this.lowStockAlerts = false,
+    this.compactRows = false,
+    this.dailyCheck = false,
+    this.dailyCheckHour = 9,
   });
 
   final ThemeMode themeMode;
   final bool reduceMotion;
+
+  /// Drops subtitles and jar ticks so a long shelf fits more per screen.
+  final bool compactRows;
+
+  /// One scheduled reminder a day, so an untouched shelf still gets noticed.
+  final bool dailyCheck;
+
+  /// Local hour for that reminder, 0–23.
+  final int dailyCheckHour;
 
   /// Off until the user says yes, and off again if they switch it off. The
   /// phone's own permission is the second gate, checked before every send.
@@ -168,10 +180,16 @@ class AppPreferences {
     ThemeMode? themeMode,
     bool? reduceMotion,
     bool? lowStockAlerts,
+    bool? compactRows,
+    bool? dailyCheck,
+    int? dailyCheckHour,
   }) => AppPreferences(
     themeMode: themeMode ?? this.themeMode,
     reduceMotion: reduceMotion ?? this.reduceMotion,
     lowStockAlerts: lowStockAlerts ?? this.lowStockAlerts,
+    compactRows: compactRows ?? this.compactRows,
+    dailyCheck: dailyCheck ?? this.dailyCheck,
+    dailyCheckHour: dailyCheckHour ?? this.dailyCheckHour,
   );
 }
 
@@ -198,6 +216,9 @@ class PreferencesController extends Notifier<AppPreferences> {
       },
       reduceMotion: preferences.getBool('reduce_motion') ?? false,
       lowStockAlerts: preferences.getBool('low_stock_alerts') ?? false,
+      compactRows: preferences.getBool('compact_rows') ?? false,
+      dailyCheck: preferences.getBool('daily_check') ?? false,
+      dailyCheckHour: preferences.getInt('daily_check_hour') ?? 9,
     );
   }
 
@@ -211,6 +232,50 @@ class PreferencesController extends Notifier<AppPreferences> {
     state = state.copyWith(reduceMotion: value);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('reduce_motion', value);
+  }
+
+  /// Turning the daily check on asks for notification permission and schedules
+  /// the reminder in the same breath; leaving it to a separate step is how a
+  /// switch ends up on with nothing behind it.
+  Future<bool> setDailyCheck(bool value) async {
+    final service = ref.read(notificationServiceProvider);
+    if (value) {
+      final granted = await service.requestPermission();
+      if (!granted) return false;
+      final scheduled = await service.scheduleDailyReminder(
+        hour: state.dailyCheckHour,
+        title: 'Lab Wizard check',
+        body: 'Open the app to see what needs ordering.',
+      );
+      if (!scheduled) return false;
+    } else {
+      await service.cancelDailyReminder();
+    }
+    state = state.copyWith(dailyCheck: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('daily_check', value);
+    return true;
+  }
+
+  Future<void> setDailyCheckHour(int hour) async {
+    state = state.copyWith(dailyCheckHour: hour);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setInt('daily_check_hour', hour);
+    if (state.dailyCheck) {
+      await ref
+          .read(notificationServiceProvider)
+          .scheduleDailyReminder(
+            hour: hour,
+            title: 'Lab Wizard check',
+            body: 'Open the app to see what needs ordering.',
+          );
+    }
+  }
+
+  Future<void> setCompactRows(bool value) async {
+    state = state.copyWith(compactRows: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('compact_rows', value);
   }
 
   /// Turning alerts on asks the phone for permission first. If the user says no

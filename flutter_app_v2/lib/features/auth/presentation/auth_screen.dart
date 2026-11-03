@@ -207,7 +207,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     child: Text(
                       'Lab Wizard 2 · $buildStamp',
                       style: context.label.copyWith(
-                        fontSize: 8.5,
+                        fontSize: LabType.micro,
                         letterSpacing: 1,
                       ),
                     ),
