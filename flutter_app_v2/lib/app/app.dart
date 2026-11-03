@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../features/inventory/domain/models.dart';
+import '../features/reports/presentation/reports_screen.dart';
+import '../features/scanner/presentation/scanner_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../features/shelf/presentation/shelf_screen.dart';
 import 'providers.dart';
 
@@ -41,9 +46,7 @@ class _Gate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
-    if (auth.phase == AuthPhase.setupRequired) {
-      return const _BackendMissing();
-    }
+    if (auth.phase == AuthPhase.setupRequired) return const _BackendMissing();
     if (auth.phase == AuthPhase.signedIn && auth.user != null) {
       return HomeShell(user: auth.user!);
     }
@@ -51,8 +54,6 @@ class _Gate extends ConsumerWidget {
   }
 }
 
-/// The shelf is the app for now; the remaining tabs come after this one has
-/// been through your hands.
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({required this.user, super.key});
 
@@ -63,6 +64,8 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
+  int _index = 0;
+
   @override
   void initState() {
     super.initState();
@@ -73,8 +76,120 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: SafeArea(bottom: false, child: ShelfScreen()),
+    final pages = <Widget>[
+      const ShelfScreen(kind: ItemKind.chemical),
+      const ShelfScreen(kind: ItemKind.apparatus),
+      ScannerScreen(active: _index == 2),
+      const ReportsScreen(),
+    ];
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: IndexedStack(
+          index: _index,
+          sizing: StackFit.expand,
+          children: List.generate(
+            pages.length,
+            (page) => TickerMode(
+              enabled: page == _index,
+              child: pages[page],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: _NavBar(
+        index: _index,
+        onSelected: (value) {
+          if (_index == value) return;
+          HapticFeedback.selectionClick();
+          setState(() => _index = value);
+        },
+        onSettings: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+        ),
+      ),
+    );
+  }
+}
+
+/// Text-only tabs. No icons in the bar: the app already carries enough
+/// furniture, and four words are faster to read than four glyphs.
+class _NavBar extends StatelessWidget {
+  const _NavBar({
+    required this.index,
+    required this.onSelected,
+    required this.onSettings,
+  });
+
+  final int index;
+  final ValueChanged<int> onSelected;
+  final VoidCallback onSettings;
+
+  static const _labels = ['CHEMS', 'APPARATUS', 'SCAN', 'REPORTS'];
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: lab.bone,
+        border: Border(top: BorderSide(color: lab.hair)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            children: [
+              for (var i = 0; i < _labels.length; i++)
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: index == i,
+                    label: _labels[i],
+                    child: InkResponse(
+                      onTap: () => onSelected(i),
+                      radius: 40,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _labels[i],
+                              style: context.label.copyWith(
+                                fontSize: 9.5,
+                                letterSpacing: 1.3,
+                                color: index == i ? lab.ink : lab.soft,
+                                fontWeight: index == i
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: index == i ? 16 : 0,
+                              height: 2,
+                              decoration: BoxDecoration(
+                                color: lab.sage,
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              IconButton(
+                tooltip: 'Settings',
+                onPressed: onSettings,
+                icon: Icon(Icons.tune, size: 19, color: lab.soft),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

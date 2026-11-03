@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -134,7 +136,10 @@ class AuthController extends Notifier<AuthState> {
       await client?.auth.signOut();
     } finally {
       if (userId != null) {
-        await ref.read(localDatabaseProvider).clearUser(userId);
+        // Keep the outbox: anything not yet uploaded is the user's work.
+        await ref
+            .read(localDatabaseProvider)
+            .clearUser(userId, keepOutbox: true);
       }
       ref.read(inventoryProvider.notifier).clearMemory();
       state = const AuthState(phase: AuthPhase.signedOut);
@@ -397,7 +402,7 @@ class InventoryController extends Notifier<InventoryState> {
     );
   }
 
-  Future<void> applyAction({
+  Future<ConsumptionLog> applyAction({
     required String itemId,
     required ItemKind itemType,
     required InventoryAction action,
@@ -450,6 +455,51 @@ class InventoryController extends Notifier<InventoryState> {
       logs: [log, ...state.logs.where((value) => value.id != log.id)],
       pendingCount: cached.pendingCount,
       fromCache: cached.pendingCount > 0,
+    );
+    return log;
+  }
+
+  /// Removes a log and puts the quantity back, rather than recording a second
+  /// entry. That keeps reports honest: an undone action leaves no trace.
+  Future<void> undoAction(ConsumptionLog log) async {
+    final userId = _requireUser();
+    final current = log.itemType == ItemKind.chemical
+        ? state.chemicals
+              .where((item) => item.id == log.itemId)
+              .firstOrNull
+              ?.quantity
+        : state.apparatus
+              .where((item) => item.id == log.itemId)
+              .firstOrNull
+              ?.quantity;
+    if (current == null) {
+      throw StateError('That item is no longer on the shelf.');
+    }
+    final restored = await _repository.revertAction(
+      userId: userId,
+      log: log,
+      currentQuantity: current,
+    );
+    state = state.copyWith(
+      chemicals: log.itemType == ItemKind.chemical
+          ? state.chemicals
+                .map(
+                  (item) => item.id == log.itemId
+                      ? item.copyWith(quantity: restored)
+                      : item,
+                )
+                .toList()
+          : state.chemicals,
+      apparatus: log.itemType == ItemKind.apparatus
+          ? state.apparatus
+                .map(
+                  (item) => item.id == log.itemId
+                      ? item.copyWith(quantity: restored)
+                      : item,
+                )
+                .toList()
+          : state.apparatus,
+      logs: state.logs.where((value) => value.id != log.id).toList(),
     );
   }
 
