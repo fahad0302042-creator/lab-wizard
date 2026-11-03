@@ -299,3 +299,32 @@ DateTime localDayAtNoon(DateTime value) =>
 
 String localDayKey(DateTime value) =>
     DateFormat('yyyy-MM-dd').format(value.toLocal());
+
+/// The quantity after an entry is corrected, given the shelf as it stands.
+///
+/// Wind the shelf back to what it was before the old entry, then forward by the
+/// corrected one. Doing it in one step — rather than adding a delta — is what
+/// keeps the two directions straight when an entry changes from use to restock.
+/// `test/correction_math_test.dart` pins the behaviour.
+double quantityAfterCorrection({
+  required double currentQuantity,
+  required InventoryAction oldAction,
+  required double oldAmount,
+  required InventoryAction newAction,
+  required double newAmount,
+}) {
+  final before = switch (oldAction) {
+    InventoryAction.restock => (currentQuantity - oldAmount)
+        .clamp(0, double.infinity)
+        .toDouble(),
+    InventoryAction.consume ||
+    InventoryAction.breakage => currentQuantity + oldAmount,
+  };
+  return switch (newAction) {
+    InventoryAction.restock => before + newAmount,
+    InventoryAction.consume ||
+    InventoryAction.breakage => (before - newAmount)
+        .clamp(0, double.infinity)
+        .toDouble(),
+  };
+}

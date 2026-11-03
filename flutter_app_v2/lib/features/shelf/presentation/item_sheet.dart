@@ -9,6 +9,8 @@ import '../../../core/widgets/glass_jar.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
 import 'action_sheet.dart';
+import 'edit_item_sheet.dart';
+import 'log_sheet.dart';
 
 /// The item page, opened from a row, a scan, or a search result.
 Future<void> showItemSheet(
@@ -128,14 +130,8 @@ class _ItemSheet extends ConsumerWidget {
               ),
             ],
           ),
-          if (item.threshold > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                'Flags below ${formatQuantity(item.threshold)} ${item.unit}',
-                style: context.aside.copyWith(fontSize: 15),
-              ),
-            ),
+          const SizedBox(height: 10),
+          _OrderLevelRow(item: item),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -175,8 +171,19 @@ class _ItemSheet extends ConsumerWidget {
             )
           else
             ...logs.map(
-              (log) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 7),
+              (log) => InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => showLogSheet(
+                  context,
+                  log: log,
+                  itemName: item.name,
+                  unit: item.unit,
+                ),
+                child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 7,
+                  horizontal: 2,
+                ),
                 child: Row(
                   children: [
                     Icon(
@@ -212,6 +219,7 @@ class _ItemSheet extends ConsumerWidget {
                     ),
                   ],
                 ),
+                ),
               ),
             ),
           if (item.notes.isNotEmpty) ...[
@@ -223,11 +231,28 @@ class _ItemSheet extends ConsumerWidget {
               style: TextStyle(fontSize: 13, height: 1.5, color: lab.soft),
             ),
           ],
-          const SizedBox(height: 22),
-          OutlinedButton.icon(
-            onPressed: () => _delete(context, ref, item),
-            icon: Icon(Icons.delete_outline, size: 18, color: lab.berry),
-            label: Text('Delete item', style: TextStyle(color: lab.berry)),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => showEditItemSheet(context, item: item),
+                  icon: const Icon(Icons.edit_outlined, size: 17),
+                  label: const Text('Edit item'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _delete(context, ref, item),
+                  icon: Icon(Icons.delete_outline, size: 17, color: lab.berry),
+                  label: Text(
+                    'Delete',
+                    style: TextStyle(color: lab.berry),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -278,5 +303,78 @@ class _ItemSheet extends ConsumerWidget {
         context,
       ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
     }
+  }
+}
+
+/// The manual low-stock switch.
+///
+/// Nothing is flagged until a level exists, so this row is the one place that
+/// decides whether an item can ever ask for attention. It sits directly under
+/// the quantity, because that is where the question "when should this shout at
+/// me?" actually occurs to someone.
+class _OrderLevelRow extends ConsumerWidget {
+  const _OrderLevelRow({required this.item});
+
+  final ItemView item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lab = context.lab;
+    final hasLevel = item.threshold > 0;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => showOrderLevelSheet(context, item: item),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 9, 10, 9),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: hasLevel ? lab.hair : lab.clay),
+          color: hasLevel
+              ? Colors.transparent
+              : lab.clay.withValues(alpha: .06),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              hasLevel ? Icons.notifications_none : Icons.notifications_off,
+              size: 16,
+              color: hasLevel ? lab.soft : lab.clay,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasLevel
+                        ? 'Order level: ${formatQuantity(item.threshold)} '
+                              '${item.unit}'
+                        : 'No order level set',
+                    style: context.itemName.copyWith(fontSize: 13.5),
+                  ),
+                  Text(
+                    hasLevel
+                        ? 'This shelf asks for attention below that.'
+                        : 'Set one to let this shelf warn you.',
+                    style: context.aside.copyWith(
+                      fontSize: 14,
+                      color: hasLevel ? lab.soft : lab.clay,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              hasLevel ? 'Change' : 'Set',
+              style: context.label.copyWith(
+                fontSize: 9,
+                letterSpacing: 1,
+                color: hasLevel ? lab.soft : lab.clay,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

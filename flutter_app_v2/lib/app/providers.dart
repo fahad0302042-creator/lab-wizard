@@ -538,6 +538,69 @@ class InventoryController extends Notifier<InventoryState> {
     if (!shown) debugPrint('low stock alert not shown for ${item.name}');
   }
 
+  /// Fixes an entry that was logged wrong. The shelf quantity is recalculated
+  /// from scratch, and the log keeps its id, so reports show the corrected
+  /// figures rather than a correction entry nobody can read.
+  Future<void> correctAction({
+    required ConsumptionLog log,
+    required InventoryAction action,
+    required double amount,
+    required String note,
+    required DateTime loggedAt,
+  }) async {
+    if (amount <= 0) throw ArgumentError('Amount must be greater than zero.');
+    final userId = _requireUser();
+    final current = log.itemType == ItemKind.chemical
+        ? state.chemicals.firstWhere((item) => item.id == log.itemId).quantity
+        : state.apparatus.firstWhere((item) => item.id == log.itemId).quantity;
+    final corrected = await _repository.correctAction(
+      userId: userId,
+      log: log,
+      action: action,
+      amount: amount,
+      note: note,
+      loggedAt: loggedAt,
+      currentQuantity: current,
+    );
+    final fixed = ConsumptionLog(
+      id: log.id,
+      itemId: log.itemId,
+      itemType: log.itemType,
+      action: action,
+      amount: amount,
+      note: note.trim(),
+      loggedAt: localDayAtNoon(loggedAt),
+      createdAt: log.createdAt,
+      operationId: log.operationId,
+    );
+    final cached = await _repository.loadCached(userId);
+    state = state.copyWith(
+      chemicals: log.itemType == ItemKind.chemical
+          ? state.chemicals
+                .map(
+                  (item) => item.id == log.itemId
+                      ? item.copyWith(quantity: corrected)
+                      : item,
+                )
+                .toList()
+          : state.chemicals,
+      apparatus: log.itemType == ItemKind.apparatus
+          ? state.apparatus
+                .map(
+                  (item) => item.id == log.itemId
+                      ? item.copyWith(quantity: corrected)
+                      : item,
+                )
+                .toList()
+          : state.apparatus,
+      logs: state.logs
+          .map((value) => value.id == log.id ? fixed : value)
+          .toList(),
+      pendingCount: cached.pendingCount,
+      fromCache: cached.pendingCount > 0,
+    );
+  }
+
   /// Removes a log and puts the quantity back, rather than recording a second
   /// entry. That keeps reports honest: an undone action leaves no trace.
   Future<void> undoAction(ConsumptionLog log) async {
