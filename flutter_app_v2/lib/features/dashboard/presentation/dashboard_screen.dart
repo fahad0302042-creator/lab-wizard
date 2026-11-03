@@ -170,7 +170,7 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Center(
             child: Text(
-              'Lab Wizard 2 · ${buildStamp}',
+              'Lab Wizard 2 · $buildStamp',
               style: context.label.copyWith(fontSize: 8.5, letterSpacing: 1),
             ),
           ),
