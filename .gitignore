@@ -50,6 +50,8 @@ test
 # The root web project ignores scratch `test`, but Flutter tests are required in CI.
 !flutter_app/test/
 !flutter_app/test/**
+!flutter_app_v2/test/
+!flutter_app_v2/test/**
 prompt
 
 server.log

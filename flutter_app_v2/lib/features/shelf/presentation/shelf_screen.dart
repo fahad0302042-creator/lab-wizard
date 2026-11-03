@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1030,7 +1028,7 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
   }
 
   Future<void> _save() async {
-    if (!_form.validate()) return;
+    if (_form.currentState?.validate() != true) return;
     setState(() => _saving = true);
     try {
       await ref

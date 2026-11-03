@@ -163,7 +163,8 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
     final chemical = widget.chemical;
     final after = switch (widget.action) {
       InventoryAction.restock => chemical.quantity + (_parsed ?? 0),
-      _ => (chemical.quantity - (_parsed ?? 0)).clamp(0, double.infinity),
+      _ => (chemical.quantity - (_parsed ?? 0)).clamp(0, double.infinity)
+          .toDouble(),
     };
     final metrics = jarMetrics(
       quantity: after,
