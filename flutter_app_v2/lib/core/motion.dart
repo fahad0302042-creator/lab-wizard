@@ -108,7 +108,7 @@ class CountUp extends StatelessWidget {
   const CountUp({
     required this.value,
     required this.builder,
-    this.duration = LabMotion.quick + const Duration(milliseconds: 40),
+    this.duration = const Duration(milliseconds: 260),
     super.key,
   });
 
