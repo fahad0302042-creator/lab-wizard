@@ -1,0 +1,11 @@
+config/local.json
+*.log
+.dart_tool/
+.flutter-plugins-dependencies
+/build/
+/coverage/
+app.*.symbols
+app.*.map.json
+/android/app/debug
+/android/app/profile
+/android/app/release

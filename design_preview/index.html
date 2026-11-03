@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab Wizard 2 — design directions</title>
+<style>
+  @font-face { font-family: 'Kalam'; src: url('fonts/Kalam-Regular.ttf'); font-weight: 400; }
+  @font-face { font-family: 'Kalam'; src: url('fonts/Kalam-Bold.ttf'); font-weight: 700; }
+  @font-face { font-family: 'Caveat'; src: url('fonts/Caveat-Variable.ttf'); font-weight: 400 700; }
+  @font-face { font-family: 'Architects Daughter'; src: url('fonts/ArchitectsDaughter-Regular.ttf'); }
+  @font-face { font-family: 'Patrick Hand'; src: url('fonts/PatrickHand-Regular.ttf'); }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #14140f;
+    color: #e8e3d6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 22px 14px 60px;
+    min-height: 100vh;
+  }
+
+  header { max-width: 980px; margin: 0 auto 20px; }
+  h1 { font-size: 19px; margin: 0 0 6px; font-weight: 650; letter-spacing: -.01em; }
+  header p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #a8a294; max-width: 62ch; }
+
+  .tabs {
+    display: flex; gap: 8px; margin: 18px auto 0; max-width: 980px;
+    flex-wrap: wrap;
+  }
+  .tabs button {
+    flex: 1 1 150px;
+    appearance: none; cursor: pointer;
+    background: #1d1d17; color: #b6b0a1;
+    border: 1px solid #33332a; border-radius: 9px;
+    padding: 11px 12px; font: inherit; font-size: 13px; font-weight: 600;
+    text-align: left; transition: background .15s, color .15s, border-color .15s;
+  }
+  .tabs button span { display: block; font-weight: 400; font-size: 11.5px; color: #7d7768; margin-top: 3px; }
+  .tabs button[aria-selected="true"] { background: #2b2b21; color: #fff; border-color: #6f6a58; }
+  .tabs button[aria-selected="true"] span { color: #b6b0a1; }
+
+  .stage { max-width: 980px; margin: 22px auto 0; display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap; }
+  .phone {
+    width: 372px; height: 760px; flex: 0 0 auto;
+    border-radius: 34px; overflow: hidden; position: relative;
+    box-shadow: 0 18px 50px rgba(0,0,0,.55), 0 0 0 1px #000, 0 0 0 9px #23231c;
+    margin: 0 auto;
+  }
+  .notes { flex: 1 1 260px; min-width: 240px; max-width: 330px; font-size: 13px; line-height: 1.6; color: #a8a294; }
+  .notes h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: #6f6a58; margin: 0 0 8px; }
+  .notes p { margin: 0 0 12px; }
+  .notes b { color: #ddd7c8; font-weight: 600; }
+  .notes ul { margin: 0 0 14px; padding-left: 17px; }
+  .notes li { margin-bottom: 5px; }
+
+  /* ============================================================
+     DIRECTION A — THE LEDGER
+     A stock ledger from a working lab. Ruled columns, stamped
+     statuses, ink on cream, index tabs down the edge.
+     ============================================================ */
+  .dir-a {
+    --paper: #f4ecd8;
+    --ink: #23201a;
+    --faded: #7a6f57;
+    --rule: #d9cbab;
+    --stamp-red: #a8321f;
+    --stamp-amber: #a8721c;
+    --stamp-green: #4a6b3c;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+  .dir-a::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 26px, rgba(120,100,60,.10) 26px 27px);
+    opacity: .8;
+  }
+  .dir-a .margin-rule {
+    position: absolute; top: 0; bottom: 0; left: 30px; width: 1px;
+    background: rgba(168,50,31,.35); pointer-events: none;
+  }
+  .A-top { padding: 20px 18px 0 44px; position: relative; z-index: 2; }
+  .A-kicker {
+    font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--faded); border-bottom: 1px solid var(--rule); padding-bottom: 7px;
+    display: flex; justify-content: space-between;
+  }
+  .A-title { font-size: 27px; margin: 12px 0 2px; letter-spacing: -.015em; font-weight: 400; }
+  .A-sub { font-family: 'Caveat', cursive; font-size: 17px; color: var(--stamp-red); transform: rotate(-.6deg); }
+  .A-ledger-head {
+    display: grid; grid-template-columns: 1fr 74px 58px;
+    gap: 6px; padding: 14px 4px 5px;
+    font-size: 9px; letter-spacing: .13em; text-transform: uppercase; color: var(--faded);
+    border-bottom: 1.5px solid var(--ink);
+  }
+  .A-ledger-head div:not(:first-child) { text-align: right; }
+  .A-rows { flex: 1; overflow: hidden; position: relative; z-index: 2; }
+  .A-row {
+    display: grid; grid-template-columns: 1fr 74px 58px; gap: 6px;
+    padding: 11px 4px 10px; border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+  .A-row .nm { font-size: 15.5px; line-height: 1.25; }
+  .A-row .fm { font-family: 'Kalam', cursive; font-size: 13px; color: var(--faded); margin-top: 1px; }
+  .A-row .qt {
+    text-align: right; font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 14px; letter-spacing: -.02em; padding-top: 2px;
+  }
+  .A-row .qt small { display: block; font-size: 9.5px; color: var(--faded); letter-spacing: 0; margin-top: 2px; }
+  .A-stamp {
+    justify-self: end;
+    font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700;
+    border: 1.6px solid currentColor; border-radius: 2px;
+    padding: 2.5px 4px 2px; transform: rotate(-2.4deg);
+    margin-top: 2px;
+  }
+  .A-stamp.low { color: var(--stamp-amber); }
+  .A-stamp.out { color: var(--stamp-red); }
+  .A-stamp.ok { color: var(--stamp-green); border-color: transparent; }
+  .A-stamp.ok::before { content: "✓ "; }
+  .A-margin-note {
+    position: absolute; left: 3px; width: 22px;
+    font-family: 'Caveat', cursive; font-size: 13px; color: var(--stamp-red);
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    letter-spacing: .02em;
+  }
+  .A-tabs { position: absolute; right: 0; top: 108px; z-index: 3; }
+  .A-tabs div {
+    background: #e2d5b6; color: #6b6048; font-size: 8.5px; letter-spacing: .1em;
+    text-transform: uppercase; padding: 8px 5px; margin-bottom: 3px;
+    border-radius: 3px 0 0 3px; writing-mode: vertical-rl;
+    border: 1px solid #cdbf9d; border-right: none;
+  }
+  .A-tabs div.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .A-foot {
+    position: relative; z-index: 2;
+    border-top: 1.5px solid var(--ink);
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 18px 12px 44px;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faded);
+  }
+  .A-add {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 1.7px solid var(--ink); display: grid; place-items: center;
+    font-size: 22px; line-height: 1; color: var(--ink); background: #efe4ca;
+    font-family: Georgia, serif;
+  }
+
+  /* ============================================================
+     DIRECTION B — BENCH PANEL
+     Instrument face. Graphite, big tabular numerals, switch
+     hardware, one signal colour. Built to read at arm's length.
+     ============================================================ */
+  .dir-b {
+    --bg: #16181a;
+    --panel: #1f2225;
+    --panel-edge: #2c3034;
+    --txt: #eef1f0;
+    --dim: #8b9296;
+    --lime: #c8f04a;
+    --amber: #e8a33d;
+    --red: #e2574c;
+    background: var(--bg);
+    color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .B-head { padding: 18px 18px 12px; }
+  .B-eyebrow {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim);
+  }
+  .B-dot { display: inline-flex; align-items: center; gap: 5px; }
+  .B-dot i { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); display: block; }
+  .B-title { font-size: 24px; font-weight: 700; letter-spacing: -.03em; margin: 14px 0 3px; }
+  .B-title em { font-style: normal; color: var(--lime); }
+  .B-count { font-size: 12px; color: var(--dim); }
+  .B-switch {
+    display: flex; gap: 3px; background: #0e1012; border-radius: 8px;
+    padding: 3px; margin: 14px 0 0; border: 1px solid var(--panel-edge);
+  }
+  .B-switch span {
+    flex: 1; text-align: center; font-size: 11.5px; font-weight: 600;
+    padding: 7px 4px; border-radius: 6px; color: var(--dim);
+  }
+  .B-switch span.on { background: var(--panel-edge); color: var(--txt); box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
+  .B-list { flex: 1; overflow: hidden; padding: 4px 14px 0; display: flex; flex-direction: column; gap: 9px; }
+  .B-item {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 12px; padding: 13px 14px 12px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    position: relative; overflow: hidden;
+  }
+  .B-item .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .B-item.ok .bar { background: var(--lime); }
+  .B-item.low .bar { background: var(--amber); }
+  .B-item.out .bar { background: var(--red); }
+  .B-item .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .B-item .nm { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+  .B-item .fm { font-family: 'Kalam', cursive; font-size: 13px; color: var(--dim); margin-top: 2px; }
+  .B-item .num {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 25px; font-weight: 600; letter-spacing: -.045em; line-height: 1;
+  }
+  .B-item .num small { font-size: 11px; font-weight: 500; color: var(--dim); letter-spacing: 0; margin-left: 2px; }
+  .B-item.low .num { color: var(--amber); }
+  .B-item.out .num { color: var(--red); }
+  .B-gauge { margin-top: 11px; display: flex; align-items: center; gap: 9px; }
+  .B-gauge .track { flex: 1; height: 5px; border-radius: 3px; background: #0e1012; overflow: hidden; }
+  .B-gauge .fill { height: 100%; border-radius: 3px; }
+  .B-item.ok .fill { background: var(--lime); }
+  .B-item.low .fill { background: var(--amber); }
+  .B-item.out .fill { background: var(--red); }
+  .B-gauge .thr { font-size: 10px; color: var(--dim); font-family: ui-monospace, monospace; }
+  .B-actions { display: flex; gap: 7px; margin-top: 11px; }
+  .B-actions button {
+    flex: 1; appearance: none; font: inherit; cursor: pointer;
+    background: #262a2e; border: 1px solid #34393e; color: var(--txt);
+    font-size: 12px; font-weight: 600; padding: 8px 6px; border-radius: 7px;
+  }
+  .B-actions button.danger { color: #f0a9a3; border-color: #4a3230; background: #2a2223; }
+  .B-nav {
+    display: flex; border-top: 1px solid var(--panel-edge);
+    background: #101214; padding: 9px 6px 14px;
+  }
+  .B-nav div { flex: 1; text-align: center; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: #5c6367; }
+  .B-nav div.on { color: var(--lime); }
+  .B-nav div b { display: block; font-size: 17px; line-height: 1.15; font-weight: 400; }
+
+  /* ============================================================
+     DIRECTION C — THE STORE ROOM
+     Editorial, calm, generous. Bone paper, sage accent, labels
+     stacked like jars on a shelf. Everything breathes.
+     ============================================================ */
+  .dir-c {
+    --bone: #f0eee7;
+    --card: #fbfaf6;
+    --ink: #2c2b26;
+    --soft: #8c887c;
+    --hair: #dcd8cb;
+    --sage: #5c7a5e;
+    --clay: #b4703f;
+    --berry: #9c3f4a;
+    background: var(--bone);
+    color: var(--ink);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .C-head { padding: 20px 20px 0; }
+  .C-date { font-family: 'Caveat', cursive; font-size: 16px; color: var(--soft); }
+  .C-title { font-size: 30px; letter-spacing: -.045em; margin: 4px 0 0; font-weight: 600; line-height: 1.05; }
+  .C-title span { color: var(--sage); }
+  .C-rule { height: 1px; background: var(--hair); margin: 17px 0 0; }
+  .C-summary { display: flex; gap: 0; padding: 13px 0 0; }
+  .C-summary div { flex: 1; }
+  .C-summary b { display: block; font-size: 21px; letter-spacing: -.04em; font-weight: 600; }
+  .C-summary span { font-size: 10.5px; color: var(--soft); letter-spacing: .05em; text-transform: uppercase; }
+  .C-summary div + div { border-left: 1px solid var(--hair); padding-left: 14px; }
+  .C-list { flex: 1; overflow: hidden; padding: 14px 14px 0; display: flex; flex-direction: column; gap: 8px; }
+  .C-item {
+    background: var(--card); border: 1px solid var(--hair); border-radius: 13px;
+    padding: 13px 14px; display: flex; align-items: center; gap: 12px;
+  }
+  .C-jar {
+    width: 34px; height: 40px; flex: 0 0 auto; border-radius: 5px 5px 7px 7px;
+    border: 1.4px solid var(--ink); position: relative; overflow: hidden;
+  }
+  .C-jar::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+    background: currentColor; opacity: .3;
+  }
+  .C-jar::before {
+    content: ""; position: absolute; top: 3px; left: 3px; right: 3px; height: 3px;
+    border-radius: 1px; background: var(--ink); opacity: .55;
+  }
+  .C-body { flex: 1; min-width: 0; }
+  .C-body .nm { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+  .C-body .fm { font-family: 'Kalam', cursive; font-size: 12.5px; color: var(--soft); }
+  .C-body .meter { display: flex; gap: 3px; margin-top: 7px; }
+  .C-body .meter i { height: 3.5px; width: 15px; border-radius: 2px; background: var(--hair); display: block; }
+  .C-body .meter i.on { background: var(--sage); }
+  .C-item.low .meter i.on { background: var(--clay); }
+  .C-item.out .meter i.on { background: var(--berry); }
+  .C-amt { text-align: right; flex: 0 0 auto; }
+  .C-amt .q { font-size: 16px; font-weight: 600; letter-spacing: -.03em; }
+  .C-amt .u { font-size: 10px; color: var(--soft); text-transform: uppercase; letter-spacing: .06em; }
+  .C-amt .flag { font-size: 9.5px; color: var(--clay); letter-spacing: .07em; text-transform: uppercase; margin-top: 2px; }
+  .C-item.out .C-amt .flag { color: var(--berry); }
+  .C-foot {
+    padding: 10px 20px 14px; display: flex; justify-content: space-between;
+    align-items: center; border-top: 1px solid var(--hair); margin-top: 10px;
+    background: var(--bone);
+  }
+  .C-foot .hint { font-family: 'Caveat', cursive; font-size: 15px; color: var(--soft); }
+  .C-add {
+    background: var(--ink); color: var(--bone); border: none;
+    border-radius: 999px; padding: 12px 20px; font-family: inherit;
+    font-size: 13px; font-weight: 600; letter-spacing: -.01em;
+  }
+
+  [hidden] { display: none !important; }
+  @media (max-width: 760px) {
+    .notes { max-width: 100%; flex-basis: 100%; }
+    .phone { width: 100%; max-width: 372px; height: 700px; }
+    .tabs button { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Three directions for the new app</h1>
+  <p>Same screens, same data, three different personalities. Each one shows the chemicals shelf with real lab items — low stock, empty, and healthy — so you can judge how it handles the states you actually see. Tap a direction to switch.</p>
+</header>
+
+<div class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="a">A · The Ledger<span>Paper stock book, rubber stamps</span></button>
+  <button role="tab" aria-selected="false" data-tab="b">B · Bench Panel<span>Dark instrument face, big numbers</span></button>
+  <button role="tab" aria-selected="false" data-tab="c">C · The Store Room<span>Calm, editorial, label-forward</span></button>
+</div>
+
+<div class="stage">
+
+  <!-- ================= A ================= -->
+  <div class="phone dir-a" id="pane-a">
+    <div class="margin-rule"></div>
+    <div class="A-tabs">
+      <div class="on">Chems</div><div>Glass</div><div>Scan</div><div>Rep</div>
+    </div>
+    <div class="A-top">
+      <div class="A-kicker"><span>Lab Wizard</span><span>03 Nov 2026</span></div>
+      <h2 class="A-title">Stock ledger</h2>
+      <div class="A-sub">14 items on the shelf, 3 to reorder</div>
+      <div class="A-ledger-head">
+        <div>Item</div><div>Qty</div><div>State</div>
+      </div>
+    </div>
+    <div class="A-rows">
+      <div class="A-margin-note" style="top:44px">reorder!</div>
+      <div class="A-row">
+        <div><div class="nm">Hydrochloric acid</div><div class="fm">HCl · 0.1 M</div></div>
+        <div class="qt">450<small>of 500 mL</small></div>
+        <div class="A-stamp ok">fine</div>
+      </div>
+      <div class="A-row">
+        <div><div class="nm">Sodium hydroxide</div><div class="fm">NaOH</div></div>
+        <div class="qt">18<small>min 25 g</small></div>
+        <div class="A-stamp low">low</div>
+      </div>
+      <div class="A-row">
+        <div><div class="nm">Ethanol</div><div class="fm">C₂H₅OH · 95%</div></div>
+        <div class="qt">0<small>of 1 L</small></div>
+        <div class="A-stamp out">out</div>
+      </div>
+      <div class="A-row">
+        <div><div class="nm">Copper sulfate</div><div class="fm">CuSO₄ · 5H₂O</div></div>
+        <div class="qt">240<small>of 250 g</small></div>
+        <div class="A-stamp ok">fine</div>
+      </div>
+      <div class="A-row">
+        <div><div class="nm">Phenolphthalein</div><div class="fm">C₂₀H₁₄O₄</div></div>
+        <div class="qt">32<small>min 15 drops</small></div>
+        <div class="A-stamp ok">fine</div>
+      </div>
+    </div>
+    <div class="A-foot">
+      <span>used 3 today</span>
+      <div class="A-add">+</div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes-a">
+    <h3>Why this one</h3>
+    <p><b>It looks like something a lab already owns.</b> A stock book on a shelf next to the reagents — ruled columns, typewriter numerals, rubber stamps for state. Nothing on screen looks like software.</p>
+    <ul>
+      <li>Stamps do the work sideways, so scanning a column tells you what's low</li>
+      <li>Numbers in a monospace column actually line up — you can compare at a glance</li>
+      <li>Margin notes are written in the gutter, like a real ledger</li>
+    </ul>
+    <p><b>Best if</b> you like the current paper feel and just want it more grown-up and legible.</p>
+  </div>
+
+  <!-- ================= B ================= -->
+  <div class="phone dir-b" id="pane-b" hidden>
+    <div class="B-head">
+      <div class="B-eyebrow">
+        <span class="B-dot"><i></i>synced</span>
+        <span>Reagents</span>
+      </div>
+      <h2 class="B-title">Shelf <em>—14</em></h2>
+      <div class="B-count">3 need restocking</div>
+      <div class="B-switch">
+        <span class="on">All</span><span>Low</span><span>Out</span><span>A–Z</span>
+      </div>
+    </div>
+    <div class="B-list">
+      <div class="B-item ok"><div class="bar"></div>
+        <div class="top"><div><div class="nm">Hydrochloric acid</div><div class="fm">HCl · 0.1 M</div></div>
+          <div class="num">450<small>mL</small></div></div>
+        <div class="B-gauge"><div class="track"><div class="fill" style="width:90%"></div></div><div class="thr">90%</div></div>
+      </div>
+      <div class="B-item low"><div class="bar"></div>
+        <div class="top"><div><div class="nm">Sodium hydroxide</div><div class="fm">NaOH · pellets</div></div>
+          <div class="num">18<small>g</small></div></div>
+        <div class="B-gauge"><div class="track"><div class="fill" style="width:22%"></div></div><div class="thr">min 25</div></div>
+        <div class="B-actions"><button class="danger">− use</button><button>+ stock</button></div>
+      </div>
+      <div class="B-item out"><div class="bar"></div>
+        <div class="top"><div><div class="nm">Ethanol</div><div class="fm">C₂H₅OH · 95%</div></div>
+          <div class="num">0<small>L</small></div></div>
+        <div class="B-gauge"><div class="track"><div class="fill" style="width:0%"></div></div><div class="thr">empty</div></div>
+      </div>
+      <div class="B-item ok"><div class="bar"></div>
+        <div class="top"><div><div class="nm">Copper sulfate</div><div class="fm">CuSO₄ · 5H₂O</div></div>
+          <div class="num">240<small>g</small></div></div>
+        <div class="B-gauge"><div class="track"><div class="fill" style="width:96%"></div></div><div class="thr">96%</div></div>
+      </div>
+    </div>
+    <div class="B-nav">
+      <div class="on"><b>◉</b>Home</div><div><b>▤</b>Shelf</div><div><b>⌗</b>Scan</div><div><b>◔</b>Reports</div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes-b" hidden>
+    <h3>Why this one</h3>
+    <p><b>Built for reading across a bench.</b> Big tabular numbers you can read from a metre away, a coloured edge showing state without reading anything, and one accent colour so attention goes where the problem is.</p>
+    <ul>
+      <li>Nobody has to squint to find "18 g" or "0 L"</li>
+      <li>Dark by default so a bright screen doesn't wash out the bench</li>
+      <li>Use and restock live on the card — two taps to log anything</li>
+    </ul>
+    <p><b>Best if</b> speed matters more than charm, and you mostly use it standing up with gloves on.</p>
+  </div>
+
+  <!-- ================= C ================= -->
+  <div class="phone dir-c" id="pane-c" hidden>
+    <div class="C-head">
+      <div class="C-date">Tuesday, 3 November</div>
+      <h2 class="C-title">Good shelves.<br><span>Three need a look.</span></h2>
+      <div class="C-rule"></div>
+      <div class="C-summary">
+        <div><b>14</b><span>Reagents</span></div>
+        <div><b>3</b><span>To reorder</span></div>
+        <div><b>9</b><span>Used today</span></div>
+      </div>
+    </div>
+    <div class="C-list">
+      <div class="C-item" style="color:#5c7a5e">
+        <div class="C-jar"><div style="position:absolute;inset:auto 0 0 0;height:88%;background:#5c7a5e;opacity:.32"></div></div>
+        <div class="C-body"><div class="nm">Hydrochloric acid</div><div class="fm">HCl · 0.1 M</div>
+          <div class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+        <div class="C-amt"><div class="q">450</div><div class="u">mL</div></div>
+      </div>
+      <div class="C-item low" style="color:#b4703f">
+        <div class="C-jar"><div style="position:absolute;inset:auto 0 0 0;height:22%;background:#b4703f;opacity:.4"></div></div>
+        <div class="C-body"><div class="nm">Sodium hydroxide</div><div class="fm">NaOH · pellets</div>
+          <div class="meter"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div>
+        <div class="C-amt"><div class="q">18</div><div class="u">g</div><div class="flag">order</div></div>
+      </div>
+      <div class="C-item out" style="color:#9c3f4a">
+        <div class="C-jar"><div style="position:absolute;inset:auto 0 0 0;height:0%;background:#9c3f4a"></div></div>
+        <div class="C-body"><div class="nm">Ethanol</div><div class="fm">C₂H₅OH · 95%</div>
+          <div class="meter"><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="C-amt"><div class="q">0</div><div class="u">L</div><div class="flag">empty</div></div>
+      </div>
+      <div class="C-item" style="color:#5c7a5e">
+        <div class="C-jar"><div style="position:absolute;inset:auto 0 0 0;height:94%;background:#5c7a5e;opacity:.32"></div></div>
+        <div class="C-body"><div class="nm">Copper sulfate</div><div class="fm">CuSO₄ · 5H₂O</div>
+          <div class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+        <div class="C-amt"><div class="q">240</div><div class="u">g</div></div>
+      </div>
+      <div class="C-item" style="color:#5c7a5e">
+        <div class="C-jar"><div style="position:absolute;inset:auto 0 0 0;height:70%;background:#5c7a5e;opacity:.32"></div></div>
+        <div class="C-body"><div class="nm">Phenolphthalein</div><div class="fm">C₂₀H₁₄O₄</div>
+          <div class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div></div>
+        <div class="C-amt"><div class="q">32</div><div class="u">drops</div></div>
+      </div>
+    </div>
+    <div class="C-foot">
+      <span class="hint">swipe a row to log use</span>
+      <button class="C-add">+ Add</button>
+    </div>
+  </div>
+
+  <div class="notes" id="notes-c" hidden>
+    <h3>Why this one</h3>
+    <p><b>The one that feels designed rather than generated.</b> Restrained type, real breathing room, and a little jar on each row whose fill level is the stock bar — so the data reads as an object, not a chart.</p>
+    <ul>
+      <li>Calm enough to use every day without fatigue</li>
+      <li>Every row doubles as a glanceable "how full is it" picture</li>
+      <li>Colour only appears when something needs attention</li>
+    </ul>
+    <p><b>Best if</b> you want it to look and feel like a modern, considered app — not a lab tool from 2004, and not a template.</p>
+  </div>
+
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.tabs button');
+  const panes = {
+    a: [document.getElementById('pane-a'), document.getElementById('notes-a')],
+    b: [document.getElementById('pane-b'), document.getElementById('notes-b')],
+    c: [document.getElementById('pane-c'), document.getElementById('notes-c')],
+  };
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+      Object.entries(panes).forEach(([ key, nodes ]) => {
+        nodes.forEach((node) => { node.hidden = key !== target; });
+      });
+    });
+  });
+</script>
+</body>
+</html>
