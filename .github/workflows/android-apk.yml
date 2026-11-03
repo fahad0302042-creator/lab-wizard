@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "flutter_app/**"
+      - "flutter_app_v2/**"
       - ".github/workflows/android-apk.yml"
   workflow_dispatch:
 
@@ -81,3 +82,73 @@ jobs:
             --target "${{ github.sha }}" \
             --title "Lab Wizard Android 1.0.${{ github.run_number }}" \
             --notes "Install this APK directly on Android. Allow installs from your browser or GitHub app if Android asks. Sign in with the same Lab Wizard account to load existing Supabase data. This is a GitHub development build, not a Play Store release."
+
+  # The rebuilt app builds and publishes on its own, so a failure in the older
+  # app's checks never blocks it. A manual run is allowed to publish too, which
+  # is how a test build gets a download link that works on a phone.
+  build-v2:
+    name: Test, build, and publish Lab Wizard 2
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app_v2
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze source
+        run: flutter analyze --fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build signed universal APK
+        run: >-
+          flutter build apk --release
+          --dart-define-from-file=config/production.json
+          --build-name=2.0.${{ github.run_number }}
+          --build-number=${{ github.run_number }}
+
+      - name: Name APK for download
+        run: cp build/app/outputs/flutter-apk/app-release.apk "Lab-Wizard-2-Android-2.0.${{ github.run_number }}.apk"
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lab-Wizard-2-Android-2.0.${{ github.run_number }}
+          path: flutter_app_v2/Lab-Wizard-2-Android-2.0.${{ github.run_number }}.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: labwizard2-2.0.${{ github.run_number }}
+          APK: Lab-Wizard-2-Android-2.0.${{ github.run_number }}.apk
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" "$APK" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Lab Wizard 2 — 2.0.${{ github.run_number }}" \
+            --notes "The rebuilt app, from \`$BRANCH\`. It installs alongside the current Lab Wizard, so you can compare them side by side. Sign in with the same account and your existing chemicals, history and reports load as before."
