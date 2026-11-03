@@ -1,0 +1,89 @@
+name: Build Lab Wizard 2 APK
+
+# A separate workflow from the original app's build, so a problem in one never
+# blocks the other. It can be started from a phone browser via
+# Actions → Build Lab Wizard 2 APK → Run workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "flutter_app_v2/**"
+      - ".github/workflows/android-v2-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-v2-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test, build, and publish Lab Wizard 2
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app_v2
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze source
+        run: flutter analyze --fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build signed universal APK
+        run: >-
+          flutter build apk --release
+          --dart-define-from-file=config/production.json
+          --build-name=2.0.${{ github.run_number }}
+          --build-number=${{ github.run_number }}
+
+      - name: Name APK for download
+        run: cp build/app/outputs/flutter-apk/app-release.apk "Lab-Wizard-2-Android-2.0.${{ github.run_number }}.apk"
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lab-Wizard-2-Android-2.0.${{ github.run_number }}
+          path: flutter_app_v2/Lab-Wizard-2-Android-2.0.${{ github.run_number }}.apk
+          if-no-files-found: error
+
+      # Publishing is allowed from a manual run as well as from main, so a test
+      # build can be installed straight from a release page on a phone.
+      - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: labwizard2-2.0.${{ github.run_number }}
+          APK: Lab-Wizard-2-Android-2.0.${{ github.run_number }}.apk
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" "$APK" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Lab Wizard 2 — 2.0.${{ github.run_number }}" \
+            --notes "The rebuilt app. Installs alongside the current Lab Wizard, so you can compare them side by side. Sign in with the same account and your existing chemicals, history and reports load as before. Built from \`$BRANCH\`."
