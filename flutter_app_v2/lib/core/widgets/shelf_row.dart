@@ -28,11 +28,15 @@ class ShelfRow extends StatefulWidget {
     required this.onTap,
     required this.onSwipe,
     this.onLongPress,
+    this.compact = false,
     super.key,
   });
 
   final ItemView item;
   final VoidCallback onTap;
+
+  /// Drops the subtitle and the tick row, so a long shelf fits more per screen.
+  final bool compact;
 
   /// Right means use, left means restock. The caller opens the matching panel.
   final ValueChanged<RowSwipe> onSwipe;
@@ -52,7 +56,11 @@ class _ShelfRowState extends State<ShelfRow> {
     final item = widget.item;
     final metrics = item.metrics;
     final color = lab.forState(metrics.signal);
-    final caption = stockCaption(metrics, piecewiseUnit: item.piecewise);
+    final needsAttention = metrics.signal != StockSignal.fine;
+    final caption = needsAttention
+        ? stockCaption(metrics, piecewiseUnit: item.piecewise)
+        : '';
+    final compact = widget.compact;
 
     return Dismissible(
       key: ValueKey('row-${item.id}'),
@@ -104,14 +112,25 @@ class _ShelfRowState extends State<ShelfRow> {
           onLongPress: widget.onLongPress,
           child: Container(
             decoration: BoxDecoration(
+              color: needsAttention ? lab.wash(color) : null,
               borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: lab.hair, width: 1),
+              border: Border.all(
+                color: needsAttention ? lab.wash(color, .45) : lab.hair,
+                width: 1,
+              ),
             ),
-            padding: const EdgeInsets.fromLTRB(12, 11, 13, 11),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              compact ? 8 : 11,
+              13,
+              compact ? 8 : 11,
+            ),
             child: Row(
               children: [
                 GlassJar(
                   metrics: metrics,
+                  width: compact ? 22 : 30,
+                  height: compact ? 30 : 40,
                   onTap: widget.onTap,
                   semanticLabel:
                       '${item.name}, ${formatQuantity(item.quantity)} '
@@ -129,13 +148,20 @@ class _ShelfRowState extends State<ShelfRow> {
                         overflow: TextOverflow.ellipsis,
                         style: context.itemName,
                       ),
-                      if (item.subtitle.isNotEmpty)
+                      if (item.subtitle.isNotEmpty && !compact)
                         Padding(
                           padding: const EdgeInsets.only(top: 1),
-                          child: Text(item.subtitle, style: context.formula),
+                          child: Text(
+                            item.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.formula,
+                          ),
                         ),
-                      const SizedBox(height: 7),
-                      JarTicks(count: metrics.ticks, color: color),
+                      if (!compact) ...[
+                        const SizedBox(height: 7),
+                        JarTicks(count: metrics.ticks, color: color),
+                      ],
                     ],
                   ),
                 ),
@@ -154,7 +180,7 @@ class _ShelfRowState extends State<ShelfRow> {
                       padding: const EdgeInsets.only(top: 1),
                       child: Text(
                         item.unit.toUpperCase(),
-                        style: context.label.copyWith(fontSize: 9),
+                        style: context.label.copyWith(fontSize: LabType.micro),
                       ),
                     ),
                     if (caption.isNotEmpty)
@@ -163,11 +189,9 @@ class _ShelfRowState extends State<ShelfRow> {
                         child: Text(
                           caption,
                           style: context.label.copyWith(
-                            color: metrics.signal == StockSignal.fine
-                                ? lab.soft.withValues(alpha: .7)
-                                : color,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 9,
+                            color: color,
+                            fontWeight: FontWeight.w800,
+                            fontSize: LabType.micro,
                           ),
                         ),
                       ),

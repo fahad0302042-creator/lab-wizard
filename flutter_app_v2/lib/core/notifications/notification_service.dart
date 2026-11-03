@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 /// Phone notifications, kept in one place.
 ///
@@ -15,6 +17,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// notification actually went out.
 class NotificationService {
   NotificationService();
+
+  /// The daily nudge. Separate from [_channelId] so it can be silenced without
+  /// silencing the immediate low-stock warnings.
+  static const _reminderChannelId = 'low_stock_daily';
+  static const _dailyId = 90001;
 
   static const _channelId = 'low_stock';
   static const _channelName = 'Low stock';
@@ -29,6 +36,14 @@ class NotificationService {
 
   Future<void> init() async {
     if (!isSupported || _ready) return;
+    try {
+      tzdata.initializeTimeZones();
+      // A fixed local location is enough for a daily reminder and needs no
+      // extra plugin: the phone's own offset is read at scheduling time.
+      tz.setLocalLocation(tz.getLocation('Etc/GMT'));
+    } catch (error) {
+      debugPrint('time zone setup failed: $error');
+    }
     try {
       await _plugin.initialize(
         const InitializationSettings(
@@ -77,10 +92,85 @@ class NotificationService {
           importance: Importance.defaultImportance,
         ),
       );
+      await android.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _reminderChannelId,
+          'Daily check',
+          description:
+              'One quiet reminder a day when something is below its order '
+              'level.',
+          importance: Importance.low,
+        ),
+      );
       _channelCreated = true;
     } catch (error) {
       debugPrint('notification channel failed: $error');
     }
+  }
+
+  /// Schedules the daily check for [hour]:00 local time.
+  ///
+  /// Inexact on purpose: an exact alarm needs a special Android permission and
+  /// a stock check is not worth waking the phone for. The time is computed in
+  /// UTC from the device's current offset, which is right for the year round in
+  /// places without daylight saving and drifts by an hour where there is one —
+  /// acceptable for a reminder, and noted here rather than hidden.
+  Future<bool> scheduleDailyReminder({
+    required int hour,
+    required String title,
+    required String body,
+  }) async {
+    await init();
+    if (_android == null) return false;
+    await _ensureChannel();
+    try {
+      await _plugin.zonedSchedule(
+        _dailyId,
+        title,
+        body,
+        _nextInstanceOf(hour),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _reminderChannelId,
+            'Daily check',
+            channelDescription:
+                'One quiet reminder a day when something is below its order '
+                'level.',
+            importance: Importance.low,
+            priority: Priority.low,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'daily',
+      );
+      return true;
+    } catch (error) {
+      debugPrint('daily reminder failed: $error');
+      return false;
+    }
+  }
+
+  Future<void> cancelDailyReminder() async {
+    await init();
+    if (_android == null) return;
+    try {
+      await _plugin.cancel(_dailyId);
+    } catch (error) {
+      debugPrint('could not cancel daily reminder: $error');
+    }
+  }
+
+  /// The next [hour]:00 on the phone's clock, expressed as the UTC instant it
+  /// actually is. Building it from the device's local wall clock is what makes
+  /// the reminder land at breakfast rather than at 9am UTC.
+  tz.TZDateTime _nextInstanceOf(int hour) {
+    final now = DateTime.now();
+    var next = DateTime(now.year, now.month, now.day, hour);
+    if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
+    return tz.TZDateTime.from(next.toUtc(), tz.local);
   }
 
   /// Posts one notification. [tag] keeps related notices from stacking up: a

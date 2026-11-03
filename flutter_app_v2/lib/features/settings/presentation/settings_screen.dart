@@ -60,23 +60,81 @@ class SettingsScreen extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: const Text('Low-stock alerts'),
             subtitle: const Text(
-              'A notification when a shelf reaches its order level',
+              'A notification the moment a shelf drops to its order level',
             ),
             value: preferences.lowStockAlerts,
             onChanged: (value) async {
               final ok = await ref
                   .read(preferencesProvider.notifier)
                   .setLowStockAlerts(value);
-              if (!context.mounted || ok || !value) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Notifications are blocked for this app. Allow them in '
-                    'Android settings, then try again.',
+              if (!context.mounted) return;
+              if (value && !ok) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Notifications are blocked for this app. Allow them in '
+                      'Android settings, then try again.',
+                    ),
                   ),
-                ),
-              );
+                );
+              }
             },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Daily check'),
+            subtitle: Text(
+              preferences.dailyCheck
+                  ? 'One quiet reminder at ${preferences.dailyCheckHour}:00 '
+                        'if anything is below its level'
+                  : 'No reminder — the app only speaks while you are in it',
+            ),
+            value: preferences.dailyCheck,
+            onChanged: (value) async {
+              final ok = await ref
+                  .read(preferencesProvider.notifier)
+                  .setDailyCheck(value);
+              if (!context.mounted) return;
+              if (value && !ok) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Android blocked the reminder. Allow notifications for '
+                      'this app, then try again.',
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+          if (preferences.dailyCheck)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Reminder time'),
+              trailing: Text(
+                '${preferences.dailyCheckHour.toString().padLeft(2, '0')}:00',
+                style: context.figure.copyWith(fontSize: LabType.small + 1),
+              ),
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay(
+                    hour: preferences.dailyCheckHour,
+                    minute: 0,
+                  ),
+                );
+                if (picked == null) return;
+                await ref
+                    .read(preferencesProvider.notifier)
+                    .setDailyCheckHour(picked.hour);
+              },
+            ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Compact rows'),
+            subtitle: const Text('Fit about twice as many items per screen'),
+            value: preferences.compactRows,
+            onChanged: ref.read(preferencesProvider.notifier).setCompactRows,
           ),
           const SizedBox(height: 22),
           Text('SYNC', style: context.label),
@@ -139,7 +197,10 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   buildStamp,
-                  style: context.label.copyWith(fontSize: 9, letterSpacing: 1),
+                  style: context.label.copyWith(
+                    fontSize: LabType.micro,
+                    letterSpacing: 1,
+                  ),
                 ),
               ],
             ),

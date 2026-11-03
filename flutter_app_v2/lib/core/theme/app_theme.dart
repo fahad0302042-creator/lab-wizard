@@ -43,6 +43,12 @@ class LabPalette extends ThemeExtension<LabPalette> {
   /// Empty.
   final Color berry;
 
+  /// A state colour at background strength. Used to tint a whole row, so a
+  /// problem can be spotted by sweeping a thumb down the list without reading
+  /// a single word.
+  Color wash(Color color, [double alpha = .055]) =>
+      color.withValues(alpha: alpha);
+
   /// The colour a stock state is drawn in — the single source of truth so the
   /// jar, the flag word and the summary can never disagree.
   Color forState(StockSignal signal) => switch (signal) {
@@ -110,6 +116,26 @@ class LabPalette extends ThemeExtension<LabPalette> {
   }
 }
 
+/// The size ladder. Five steps, fixed. Anything on screen picks one of these
+/// rather than inventing a number — that is what makes a screen read as loud,
+/// quiet and in between instead of uniformly medium.
+abstract final class LabType {
+  /// Eyebrows, units, flag words.
+  static const micro = 10.0;
+
+  /// Body copy and secondary lines.
+  static const small = 13.0;
+
+  /// The primary reading size: quantities, list values.
+  static const body = 17.0;
+
+  /// Section and sheet titles.
+  static const title = 24.0;
+
+  /// One per screen: the headline that answers "what do I need to know".
+  static const display = 31.0;
+}
+
 /// What a row is signalling. Three values, not four: "healthy" and "no limit
 /// set" both mean *nothing is wrong*, so they share an appearance and the
 /// difference lives in the caption instead.
@@ -127,27 +153,29 @@ extension LabThemeX on BuildContext {
     color: lab.soft,
   );
 
-  /// Item names. Hand-set rather than geometric, so a shelf of them reads as
-  /// written labels rather than rows in a spreadsheet.
+  /// Item names. A clean sans: handwriting gives the app its character through
+  /// asides and titles, but forty chemical names in a scrawl is tiring, and a
+  /// name has to survive being read at arm's length across a bench.
   TextStyle get itemName => TextStyle(
-    fontFamily: 'ArchitectsDaughter',
-    fontSize: 16.5,
-    height: 1.12,
-    letterSpacing: -.1,
+    fontSize: LabType.body,
+    height: 1.15,
+    letterSpacing: -.2,
+    fontWeight: FontWeight.w600,
     color: lab.ink,
   );
 
-  /// Chemical formulas.
+  /// Chemical formulas and categories.
   TextStyle get formula => TextStyle(
-    fontFamily: 'Kalam',
     fontSize: 12.5,
-    height: 1.15,
+    height: 1.2,
+    letterSpacing: .1,
     color: lab.soft,
   );
 
-  /// Small spaced capitals used for eyebrows, units and flag words.
+  /// Small spaced capitals used for eyebrows, units and flag words. Ten is the
+  /// floor: anything smaller is unreadable on a phone held at arm's length.
   TextStyle get label => TextStyle(
-    fontSize: 10,
+    fontSize: LabType.micro,
     height: 1.1,
     letterSpacing: 1.1,
     fontWeight: FontWeight.w600,
@@ -157,7 +185,7 @@ extension LabThemeX on BuildContext {
   /// Quantities. Tabular figures so a column of numbers lines up and never
   /// reflows while animating.
   TextStyle get figure => TextStyle(
-    fontSize: 17,
+    fontSize: LabType.body,
     height: 1.05,
     letterSpacing: -.4,
     fontWeight: FontWeight.w600,

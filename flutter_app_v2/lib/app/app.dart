@@ -97,12 +97,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: IndexedStack(
-          index: index,
-          sizing: StackFit.expand,
-          children: List.generate(
-            pages.length,
-            (page) => TickerMode(enabled: page == index, child: pages[page]),
+        child: Center(
+          // A store-room app on a tablet should not stretch a 40-character row
+          // across 10 inches: the eye loses the line. Held to a comfortable
+          // column and centred, which is the cheapest honest tablet layout.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: IndexedStack(
+              index: index,
+              sizing: StackFit.expand,
+              children: List.generate(
+                pages.length,
+                (page) =>
+                    TickerMode(enabled: page == index, child: pages[page]),
+              ),
+            ),
           ),
         ),
       ),
@@ -130,10 +139,12 @@ class _NavBar extends StatelessWidget {
   final ValueChanged<HomeTab> onSelected;
   final VoidCallback onSettings;
 
+  /// Short words, because five tabs at ten pixels have to share a phone's
+  /// width. "GEAR" is the store-room word for apparatus.
   static const _labels = {
     HomeTab.dashboard: 'HOME',
     HomeTab.chemicals: 'CHEMS',
-    HomeTab.apparatus: 'APPARATUS',
+    HomeTab.apparatus: 'GEAR',
     HomeTab.scanner: 'SCAN',
     HomeTab.reports: 'REPORTS',
   };
@@ -168,8 +179,8 @@ class _NavBar extends StatelessWidget {
                             Text(
                               _labels[tab]!,
                               style: context.label.copyWith(
-                                fontSize: 8.5,
-                                letterSpacing: .7,
+                                fontSize: LabType.micro,
+                                letterSpacing: .6,
                                 color: current == tab ? lab.ink : lab.soft,
                                 fontWeight: current == tab
                                     ? FontWeight.w800

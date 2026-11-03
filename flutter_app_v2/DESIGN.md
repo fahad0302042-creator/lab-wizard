@@ -285,3 +285,53 @@ level** row showing the current level (or "No order level set" in clay), which
 opens a sheet to set, change or clear it. The same field is in **Edit item**,
 alongside name, formula/category, unit, quantity and notes. Clearing it turns
 warnings off for that item.
+
+---
+
+## The polish pass
+
+**Type.** Five fixed steps in `LabType` (10 / 13 / 17 / 24 / 31). Names and numbers
+are now a clean sans; Caveat is kept for asides and sheet titles, Kalam for
+formulas. ArchitectsDaughter and PatrickHand are gone — four handwriting faces
+was one too many. Ten pixels is the floor; anything smaller is unreadable at
+arm's length, so labels were shortened instead (APPARATUS → GEAR).
+
+**The headline acts.** A shelf's biggest words now say what needs doing —
+"3 need ordering" — and tap through to exactly those rows. Nothing wrong reads
+"Everything above its level" in ink, not alarming clay.
+
+**Rows.** The right-hand column is a number and a unit; the flag word appears
+only when something is wrong. State colour is also a background wash, so a
+problem can be found by sweeping a thumb down the list without reading.
+Compact mode drops subtitles and jar ticks for roughly double the density.
+
+**Search and filters.** Search is always visible and matches formula or category
+as well as name — people think "NaCl", not "Sodium Chloride". ALL / ORDER / EMPTY
+chips answer the three questions actually asked of a store room.
+
+**One home per setting.** Preferences live in Settings. The shelf's ⋯ menu is
+for actions on that shelf: add, log a session, share the order list, QR labels,
+density, sync.
+
+**Reports on a phone.** The table is now cards by default — one item written as
+the sum it is — with a table view that scrolls sideways for anyone who wants the
+columns. The PDF keeps the full column layout because paper has room.
+
+**Undo bar** stays until the next action or a dismissal. A bar that vanishes
+while you are still reading it is worse than one you close.
+
+**Closing a month.** A month can be closed, which freezes the numbers that were
+filed; later corrections cannot change a printed report. Reopening is one tap.
+Stored on the device (it is a bookkeeping promise, not a fact about chemicals).
+
+**First run.** One dismissible hint about swiping, shown once and never again.
+
+**Tablets.** Content is held to a 720px column and centred rather than stretched
+across the screen.
+
+### New since 2.0.15
+
+- **Log a session** — count several items on one screen, save once.
+- **Share the order list** — the low-stock list as a message or an A4 PDF.
+- **Daily check** — one scheduled reminder a day at an hour you choose, off by
+  default. Fires only if alerts are enabled and Android allows it.

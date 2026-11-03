@@ -5,12 +5,13 @@ import 'package:intl/intl.dart';
 
 import '../../../app/home_tabs.dart';
 import '../../../app/providers.dart';
-import '../../../core/build_info.dart';
 import '../../../core/motion.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass_jar.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
+import '../../reports/data/order_list.dart';
+import '../../session/presentation/session_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../shelf/presentation/item_sheet.dart';
 
@@ -48,7 +49,7 @@ class DashboardScreen extends ConsumerWidget {
                   children: [
                     Text(
                       DateFormat(
-                        'EEEE · d MMMM',
+                        'EEEE, d MMMM',
                       ).format(DateTime.now()).toUpperCase(),
                       style: context.label.copyWith(letterSpacing: 1.1),
                     ),
@@ -82,36 +83,24 @@ class DashboardScreen extends ConsumerWidget {
             index: 0,
             child: _OrderCard(ordering: ordering, onOpenTab: onOpenTab),
           ),
-          const SizedBox(height: 10),
-          ShelfRowIn(
-            index: 1,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _Stat(
-                    value: '${state.chemicals.length}',
-                    label: 'reagents',
-                    onTap: () => onOpenTab(HomeTab.chemicals),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _Stat(
-                    value: '${state.apparatus.length}',
-                    label: 'apparatus',
-                    onTap: () => onOpenTab(HomeTab.apparatus),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _Stat(
-                    value: '${today.length}',
-                    label: 'logged today',
-                    onTap: () => onOpenTab(HomeTab.reports),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 14,
+            runSpacing: 2,
+            children: [
+              _StatLine(
+                text: '${state.chemicals.length} reagents',
+                onTap: () => onOpenTab(HomeTab.chemicals),
+              ),
+              _StatLine(
+                text: '${state.apparatus.length} apparatus',
+                onTap: () => onOpenTab(HomeTab.apparatus),
+              ),
+              _StatLine(
+                text: '${today.length} logged today',
+                onTap: () => onOpenTab(HomeTab.reports),
+              ),
+            ],
           ),
           const SizedBox(height: 18),
           Row(
@@ -126,9 +115,9 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _DoorButton(
-                  icon: Icons.add,
-                  label: 'Add to shelf',
-                  onTap: () => onOpenTab(HomeTab.chemicals),
+                  icon: Icons.playlist_add,
+                  label: 'Log a session',
+                  onTap: () => openSession(context),
                   secondary: true,
                 ),
               ),
@@ -165,13 +154,13 @@ class DashboardScreen extends ConsumerWidget {
                 style: context.aside.copyWith(fontSize: 15),
               ),
             ),
-          const SizedBox(height: 22),
-          const _AlertsCard(),
-          const SizedBox(height: 16),
-          Center(
-            child: Text(
-              'Lab Wizard 2 · $buildStamp',
-              style: context.label.copyWith(fontSize: 8.5, letterSpacing: 1),
+          const SizedBox(height: 20),
+          _AlertsLine(
+            on: ref.watch(preferencesProvider).lowStockAlerts,
+            onOpenSettings: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen(),
+              ),
             ),
           ),
         ],
@@ -248,23 +237,44 @@ class _OrderCard extends StatelessWidget {
             )
           else
             ...ordering.take(3).map((item) => _OrderLine(item: item)),
-          if (ordering.length > 3)
+          if (ordering.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: TextButton(
-                onPressed: () => onOpenTab(HomeTab.chemicals),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(60, 34),
-                  alignment: Alignment.centerLeft,
-                ),
-                child: Text(
-                  'See the other ${ordering.length - 3}',
-                  style: context.aside.copyWith(
-                    fontSize: 15,
-                    color: accent,
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  if (ordering.length > 3)
+                    TextButton(
+                      onPressed: () => onOpenTab(HomeTab.chemicals),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(60, 34),
+                        alignment: Alignment.centerLeft,
+                      ),
+                      child: Text(
+                        'See all ${ordering.length}',
+                        style: context.aside.copyWith(
+                          fontSize: LabType.small + 1,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => shareOrderList(context, ordering),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(60, 34),
+                      foregroundColor: accent,
+                    ),
+                    icon: const Icon(Icons.ios_share, size: 15),
+                    label: Text(
+                      'Share list',
+                      style: context.aside.copyWith(
+                        fontSize: LabType.small + 1,
+                        color: accent,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
         ],
@@ -309,46 +319,24 @@ class _OrderLine extends StatelessWidget {
   }
 }
 
-class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label, required this.onTap});
+/// One fact, inline. Three boxes for three numbers was a lot of furniture for
+/// something read in a glance.
+class _StatLine extends StatelessWidget {
+  const _StatLine({required this.text, required this.onTap});
 
-  final String value;
-  final String label;
+  final String text;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: lab.hair),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 21,
-                height: 1,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -.8,
-                color: lab.ink,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: context.label.copyWith(fontSize: 8, letterSpacing: .8),
-            ),
-          ],
+      child: Text(
+        text,
+        style: context.aside.copyWith(
+          fontSize: LabType.small + 1,
+          color: lab.soft,
         ),
       ),
     );
@@ -392,7 +380,7 @@ class _DoorButton extends StatelessWidget {
               Text(
                 label,
                 style: context.label.copyWith(
-                  fontSize: 9.5,
+                  fontSize: LabType.micro,
                   letterSpacing: 1,
                   color: secondary ? lab.ink : lab.bone,
                 ),
@@ -472,70 +460,50 @@ class _TodayRow extends StatelessWidget {
   }
 }
 
-/// The notifications switch, on the surface where its consequences show up.
-class _AlertsCard extends ConsumerStatefulWidget {
-  const _AlertsCard();
+/// Says whether alerts are on, and where to change them. The switch itself
+/// lives in Settings with the other preferences: two homes for one setting is
+/// how settings drift apart.
+class _AlertsLine extends StatelessWidget {
+  const _AlertsLine({required this.on, required this.onOpenSettings});
 
-  @override
-  ConsumerState<_AlertsCard> createState() => _AlertsCardState();
-}
-
-class _AlertsCardState extends ConsumerState<_AlertsCard> {
-  bool _busy = false;
-
-  Future<void> _toggle(bool value) async {
-    setState(() => _busy = true);
-    final ok = await ref
-        .read(preferencesProvider.notifier)
-        .setLowStockAlerts(value);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (value && !ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Notifications are blocked for this app. Allow them in Android '
-            'settings, then try again.',
-          ),
-        ),
-      );
-    }
-  }
+  final bool on;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
-    final on = ref.watch(preferencesProvider).lowStockAlerts;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: lab.hair),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Low-stock alerts',
-                  style: context.itemName.copyWith(fontSize: 14),
-                ),
-                Text(
-                  on
-                      ? 'A notification when a shelf drops to its order level.'
-                      : 'Off. Nothing will interrupt you.',
-                  style: context.aside.copyWith(fontSize: 14),
-                ),
-              ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(9),
+      onTap: onOpenSettings,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Row(
+          children: [
+            Icon(
+              on
+                  ? Icons.notifications_active_outlined
+                  : Icons.notifications_off,
+              size: 15,
+              color: on ? lab.sage : lab.soft,
             ),
-          ),
-          Switch(
-            value: on,
-            onChanged: _busy ? null : _toggle,
-          ),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                on
+                    ? 'Low-stock alerts are on'
+                    : 'Low-stock alerts are off',
+                style: context.aside.copyWith(
+                  fontSize: LabType.small,
+                  color: on ? lab.sage : lab.soft,
+                ),
+              ),
+            ),
+            Text(
+              'SETTINGS',
+              style: context.label.copyWith(fontSize: LabType.micro),
+            ),
+          ],
+        ),
       ),
     );
   }

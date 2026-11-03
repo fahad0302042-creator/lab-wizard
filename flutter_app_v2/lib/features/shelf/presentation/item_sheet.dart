@@ -367,7 +367,7 @@ class _OrderLevelRow extends ConsumerWidget {
             Text(
               hasLevel ? 'Change' : 'Set',
               style: context.label.copyWith(
-                fontSize: 9,
+                fontSize: LabType.micro,
                 letterSpacing: 1,
                 color: hasLevel ? lab.soft : lab.clay,
               ),

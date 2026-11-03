@@ -1,12 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
@@ -15,8 +11,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/shelf_row.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
+import '../../reports/data/order_list.dart';
+import '../../session/presentation/session_screen.dart';
 import 'action_sheet.dart';
+import 'edit_item_sheet.dart';
 import 'item_sheet.dart';
+import 'qr_labels_screen.dart';
 
 /// One shelf. Chemicals and apparatus share this screen; the differences are
 /// the title, the subtitle field, and QR labels being chemical-only.
@@ -32,16 +32,34 @@ class ShelfScreen extends ConsumerStatefulWidget {
 class _ShelfScreenState extends ConsumerState<ShelfScreen> {
   final _search = TextEditingController();
   ConsumptionLog? _undo;
-  Timer? _undoTimer;
-  bool _searching = false;
-  bool _printing = false;
+  bool _showHint = false;
+
+  /// Narrowing the shelf without typing: the three questions actually asked of
+  /// a store room ("what needs ordering", "what has run out") are one tap.
+  _Filter _filter = _Filter.all;
   int _undoToken = 0;
 
   bool get _isChemical => widget.kind == ItemKind.chemical;
 
   @override
+  void initState() {
+    super.initState();
+    _maybeShowHint();
+  }
+
+  /// Swiping is the one gesture nobody finds by accident, and a shelf with no
+  /// hint looks read-only. Shown on the first shelf opened, then never again.
+  Future<void> _maybeShowHint() async {
+    final preferences = await SharedPreferences.getInstance();
+    final seen = preferences.getBool('swipe_hint_seen') ?? false;
+    if (seen || !mounted) return;
+    await preferences.setBool('swipe_hint_seen', true);
+    if (!mounted) return;
+    setState(() => _showHint = true);
+  }
+
+  @override
   void dispose() {
-    _undoTimer?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -52,7 +70,13 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
         ? state.chemicals.map(ItemView.fromChemical)
         : state.apparatus.map(ItemView.fromApparatus);
     final filtered = views.where((item) {
+      if (_filter == _Filter.order && item.metrics.signal == StockSignal.fine) {
+        return false;
+      }
+      if (_filter == _Filter.empty && item.quantity > 0) return false;
       if (query.isEmpty) return true;
+      // Formula and category are searched too: people think "NaCl", not
+      // "Sodium Chloride".
       final haystack =
           '${item.name} ${item.subtitle} ${item.notes}'.toLowerCase();
       return haystack.contains(query);
@@ -88,22 +112,21 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
                 child: _Header(
                   title: _isChemical ? 'chemicals' : 'apparatus',
                   attention: attention,
-                  total: items.length,
-                  searching: _searching,
+                  total: state.chemicals.length + state.apparatus.length,
                   search: _search,
-                  onSearchToggle: () {
-                    setState(() {
-                      _searching = !_searching;
-                      if (!_searching) _search.clear();
-                    });
-                  },
+                  filter: _filter,
+                  onFilter: (value) => setState(() => _filter = value),
                   onSearchChanged: (_) => setState(() {}),
                   onMenu: () => _openMenu(context, ref),
-                  extra: _isChemical && items.isNotEmpty
-                      ? _printLabelsButton(state)
-                      : null,
+                  onShowOrder: () => setState(() => _filter = _Filter.order),
                 ),
               ),
+              if (_showHint)
+                SliverToBoxAdapter(
+                  child: _SwipeHint(
+                    onDismiss: () => setState(() => _showHint = false),
+                  ),
+                ),
               if (state.error != null || state.pendingCount > 0)
                 SliverToBoxAdapter(
                   child: _SyncNotice(
@@ -144,6 +167,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
                         index: index,
                         child: ShelfRow(
                           item: item,
+                          compact: ref.watch(preferencesProvider).compactRows,
                           onTap: () => _openDetail(context, item),
                           onSwipe: (swipe) => _log(
                             context,
@@ -179,19 +203,6 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
     );
   }
 
-  Widget _printLabelsButton(InventoryState state) {
-    return TextButton.icon(
-      onPressed: _printing ? null : () => _printLabels(state.chemicals),
-      icon: _printing
-          ? const SizedBox.square(
-              dimension: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.qr_code_2, size: 17),
-      label: Text(_printing ? 'preparing…' : 'QR labels'),
-    );
-  }
-
   Future<void> _log(
     BuildContext context,
     WidgetRef ref,
@@ -213,10 +224,10 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
     _undoToken++;
     final token = _undoToken;
     setState(() => _undo = log);
-    Timer(const Duration(seconds: 5), () {
-      if (!mounted || token != _undoToken) return;
-      setState(() => _undo = null);
-    });
+    // Deliberately no timer: a bar that vanishes while you are still reading it
+    // is worse than one you dismiss. It clears on the next action, on undo, or
+    // on the cross.
+    assert(token == _undoToken);
   }
 
   Future<void> _performUndo() async {
@@ -280,7 +291,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
               subtitle: const Text('When should this show as low?'),
               onTap: () {
                 Navigator.pop(sheetContext);
-                _setLimit(context, ref, item);
+                showOrderLevelSheet(context, item: item);
               },
             ),
             ListTile(
@@ -296,73 +307,6 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _setLimit(
-    BuildContext context,
-    WidgetRef ref,
-    ItemView item,
-  ) async {
-    final controller = TextEditingController(
-      text: item.threshold > 0 ? formatQuantity(item.threshold) : '',
-    );
-    final saved = await showDialog<double>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Order level'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'I will flag ${item.name} once it drops below this. Leave it '
-              'empty and the jar stays fine until it is empty.',
-              style: TextStyle(color: dialogContext.lab.soft, fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Flag below',
-                suffixText: item.unit,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(
-              dialogContext,
-              double.tryParse(controller.text.trim()) ?? 0,
-            ),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    if (saved == null) return;
-    try {
-      await ref
-          .read(inventoryProvider.notifier)
-          .updateItem(
-            type: widget.kind,
-            id: item.id,
-            changes: {'low_stock_threshold': saved},
-          );
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
-    }
   }
 
   Future<void> _openDetail(BuildContext context, ItemView item) =>
@@ -382,116 +326,54 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: context.lab.bone,
-      builder: (_) => const _MenuSheet(),
+      builder: (_) => _MenuSheet(
+        kind: widget.kind,
+        onAdd: () => _addItem(context, ref),
+      ),
     );
   }
-
-  /// A4 sheet, 40 labels per page: five across, eight down.
-  Future<void> _printLabels(List<Chemical> chemicals) async {
-    setState(() => _printing = true);
-    try {
-      final document = pw.Document(title: 'Lab Wizard QR labels');
-      for (var offset = 0; offset < chemicals.length; offset += 40) {
-        final pageItems = chemicals.skip(offset).take(40).toList();
-        document.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.all(10 * PdfPageFormat.mm),
-            build: (_) => pw.Column(
-              children: List.generate(
-                8,
-                (row) => pw.Expanded(
-                  child: pw.Row(
-                    children: List.generate(5, (column) {
-                      final index = row * 5 + column;
-                      return pw.Expanded(
-                        child: index >= pageItems.length
-                            ? pw.SizedBox()
-                            : _label(pageItems[index]),
-                      );
-                    }),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }
-      await Printing.layoutPdf(
-        name: 'Lab-Wizard-QR-Labels.pdf',
-        onLayout: (_) => document.save(),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(SnackBar(content: Text(friendlyError(error))));
-    } finally {
-      if (mounted) setState(() => _printing = false);
-    }
-  }
-
-  pw.Widget _label(Chemical chemical) => pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.grey400, width: .45),
-    ),
-    padding: const pw.EdgeInsets.all(4),
-    child: pw.Column(
-      mainAxisAlignment: pw.MainAxisAlignment.center,
-      children: [
-        pw.BarcodeWidget(
-          barcode: pw.Barcode.qrCode(),
-          data: 'labwizard:chemical:${chemical.qrCode}',
-          width: 17 * PdfPageFormat.mm,
-          height: 17 * PdfPageFormat.mm,
-        ),
-        pw.SizedBox(height: 2),
-        pw.Text(
-          chemical.name,
-          maxLines: 2,
-          textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
-        ),
-        if (chemical.formula.isNotEmpty)
-          pw.Text(
-            chemical.formula,
-            maxLines: 1,
-            style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey700),
-          ),
-      ],
-    ),
-  );
 }
 
 // ---------------------------------------------------------------------------
 
+/// Which slice of the shelf is on screen.
+enum _Filter { all, order, empty }
+
+/// The top of a shelf.
+///
+/// The largest words on screen state a fact and act as a filter, because the
+/// first question in front of a store room is "does anything need ordering?" —
+/// not "what is this app called". Search is always visible: it was previously
+/// behind an icon, which hid the fastest way to find one bottle among forty.
 class _Header extends StatelessWidget {
   const _Header({
     required this.title,
     required this.attention,
     required this.total,
-    required this.searching,
     required this.search,
-    required this.onSearchToggle,
+    required this.filter,
+    required this.onFilter,
     required this.onSearchChanged,
     required this.onMenu,
-    this.extra,
+    required this.onShowOrder,
   });
 
   final String title;
   final int attention;
   final int total;
-  final bool searching;
   final TextEditingController search;
-  final VoidCallback onSearchToggle;
+  final _Filter filter;
+  final ValueChanged<_Filter> onFilter;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onMenu;
-  final Widget? extra;
+  final VoidCallback onShowOrder;
 
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
+    final calm = attention == 0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 12, 0),
+      padding: const EdgeInsets.fromLTRB(18, 12, 10, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -500,16 +382,7 @@ class _Header extends StatelessWidget {
               Expanded(
                 child: Text(
                   DateFormat('EEEE, d MMMM').format(DateTime.now()),
-                  style: context.aside,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Search',
-                onPressed: onSearchToggle,
-                icon: Icon(
-                  searching ? Icons.close : Icons.search,
-                  size: 20,
-                  color: lab.soft,
+                  style: context.label.copyWith(letterSpacing: 1.1),
                 ),
               ),
               IconButton(
@@ -519,106 +392,200 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Text(
-              attention == 0 ? 'Good shelves.' : 'Almost there.',
-              style: TextStyle(
-                fontSize: 31,
-                height: 1.04,
-                letterSpacing: -1.4,
-                fontWeight: FontWeight.w600,
-                color: lab.ink,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Text(
-              attention == 0
-                  ? 'Nothing needs a look.'
-                  : '$attention ${attention == 1 ? 'jar needs' : 'jars need'} '
-                        'a look.',
-              style: TextStyle(
-                fontSize: 31,
-                height: 1.04,
-                letterSpacing: -1.4,
-                fontWeight: FontWeight.w600,
-                color: attention == 0 ? lab.sage : lab.clay,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Divider(color: lab.hair, height: 1),
-          Row(
-            children: [
-              _Stat(
-                label: title == 'chemicals' ? 'Reagents' : 'Pieces',
-                value: total,
-              ),
-              _Stat(label: 'To order', value: attention),
-              _Stat(label: 'Showing', value: total, last: true),
-            ],
-          ),
-          if (extra != null)
-            Padding(padding: const EdgeInsets.only(top: 4), child: extra),
-          if (searching)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: TextField(
-                controller: search,
-                autofocus: true,
-                onChanged: onSearchChanged,
-                decoration: const InputDecoration(
-                  hintText: 'Name, formula or note',
-                  prefixIcon: Icon(Icons.search, size: 18),
+          // The headline is a control: it says what the shelf needs and takes
+          // you to exactly those rows.
+          Semantics(
+            button: !calm,
+            label: calm
+                ? 'Nothing needs ordering'
+                : '$attention need attention, show them',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: calm ? null : onShowOrder,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 2, right: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        calm
+                            ? 'Everything above its level'
+                            : '$attention ${attention == 1 ? 'needs' : 'need'} '
+                                  'ordering',
+                        style: TextStyle(
+                          fontSize: LabType.display,
+                          height: 1.04,
+                          letterSpacing: -1.4,
+                          fontWeight: FontWeight.w600,
+                          color: calm ? lab.ink : lab.clay,
+                        ),
+                      ),
+                    ),
+                    if (!calm)
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 18,
+                        color: lab.clay.withValues(alpha: .8),
+                      ),
+                  ],
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '$total ${title == 'chemicals' ? 'reagents' : 'pieces'} on this '
+            'shelf',
+            style: context.aside,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: search,
+                  onChanged: onSearchChanged,
+                  style: const TextStyle(fontSize: LabType.small),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Search name, formula or note',
+                    prefixIcon: Icon(Icons.search, size: 17, color: lab.soft),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 34,
+                      minHeight: 34,
+                    ),
+                    suffixIcon: search.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            icon: const Icon(Icons.close, size: 15),
+                            onPressed: () {
+                              search.clear();
+                              onSearchChanged('');
+                            },
+                          ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Add $title',
+                onPressed: onMenu,
+                icon: Icon(Icons.add, size: 20, color: lab.ink),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _FilterChip(
+                  label: 'ALL',
+                  selected: filter == _Filter.all,
+                  onTap: () => onFilter(_Filter.all),
+                ),
+                const SizedBox(width: 7),
+                _FilterChip(
+                  label: 'ORDER',
+                  selected: filter == _Filter.order,
+                  onTap: () => onFilter(_Filter.order),
+                ),
+                const SizedBox(width: 7),
+                _FilterChip(
+                  label: 'EMPTY',
+                  selected: filter == _Filter.empty,
+                  onTap: () => onFilter(_Filter.empty),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label, this.last = false});
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-  final int value;
   final String label;
-  final bool last;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
-    return Expanded(
-      child: Container(
-        decoration: BoxDecoration(
-          border: last ? null : Border(right: BorderSide(color: lab.hair)),
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected ? lab.ink : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: selected ? lab.ink : lab.hair),
+          ),
+          child: Text(
+            label,
+            style: context.label.copyWith(
+              fontSize: LabType.micro,
+              color: selected ? lab.bone : lab.soft,
+            ),
+          ),
         ),
-        padding: const EdgeInsets.fromLTRB(0, 12, 12, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CountUp(
-              value: value.toDouble(),
-              builder: (context, animated) => Text(
-                formatQuantity(animated),
-                style: TextStyle(
-                  fontSize: 21,
-                  height: 1.1,
-                  letterSpacing: -.8,
-                  fontWeight: FontWeight.w600,
-                  color: lab.ink,
+      ),
+    );
+  }
+}
+
+/// One-time advice about the swipe, dismissed with a tap.
+class _SwipeHint extends StatelessWidget {
+  const _SwipeHint({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onDismiss,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: lab.wash(lab.sage),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: lab.wash(lab.sage, .4)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.swipe, size: 17, color: lab.sage),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Swipe right to log use, left to restock. Tap a row for '
+                  'everything else.',
+                  style: context.aside.copyWith(
+                    fontSize: LabType.small + 1,
+                    color: lab.sage,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label.toUpperCase(),
-              style: context.label.copyWith(fontSize: 9.5),
-            ),
-          ],
+              Icon(Icons.close, size: 15, color: lab.sage),
+            ],
+          ),
         ),
       ),
     );
@@ -791,7 +758,7 @@ class _UndoBar extends StatelessWidget {
                       child: Text(
                         log == null
                             ? ''
-                            : '${formatQuantity(log!.amount)} '
+                            : 'Logged ${formatQuantity(log!.amount)} '
                                   '${log!.action.name}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1017,33 +984,86 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
   }
 }
 
+/// Actions on this shelf. Preferences live in Settings — one home each, so the
+/// same switch never appears in two places with two behaviours.
 class _MenuSheet extends ConsumerWidget {
-  const _MenuSheet();
+  const _MenuSheet({required this.kind, required this.onAdd});
+
+  final ItemKind kind;
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lab = context.lab;
-    final preferences = ref.watch(preferencesProvider);
     final inventory = ref.watch(inventoryProvider);
+    final compact = ref.watch(preferencesProvider).compactRows;
+    final isChemical = kind == ItemKind.chemical;
 
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 12),
-          SwitchListTile(
-            title: const Text('Desk-lamp mode'),
-            subtitle: const Text('Dark paper for the evening shift'),
-            value: preferences.themeMode == ThemeMode.dark,
-            onChanged: (value) => ref
-                .read(preferencesProvider.notifier)
-                .setTheme(value ? ThemeMode.dark : ThemeMode.light),
+          const SizedBox(height: 10),
+          ListTile(
+            leading: const Icon(Icons.add, size: 20),
+            title: Text(isChemical ? 'Add a reagent' : 'Add apparatus'),
+            onTap: () {
+              Navigator.pop(context);
+              onAdd();
+            },
           ),
+          ListTile(
+            leading: const Icon(Icons.playlist_add, size: 20),
+            title: const Text('Log a whole session'),
+            subtitle: const Text('Several items, one screen'),
+            onTap: () {
+              Navigator.pop(context);
+              openSession(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.shopping_cart_outlined, size: 20),
+            title: const Text('Share the order list'),
+            subtitle: Text(
+              inventory.needsOrdering.isEmpty
+                  ? 'Nothing needs ordering'
+                  : '${inventory.needsOrdering.length} to order',
+            ),
+            onTap: inventory.needsOrdering.isEmpty
+                ? null
+                : () {
+                    Navigator.pop(context);
+                    shareOrderList(context, inventory.needsOrdering);
+                  },
+          ),
+          if (isChemical)
+            ListTile(
+              leading: const Icon(Icons.qr_code_2, size: 20),
+              title: const Text('Print QR labels'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const QrLabelScreen(),
+                  ),
+                );
+              },
+            ),
+          const Divider(),
           SwitchListTile(
-            title: const Text('Reduce motion'),
-            subtitle: const Text('Instant transitions, no sloshing'),
-            value: preferences.reduceMotion,
-            onChanged: ref.read(preferencesProvider.notifier).setReduceMotion,
+            secondary: Icon(
+              compact ? Icons.view_headline : Icons.view_agenda_outlined,
+              size: 20,
+              color: lab.soft,
+            ),
+            title: const Text('Compact rows'),
+            subtitle: Text(
+              compact
+                  ? 'Fitting about twice as many per screen'
+                  : 'Roomier rows, with jar ticks',
+            ),
+            value: compact,
+            onChanged: ref.read(preferencesProvider.notifier).setCompactRows,
           ),
           ListTile(
             leading: const Icon(Icons.sync, size: 20),
@@ -1055,39 +1075,7 @@ class _MenuSheet extends ConsumerWidget {
             ),
             onTap: () => ref.read(inventoryProvider.notifier).refresh(),
           ),
-          ListTile(
-            leading: Icon(Icons.logout, size: 20, color: lab.berry),
-            title: Text('Sign out', style: TextStyle(color: lab.berry)),
-            onTap: () async {
-              final pending = inventory.pendingCount;
-              if (pending > 0) {
-                final wait = await showDialog<bool>(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: const Text('Still uploading'),
-                    content: Text(
-                      '$pending change${pending == 1 ? '' : 's'} haven\'t '
-                      'reached the server yet. They will be kept and uploaded '
-                      'next time you sign in.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogContext, false),
-                        child: const Text('Stay signed in'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(dialogContext, true),
-                        child: const Text('Sign out anyway'),
-                      ),
-                    ],
-                  ),
-                );
-                if (wait != true) return;
-              }
-              await ref.read(authProvider.notifier).signOut();
-            },
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
         ],
       ),
     );
