@@ -251,3 +251,15 @@ the section name and page numbers.
   page, each sorted **A–Z**.
 - The arithmetic lives in `features/reports/domain/monthly_report.dart` with no
   Flutter imports, and `test/monthly_report_test.dart` covers it.
+
+### Which build am I running?
+
+CI passes `--dart-define=BUILD_LABEL=2.0.<run number>`, and the app prints that
+stamp at the bottom of the sign-in screen, at the bottom of the dashboard, and
+in Settings. It exists because 2.0.10 shipped correctly and still looked
+unchanged on a phone: GitHub's "Latest" release badge was on the *old* app's
+release, so the obvious download link handed back the old APK.
+
+The workflow now sets `--latest` on the rebuilt app's release and
+`--latest=false` on the old app's, and the old app's releases are titled
+"Lab Wizard (old app)" so the two can't be confused again.

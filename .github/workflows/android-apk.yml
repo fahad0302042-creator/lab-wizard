@@ -84,8 +84,11 @@ jobs:
           gh release create "$TAG" "$APK" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "Lab Wizard Android 1.0.${{ github.run_number }}" \
-            --notes "Install this APK directly on Android. Allow installs from your browser or GitHub app if Android asks. Sign in with the same Lab Wizard account to load existing Supabase data. This is a GitHub development build, not a Play Store release."
+            --latest=false \
+            --title "Lab Wizard (old app) 1.0.${{ github.run_number }}" \
+            --notes "**This is the previous app, not the rebuilt one.** It is kept so both can be installed side by side. The new app is released as \`Lab Wizard 2 — 2.0.x\` and is the one GitHub marks as Latest.
+
+Install this APK directly on Android. Allow installs from your browser or GitHub app if Android asks. Sign in with the same Lab Wizard account to load existing Supabase data. This is a GitHub development build, not a Play Store release."
 
   # The rebuilt app builds and publishes on its own, so a failure in the older
   # app's checks never blocks it. A manual run is allowed to publish too, which
@@ -168,6 +171,7 @@ jobs:
         run: >-
           flutter build apk --release
           --dart-define-from-file=config/production.json
+          --dart-define=BUILD_LABEL=2.0.${{ github.run_number }}
           --build-name=2.0.${{ github.run_number }}
           --build-number=${{ github.run_number }}
 
@@ -192,5 +196,8 @@ jobs:
           gh release create "$TAG" "$APK" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
+            --latest \
             --title "Lab Wizard 2 — 2.0.${{ github.run_number }}" \
-            --notes "The rebuilt app, from \`$BRANCH\`. It installs alongside the current Lab Wizard, so you can compare them side by side. Sign in with the same account and your existing chemicals, history and reports load as before."
+            --notes "**This is the rebuilt app.** After installing, open the app and check the build number at the bottom of the sign-in screen (or in Settings) — it must match this release. If it says an older number, an older APK is installed.
+
+It installs alongside the old Lab Wizard, so both can be compared. Sign in with the same account and your existing chemicals, history and reports load as before."
