@@ -65,6 +65,33 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
     return sorted.first.key;
   }
 
+  /// Amounts this item was last logged at, most recent first.
+  ///
+  /// A lab pours the same 500 mL again and again, so these are one tap away —
+  /// but they are a *choice made in the panel*, not a gesture that fires on its
+  /// own. Distinct values only, so three 500 mL pours offer one chip.
+  List<double> _recentAmounts() {
+    final family = _isUse ? null : InventoryAction.restock;
+    final logs = ref
+        .read(inventoryProvider)
+        .logs
+        .where(
+          (log) =>
+              log.itemId == widget.item.id &&
+              (family == null
+                  ? log.action != InventoryAction.restock
+                  : log.action == family),
+        )
+        .toList()
+      ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
+    final seen = <double>[];
+    for (final log in logs) {
+      if (!seen.contains(log.amount)) seen.add(log.amount);
+      if (seen.length == 3) break;
+    }
+    return seen;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -227,6 +254,25 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                 ),
               ],
             ),
+            if (_recentAmounts().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final value in _recentAmounts())
+                    _RecentAmountChip(
+                      label: '${formatQuantity(value)} ${item.unit}',
+                      selected: _parsed == value,
+                      onTap: _saving
+                          ? null
+                          : () => setState(
+                              () => _amount.text = formatQuantity(value),
+                            ),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
             TextField(
               controller: _note,
@@ -261,6 +307,47 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One of the amounts this item is usually logged at.
+class _RecentAmountChip extends StatelessWidget {
+  const _RecentAmountChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? lab.ink : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: selected ? lab.ink : lab.hair),
+          ),
+          child: Text(
+            label,
+            style: context.figure.copyWith(
+              fontSize: 12,
+              color: selected ? lab.bone : lab.soft,
+            ),
+          ),
         ),
       ),
     );

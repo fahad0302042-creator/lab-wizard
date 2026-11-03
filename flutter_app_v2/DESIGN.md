@@ -205,3 +205,49 @@ deletes transactional.
 **Data safety:** sign-out keeps the outbox; refresh merges instead of replacing; undo restores the quantity and deletes the log (queued when offline); item deletion runs item-first so a failure can't leave a ghost row.
 
 **Not built** (deliberate, listed so it isn't mistaken for done): multi-item batch consume, editing an individual log entry, and clearing a whole month. Those are the three remaining features the old app had that this one doesn't.
+
+---
+
+## Swipes, the dashboard, and the report sheet
+
+### A swipe opens a panel; it never logs anything
+
+The first build committed an action when a drag passed 88% of the row width.
+On a real phone every confident swipe passes 88%, so it read as "the app just
+consumed something I never chose". That shortcut is gone.
+
+Now: swipe right or left, and the same panel opens, pre-filled — amount, date,
+note and the three amounts this item is usually logged at, one tap each. The
+only way a number reaches the database is the **Record** / **Add to stock**
+button.
+
+### Home
+
+Opening the app lands on a dashboard: what needs ordering (taken straight from
+the jar rule, so an item with no order level set never appears), how many
+reagents and apparatus are on the shelf, what was logged today, and the
+low-stock alert switch. Scanning and adding are one tap from there.
+
+### Low-stock notifications
+
+`flutter_local_notifications`, one channel, off until the user turns it on. A
+notification is sent only when an action *crosses* the order level (an
+already-low shelf does not re-notify) or when something runs out. Items with no
+order level never notify. Permission is requested once, and a refusal leaves the
+switch off rather than pretending.
+
+### The report sheet
+
+Matches the October sheet that was in use: masthead, three KPI boxes, a table of
+only the items that moved this month, an A4 page per shelf, and a footer with
+the section name and page numbers.
+
+- **Added / now we have** columns appear **only when something was restocked**
+  in that month. Otherwise the sheet prints `we have − used = left`, exactly as
+  the arithmetic reads.
+- `left` is today's quantity, so `now we have = left + used` and
+  `we have = now we have − added`. Every row can be checked by hand.
+- Chemicals and apparatus are **separate sections**, each starting on its own
+  page, each sorted **A–Z**.
+- The arithmetic lives in `features/reports/domain/monthly_report.dart` with no
+  Flutter imports, and `test/monthly_report_test.dart` covers it.

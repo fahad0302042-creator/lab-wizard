@@ -3,13 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/notifications/notification_service.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/inventory/domain/models.dart';
 import '../features/reports/presentation/reports_screen.dart';
 import '../features/scanner/presentation/scanner_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/shelf/presentation/shelf_screen.dart';
+import 'home_tabs.dart';
 import 'providers.dart';
 
 class LabWizardApp extends ConsumerWidget {
@@ -64,46 +67,48 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  int _index = 0;
+  HomeTab _tab = HomeTab.dashboard;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(inventoryProvider.notifier).bootstrap(widget.user.id),
-    );
+    Future.microtask(() async {
+      await ref.read(inventoryProvider.notifier).bootstrap(widget.user.id);
+      await ref.read(notificationServiceProvider).init();
+    });
+  }
+
+  void _open(HomeTab tab) {
+    if (_tab == tab) return;
+    HapticFeedback.selectionClick();
+    setState(() => _tab = tab);
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
+      DashboardScreen(onOpenTab: _open),
       const ShelfScreen(kind: ItemKind.chemical),
       const ShelfScreen(kind: ItemKind.apparatus),
-      ScannerScreen(active: _index == 2),
+      ScannerScreen(active: _tab == HomeTab.scanner),
       const ReportsScreen(),
     ];
+    final index = _tab.index;
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: IndexedStack(
-          index: _index,
+          index: index,
           sizing: StackFit.expand,
           children: List.generate(
             pages.length,
-            (page) => TickerMode(
-              enabled: page == _index,
-              child: pages[page],
-            ),
+            (page) => TickerMode(enabled: page == index, child: pages[page]),
           ),
         ),
       ),
       bottomNavigationBar: _NavBar(
-        index: _index,
-        onSelected: (value) {
-          if (_index == value) return;
-          HapticFeedback.selectionClick();
-          setState(() => _index = value);
-        },
+        current: _tab,
+        onSelected: _open,
         onSettings: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
         ),
@@ -112,20 +117,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 }
 
-/// Text-only tabs. No icons in the bar: the app already carries enough
-/// furniture, and four words are faster to read than four glyphs.
+/// Text-only tabs. Five labels do not fit as icons plus words, and four short
+/// words are faster to read than five glyphs with a guess under each.
 class _NavBar extends StatelessWidget {
   const _NavBar({
-    required this.index,
+    required this.current,
     required this.onSelected,
     required this.onSettings,
   });
 
-  final int index;
-  final ValueChanged<int> onSelected;
+  final HomeTab current;
+  final ValueChanged<HomeTab> onSelected;
   final VoidCallback onSettings;
 
-  static const _labels = ['CHEMS', 'APPARATUS', 'SCAN', 'REPORTS'];
+  static const _labels = {
+    HomeTab.dashboard: 'HOME',
+    HomeTab.chemicals: 'CHEMS',
+    HomeTab.apparatus: 'APPARATUS',
+    HomeTab.scanner: 'SCAN',
+    HomeTab.reports: 'REPORTS',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -141,26 +152,26 @@ class _NavBar extends StatelessWidget {
           height: 60,
           child: Row(
             children: [
-              for (var i = 0; i < _labels.length; i++)
+              for (final tab in HomeTab.values)
                 Expanded(
                   child: Semantics(
                     button: true,
-                    selected: index == i,
-                    label: _labels[i],
+                    selected: current == tab,
+                    label: _labels[tab],
                     child: InkResponse(
-                      onTap: () => onSelected(i),
+                      onTap: () => onSelected(tab),
                       radius: 40,
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _labels[i],
+                              _labels[tab]!,
                               style: context.label.copyWith(
-                                fontSize: 9.5,
-                                letterSpacing: 1.3,
-                                color: index == i ? lab.ink : lab.soft,
-                                fontWeight: index == i
+                                fontSize: 8.5,
+                                letterSpacing: .7,
+                                color: current == tab ? lab.ink : lab.soft,
+                                fontWeight: current == tab
                                     ? FontWeight.w800
                                     : FontWeight.w600,
                               ),
@@ -168,7 +179,7 @@ class _NavBar extends StatelessWidget {
                             const SizedBox(height: 4),
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 180),
-                              width: index == i ? 16 : 0,
+                              width: current == tab ? 14 : 0,
                               height: 2,
                               decoration: BoxDecoration(
                                 color: lab.sage,
@@ -181,10 +192,13 @@ class _NavBar extends StatelessWidget {
                     ),
                   ),
                 ),
-              IconButton(
-                tooltip: 'Settings',
-                onPressed: onSettings,
-                icon: Icon(Icons.tune, size: 19, color: lab.soft),
+              SizedBox(
+                width: 46,
+                child: IconButton(
+                  tooltip: 'Settings',
+                  onPressed: onSettings,
+                  icon: Icon(Icons.tune, size: 18, color: lab.soft),
+                ),
               ),
             ],
           ),

@@ -26,6 +26,9 @@ dependencies:
   share_plus: ^13.3.0
   collection: ^1.19.1
   shared_preferences: ^2.5.5
+  # Range rather than a caret: the low-stock warning only needs the stable
+  # show/request-permission surface, which has not moved across these majors.
+  flutter_local_notifications: ">=17.0.0 <20.0.0"
 
 dev_dependencies:
   flutter_test:
