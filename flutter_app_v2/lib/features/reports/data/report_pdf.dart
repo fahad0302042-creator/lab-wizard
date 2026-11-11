@@ -18,6 +18,7 @@ class ReportPdf {
   static Future<Uint8List> build({
     required List<MonthlyReport> reports,
     required DateTime generatedAt,
+    Uint8List? logoBytes,
   }) async {
     // Two passes: the first measures how long the document is, the second
     // prints "Page 3 of 7" on it. A footer written during a single pass cannot
@@ -26,12 +27,14 @@ class ReportPdf {
       reports: reports,
       generatedAt: generatedAt,
       totalPages: null,
+      logoBytes: logoBytes,
     );
     final totalPages = probe.document.pdfPageList.pages.length;
     final document = _compose(
       reports: reports,
       generatedAt: generatedAt,
       totalPages: totalPages,
+      logoBytes: logoBytes,
     );
     return document.save();
   }
@@ -40,6 +43,7 @@ class ReportPdf {
     required List<MonthlyReport> reports,
     required DateTime generatedAt,
     required int? totalPages,
+    required Uint8List? logoBytes,
   }) {
     final document = pw.Document(
       title: 'Lab Wizard report',
@@ -51,7 +55,7 @@ class ReportPdf {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.fromLTRB(34, 34, 34, 26),
-          header: (context) => _masthead(report, generatedAt),
+          header: (context) => _masthead(report, generatedAt, logoBytes),
           footer: (context) => _footer(report, context, totalPages),
           build: (context) => [
             if (!report.isEmpty) _kpis(report),
@@ -76,7 +80,11 @@ class ReportPdf {
     return document;
   }
 
-  static pw.Widget _masthead(MonthlyReport report, DateTime generatedAt) {
+  static pw.Widget _masthead(
+    MonthlyReport report,
+    DateTime generatedAt,
+    Uint8List? logoBytes,
+  ) {
     final generated = DateFormat(
       'd MMM yyyy, HH:mm',
     ).format(generatedAt.toLocal());
@@ -91,6 +99,15 @@ class ReportPdf {
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
+          if (logoBytes != null) ...[
+            pw.Image(
+              pw.MemoryImage(logoBytes),
+              width: 42,
+              height: 42,
+              fit: pw.BoxFit.contain,
+            ),
+            pw.SizedBox(width: 9),
+          ],
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
