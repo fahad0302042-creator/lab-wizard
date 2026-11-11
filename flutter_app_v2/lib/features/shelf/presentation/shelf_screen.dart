@@ -37,6 +37,10 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
   /// Narrowing the shelf without typing: the three questions actually asked of
   /// a store room ("what needs ordering", "what has run out") are one tap.
   _Filter _filter = _Filter.all;
+  String? _unitFilter;
+  String? _categoryFilter;
+  List<String> _recentSearches = [];
+  String get _recentKey => 'recent_shelf_searches_${widget.kind.name}';
   int _undoToken = 0;
 
   bool get _isChemical => widget.kind == ItemKind.chemical;
@@ -45,6 +49,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
   void initState() {
     super.initState();
     _maybeShowHint();
+    _loadRecentSearches();
   }
 
   /// Swiping is the one gesture nobody finds by accident, and a shelf with no
@@ -54,6 +59,22 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
     final seen = preferences.getBool('shelf_gestures_hint_seen_v2') ?? false;
     if (seen || !mounted) return;
     setState(() => _showHint = true);
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _recentSearches = prefs.getStringList(_recentKey) ?? []);
+  }
+
+  Future<void> _rememberSearch(String value) async {
+    final query = value.trim();
+    if (query.isEmpty) return;
+    final next = [query, ..._recentSearches.where(
+      (entry) => entry.toLowerCase() != query.toLowerCase(),
+    )].take(5).toList();
+    setState(() => _recentSearches = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_recentKey, next);
   }
 
   Future<void> _dismissHint() async {
@@ -78,6 +99,8 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
         return false;
       }
       if (_filter == _Filter.empty && item.quantity > 0) return false;
+      if (_unitFilter != null && item.unit != _unitFilter) return false;
+      if (_categoryFilter != null && item.subtitle != _categoryFilter) return false;
       if (query.isEmpty) return true;
       // Formula and category are searched too: people think "NaCl", not
       // "Sodium Chloride".
@@ -99,9 +122,14 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
 
     // Only empty items, or items low against a level you actually set, count as
     // needing attention.
-    final attention = items
+    final shelf = (_isChemical
+        ? state.chemicals.map(ItemView.fromChemical)
+        : state.apparatus.map(ItemView.fromApparatus)).toList();
+    final attention = shelf
         .where((item) => item.metrics.signal != StockSignal.fine)
         .length;
+    final units = shelf.map((item) => item.unit).where((v) => v.isNotEmpty).toSet().toList()..sort();
+    final categories = shelf.map((item) => item.subtitle).where((v) => v.isNotEmpty).toSet().toList()..sort();
 
     return Stack(
       children: [
@@ -116,15 +144,74 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
                 child: _Header(
                   title: _isChemical ? 'chemicals' : 'apparatus',
                   attention: attention,
-                  total: state.chemicals.length + state.apparatus.length,
+                  total: shelf.length,
                   search: _search,
                   filter: _filter,
                   onFilter: (value) => setState(() => _filter = value),
                   onSearchChanged: (_) => setState(() {}),
+                  onSearchSubmitted: _rememberSearch,
                   onMenu: () => _openMenu(context, ref),
-                  onShowOrder: () => setState(() => _filter = _Filter.order),
+                  onShowOrder: () => setState(() {
+                    _filter = _Filter.order;
+                    _search.clear();
+                    _unitFilter = null;
+                    _categoryFilter = null;
+                  }),
                 ),
               ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      PopupMenuButton<String>(
+                        tooltip: 'Filter by unit',
+                        onSelected: (value) => setState(() =>
+                          _unitFilter = value.isEmpty ? null : value),
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(value: '', child: Text('All units')),
+                          for (final unit in units)
+                            PopupMenuItem(value: unit, child: Text(unit)),
+                        ],
+                        child: Chip(label: Text(_unitFilter == null
+                            ? 'Unit: all' : 'Unit: $_unitFilter')),
+                      ),
+                      if (!_isChemical)
+                        PopupMenuButton<String>(
+                          tooltip: 'Filter by category',
+                          onSelected: (value) => setState(() =>
+                            _categoryFilter = value.isEmpty ? null : value),
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(value: '', child: Text('All categories')),
+                            for (final category in categories)
+                              PopupMenuItem(value: category, child: Text(category)),
+                          ],
+                          child: Chip(label: Text(_categoryFilter == null
+                              ? 'Category: all' : 'Category: $_categoryFilter')),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_search.text.isEmpty && _recentSearches.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                    child: Wrap(
+                      spacing: 6,
+                      children: [
+                        const Chip(label: Text('Recent searches')),
+                        for (final query in _recentSearches)
+                          ActionChip(
+                            label: Text(query),
+                            tooltip: 'Search again',
+                            onPressed: () => setState(() => _search.text = query),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               if (_showHint && items.isNotEmpty)
                 SliverToBoxAdapter(
                   child: _SwipeHint(
@@ -154,7 +241,9 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: _EmptyShelf(
-                    searching: _search.text.trim().isNotEmpty,
+                    searching: _search.text.trim().isNotEmpty ||
+                        _filter != _Filter.all || _unitFilter != null ||
+                        _categoryFilter != null,
                     isChemical: _isChemical,
                     onAdd: () => _addItem(context, ref),
                   ),
@@ -172,7 +261,10 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
                           child: ShelfRow(
                             item: item,
                             compact: ref.watch(preferencesProvider).compactRows,
-                            onTap: () => _openDetail(context, item),
+                            onTap: () {
+                              _rememberSearch(_search.text);
+                              _openDetail(context, item);
+                            },
                             onSwipe: (swipe) => _log(
                               context,
                               ref,
@@ -383,6 +475,7 @@ class _Header extends StatelessWidget {
     required this.filter,
     required this.onFilter,
     required this.onSearchChanged,
+    required this.onSearchSubmitted,
     required this.onMenu,
     required this.onShowOrder,
   });
@@ -394,6 +487,7 @@ class _Header extends StatelessWidget {
   final _Filter filter;
   final ValueChanged<_Filter> onFilter;
   final ValueChanged<String> onSearchChanged;
+  final ValueChanged<String> onSearchSubmitted;
   final VoidCallback onMenu;
   final VoidCallback onShowOrder;
 
@@ -475,6 +569,7 @@ class _Header extends StatelessWidget {
                 child: TextField(
                   controller: search,
                   onChanged: onSearchChanged,
+                  onSubmitted: onSearchSubmitted,
                   style: const TextStyle(fontSize: LabType.small),
                   decoration: InputDecoration(
                     isDense: true,

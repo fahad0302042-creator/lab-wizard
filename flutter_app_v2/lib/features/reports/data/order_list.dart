@@ -4,19 +4,27 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
-import 'package:share_plus/share_plus.dart';
 
-import '../../../core/error_text.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
+import '../presentation/order_plan_screen.dart';
+
+class OrderPlanEntry {
+  const OrderPlanEntry({this.amount, this.note = ''});
+  final double? amount;
+  final String note;
+}
 
 /// What to buy, in the order you would walk the shelves.
 ///
 /// The app already knows this; the only missing step was getting it out of the
 /// phone and into the hands of whoever places the order. Text is the useful
 /// format — it pastes straight into a message — with a PDF for printing.
-String orderListText(List<ItemView> items, {DateTime? at}) {
+String orderListText(
+  List<ItemView> items, {
+  DateTime? at,
+  Map<String, OrderPlanEntry> plan = const {},
+}) {
   final when = DateFormat('d MMM yyyy').format(at ?? DateTime.now());
   final buffer = StringBuffer()
     ..writeln('Lab Wizard — order list ($when)')
@@ -26,11 +34,18 @@ String orderListText(List<ItemView> items, {DateTime? at}) {
     final level = item.threshold > 0
         ? ' — order level ${formatQuantity(item.threshold)} ${item.unit}'
         : ' — no order level set';
+    final entry = plan[item.id];
     buffer.writeln(
       '• ${item.name}'
       '${item.subtitle.isEmpty ? '' : ' (${item.subtitle})'}: '
       '${formatQuantity(item.quantity)} ${item.unit} left$level',
     );
+    if (entry?.amount != null) {
+      buffer.writeln('  Order: ${formatQuantity(entry!.amount!)} ${item.unit}');
+    }
+    if (entry?.note.isNotEmpty == true) {
+      buffer.writeln('  Note: ${entry!.note}');
+    }
   }
   buffer
     ..writeln()
@@ -38,7 +53,11 @@ String orderListText(List<ItemView> items, {DateTime? at}) {
   return buffer.toString();
 }
 
-Future<Uint8List> orderListPdf(List<ItemView> items, {DateTime? at}) async {
+Future<Uint8List> orderListPdf(
+  List<ItemView> items, {
+  DateTime? at,
+  Map<String, OrderPlanEntry> plan = const {},
+}) async {
   final when = at ?? DateTime.now();
   final document = pw.Document(title: 'Lab Wizard order list');
   document.addPage(
@@ -63,6 +82,7 @@ Future<Uint8List> orderListPdf(List<ItemView> items, {DateTime? at}) async {
             'Formula / category',
             'On shelf',
             'Order level',
+            'To order / note',
           ],
           data: items
               .map(
@@ -73,6 +93,12 @@ Future<Uint8List> orderListPdf(List<ItemView> items, {DateTime? at}) async {
                   item.threshold > 0
                       ? '${formatQuantity(item.threshold)} ${item.unit}'
                       : '—',
+                  [
+                    if (plan[item.id]?.amount != null)
+                      '${formatQuantity(plan[item.id]!.amount!)} ${item.unit}',
+                    if (plan[item.id]?.note.isNotEmpty == true)
+                      plan[item.id]!.note,
+                  ].join('\n'),
                 ],
               )
               .toList(),
@@ -90,52 +116,9 @@ Future<Uint8List> orderListPdf(List<ItemView> items, {DateTime? at}) async {
   return document.save();
 }
 
-/// Opens the share sheet with both formats available.
-///
-/// Text first, because the point of this list is to reach another person — and
-/// a chat message is where it goes.
+/// Open an editable plan before sharing; nothing changes on the shelf.
 Future<void> shareOrderList(BuildContext context, List<ItemView> items) async {
-  try {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            ListTile(
-              leading: const Icon(Icons.chat_outlined, size: 20),
-              title: const Text('Send as a message'),
-              subtitle: const Text('Pastes straight into WhatsApp'),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await SharePlus.instance.share(
-                  ShareParams(text: orderListText(items)),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf_outlined, size: 20),
-              title: const Text('Save as PDF'),
-              subtitle: const Text('A4, for printing'),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await Printing.sharePdf(
-                  bytes: await orderListPdf(items),
-                  filename: 'order-list.pdf',
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  } catch (error) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(friendlyError(error))));
-  }
+  await Navigator.of(context).push(MaterialPageRoute<void>(
+    builder: (_) => OrderPlanScreen(items: items),
+  ));
 }

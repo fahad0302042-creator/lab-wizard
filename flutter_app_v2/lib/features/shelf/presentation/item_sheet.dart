@@ -50,7 +50,12 @@ class _ItemSheet extends ConsumerWidget {
     }
     final item = match.first;
     final metrics = item.metrics;
-    final logs = state.logs.where((log) => log.itemId == itemId).take(10);
+    final logs = state.logs
+        .where((log) => log.itemId == itemId && log.itemType == kind)
+        .toList()
+      ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
+    final restocks = logs.where((log) => log.action == InventoryAction.restock);
+    final lastRestock = restocks.isEmpty ? null : restocks.first;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -99,6 +104,31 @@ class _ItemSheet extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (item.isChemical && item.qrCode.trim().isNotEmpty)
+                IconButton(
+                  tooltip: 'Show QR code',
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: Text(item.name),
+                      content: ColoredBox(
+                        color: Colors.white,
+                        child: QrImageView(
+                          data: 'labwizard:chemical:${item.qrCode}',
+                          size: 200,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  icon: const Icon(Icons.qr_code_2),
+                ),
               GlassJar(metrics: metrics, width: 46, height: 58),
             ],
           ),
@@ -133,6 +163,14 @@ class _ItemSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _OrderLevelRow(item: item),
+          if (lastRestock != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Last restocked ${DateFormat('d MMM yyyy').format(lastRestock.loggedAt.toLocal())}',
+                style: context.aside.copyWith(fontSize: 14),
+              ),
+            ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -194,7 +232,7 @@ class _ItemSheet extends ConsumerWidget {
             ],
           ],
           const SizedBox(height: 22),
-          Text('HISTORY', style: context.label),
+          Text('HISTORY · TAP AN ENTRY TO CORRECT', style: context.label),
           const SizedBox(height: 8),
           if (logs.isEmpty)
             Padding(
@@ -233,14 +271,16 @@ class _ItemSheet extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        log.note.isEmpty ? log.action.name : log.note,
+                        log.note.isEmpty
+                            ? log.action.name
+                            : '${log.action.name} · ${log.note}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 13, color: lab.ink),
                       ),
                     ),
                     Text(
-                      DateFormat('d MMM').format(log.loggedAt.toLocal()),
+                      DateFormat('d MMM yyyy').format(log.loggedAt.toLocal()),
                       style: context.aside.copyWith(fontSize: 15),
                     ),
                     const SizedBox(width: 12),

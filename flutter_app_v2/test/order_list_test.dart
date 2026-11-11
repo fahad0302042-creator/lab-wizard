@@ -42,6 +42,18 @@ void main() {
       expect(text, contains('no order level set'));
     });
 
+    test('planning amounts and notes are included in the message and PDF', () async {
+      final item = _item(name: 'Acetone', quantity: 1, threshold: 5);
+      final plan = {
+        item.id: const OrderPlanEntry(amount: 2.5, note: 'Glass bottles'),
+      };
+      final text = orderListText([item], plan: plan);
+      expect(text, contains('Order: 2.5 g'));
+      expect(text, contains('Note: Glass bottles'));
+      final pdf = await orderListPdf([item], plan: plan);
+      expect(String.fromCharCodes(pdf.take(4)), '%PDF');
+    });
+
     test('one item reads as one item, not "1 items"', () {
       final text = orderListText(
         [_item(name: 'Acetone', quantity: 1, threshold: 5)],

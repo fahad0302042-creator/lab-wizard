@@ -65,7 +65,13 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
 
   String? get _error {
     final value = _parsed;
-    if (value == null || value <= 0) return 'Enter an amount above zero';
+    if (value == null || !value.isFinite || value <= 0) {
+      return 'Enter an amount above zero';
+    }
+    if (widget.log.itemType == ItemKind.apparatus &&
+        value != value.roundToDouble()) {
+      return 'Enter a whole number';
+    }
     return null;
   }
 
@@ -77,6 +83,49 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
 
   Future<void> _save() async {
     if (_error != null || _busy) return;
+    final inventory = ref.read(inventoryProvider);
+    final items = widget.log.itemType == ItemKind.chemical
+        ? inventory.chemicals.map((e) => (e.id, e.quantity))
+        : inventory.apparatus.map((e) => (e.id, e.quantity));
+    final matches = items.where((item) => item.$1 == widget.log.itemId);
+    if (matches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This item is no longer on the shelf.')),
+      );
+      return;
+    }
+    final current = matches.first.$2;
+    final after = quantityAfterCorrection(
+      currentQuantity: current,
+      oldAction: widget.log.action,
+      oldAmount: widget.log.amount,
+      newAction: _action,
+      newAmount: _parsed!,
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm correction'),
+        content: Text(
+          'Change ${widget.log.action.name} ${formatQuantity(widget.log.amount)} '
+          '${widget.unit} to ${_action.name} ${formatQuantity(_parsed!)} '
+          '${widget.unit}.\n\n'
+          'Estimated shelf balance: ${formatQuantity(current)} → '
+          '${formatQuantity(after)} ${widget.unit}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Go back'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save correction'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
       await ref
@@ -109,8 +158,11 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove this entry?'),
         content: Text(
-          'It will come off the history and the ${widget.unit} will be put '
-          'back on the shelf.',
+          widget.log.action == InventoryAction.restock
+              ? 'The entry will be removed and its added amount will be '
+                    'taken off the shelf balance.'
+              : 'The entry will be removed and its amount will be put '
+                    'back on the shelf balance.',
         ),
         actions: [
           TextButton(
@@ -150,7 +202,7 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
       lastDate: DateTime.now(),
       helpText: 'What date was it really?',
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null && mounted) setState(() => _date = picked);
   }
 
   @override
@@ -193,19 +245,23 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
             Text(widget.itemName, style: context.itemName),
             const SizedBox(height: 16),
             SegmentedButton<InventoryAction>(
-              segments: const [
-                ButtonSegment(
-                  value: InventoryAction.consume,
-                  label: Text('Used'),
-                ),
-                ButtonSegment(
+              segments: [
+                if (widget.log.itemType == ItemKind.chemical ||
+                    _action == InventoryAction.consume)
+                  const ButtonSegment(
+                    value: InventoryAction.consume,
+                    label: Text('Used'),
+                  ),
+                const ButtonSegment(
                   value: InventoryAction.restock,
                   label: Text('Added'),
                 ),
-                ButtonSegment(
-                  value: InventoryAction.breakage,
-                  label: Text('Broken'),
-                ),
+                if (widget.log.itemType == ItemKind.apparatus ||
+                    _action == InventoryAction.breakage)
+                  const ButtonSegment(
+                    value: InventoryAction.breakage,
+                    label: Text('Broken'),
+                  ),
               ],
               selected: {_action},
               onSelectionChanged: _busy
@@ -232,6 +288,7 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
             const SizedBox(height: 12),
             TextField(
               controller: _note,
+              onChanged: (_) => setState(() {}),
               enabled: !_busy,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(labelText: 'Note'),

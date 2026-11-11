@@ -34,6 +34,15 @@ class DashboardScreen extends ConsumerWidget {
         .toList()
       ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
     final name = _firstName(auth.user?.userMetadata?['name']?.toString());
+    final now = DateTime.now();
+    final monthLogs = state.logs.where((log) {
+      final date = log.loggedAt.toLocal();
+      return date.year == now.year && date.month == now.month;
+    });
+    final usedCount = monthLogs.where((l) => l.action != InventoryAction.restock).length;
+    final addedCount = monthLogs.where((l) => l.action == InventoryAction.restock).length;
+    final emptyCount = [...state.chemicals.map((i) => i.quantity),
+      ...state.apparatus.map((i) => i.quantity)].where((q) => q <= 0).length;
 
     return RefreshIndicator(
       onRefresh: () => ref.read(inventoryProvider.notifier).refresh(),
@@ -123,15 +132,33 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ],
           ),
-          if (state.pendingCount > 0) ...[
-            const SizedBox(height: 14),
-            _Note(
-              text:
-                  '${state.pendingCount} change'
-                  '${state.pendingCount == 1 ? '' : 's'} still to upload. '
-                  'They are safe on this phone.',
-            ),
-          ],
+          const SizedBox(height: 14),
+          _Note(
+            text: state.pendingCount > 0
+                ? '${state.pendingCount} change${state.pendingCount == 1 ? '' : 's'} '
+                    'waiting to upload. Kept on this phone.'
+                : state.error != null
+                    ? 'Sync needs attention. Check Settings for details.'
+                    : state.fromCache
+                        ? 'Showing the saved copy. Pull down to sync.'
+                        : state.loading || state.refreshing
+                            ? 'Checking for updates…'
+                            : 'No changes waiting to upload.',
+          ),
+          const SizedBox(height: 20),
+          Text('THIS MONTH', style: context.label),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              _StatLine(text: '$usedCount use/breakage entries',
+                  onTap: () => onOpenTab(HomeTab.reports)),
+              _StatLine(text: '$addedCount restock entries',
+                  onTap: () => onOpenTab(HomeTab.reports)),
+              Text('$emptyCount empty now', style: context.aside),
+            ],
+          ),
           const SizedBox(height: 22),
           Text('TODAY', style: context.label),
           const SizedBox(height: 8),
