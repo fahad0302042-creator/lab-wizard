@@ -66,16 +66,32 @@ class HomeShell extends ConsumerStatefulWidget {
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell>
+    with WidgetsBindingObserver {
   HomeTab _tab = HomeTab.dashboard;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       await ref.read(inventoryProvider.notifier).bootstrap(widget.user.id);
       await ref.read(notificationServiceProvider).init();
+      if (mounted) await ref.read(preferencesProvider.notifier).refreshDailyReminder();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(preferencesProvider.notifier).refreshDailyReminder();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   void _open(HomeTab tab) {
@@ -98,11 +114,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       body: SafeArea(
         bottom: false,
         child: Center(
-          // A store-room app on a tablet should not stretch a 40-character row
-          // across 10 inches: the eye loses the line. Held to a comfortable
-          // column and centred, which is the cheapest honest tablet layout.
+          // Keep very wide screens readable while allowing a two-column shelf.
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: const BoxConstraints(maxWidth: 1000),
             child: IndexedStack(
               index: index,
               sizing: StackFit.expand,

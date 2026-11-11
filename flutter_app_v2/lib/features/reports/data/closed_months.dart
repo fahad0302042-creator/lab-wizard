@@ -140,18 +140,20 @@ final closedMonthsProvider =
 
 class ClosedMonthsController extends Notifier<Map<String, ClosedMonth>> {
   static const _storageKey = 'closed_months';
+  late Future<void> _ready;
+  bool _restoreFailed = false;
 
   @override
   Map<String, ClosedMonth> build() {
-    Future.microtask(_restore);
+    _ready = Future.microtask(_restore);
     return const {};
   }
 
   Future<void> _restore() async {
-    final preferences = await SharedPreferences.getInstance();
-    final raw = preferences.getString(_storageKey);
-    if (raw == null || raw.isEmpty) return;
     try {
+      final preferences = await SharedPreferences.getInstance();
+      final raw = preferences.getString(_storageKey);
+      if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
       state = {
         for (final entry in decoded.entries)
@@ -160,25 +162,34 @@ class ClosedMonthsController extends Notifier<Map<String, ClosedMonth>> {
           ),
       };
     } catch (_) {
-      // A corrupt blob is not worth failing over; an unclosed month is safe.
-      state = const {};
+      // Do not overwrite unreadable saved reports with an empty collection.
+      _restoreFailed = true;
     }
   }
 
-  Future<void> _persist() async {
+  Future<void> _persist(Map<String, ClosedMonth> next) async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(
+    final saved = await preferences.setString(
       _storageKey,
       jsonEncode({
-        for (final entry in state.entries) entry.key: entry.value.toJson(),
+        for (final entry in next.entries) entry.key: entry.value.toJson(),
       }),
     );
+    if (!saved) throw StateError('Could not save closed reports');
+  }
+
+  Future<ClosedMonth?> closedFor(DateTime month) async {
+    await _ready;
+    if (_restoreFailed) throw StateError('Saved reports could not be read');
+    return state[ClosedMonth.keyFor(month)];
   }
 
   bool isClosed(DateTime month) =>
       state.containsKey(ClosedMonth.keyFor(month));
 
   Future<void> close(List<MonthlyReport> reports, DateTime month) async {
+    await _ready;
+    if (_restoreFailed) throw StateError('Saved reports could not be read');
     final closed = ClosedMonth(
       monthKey: ClosedMonth.keyFor(month),
       closedAt: DateTime.now(),
@@ -191,14 +202,18 @@ class ClosedMonthsController extends Notifier<Map<String, ClosedMonth>> {
         for (final report in reports) report.kind.name: report.lowStockCount,
       },
     );
-    state = {...state, closed.monthKey: closed};
-    await _persist();
+    final next = {...state, closed.monthKey: closed};
+    await _persist(next);
+    state = next;
   }
 
   Future<void> reopen(DateTime month) async {
+    await _ready;
+    if (_restoreFailed) throw StateError('Saved reports could not be read');
     final key = ClosedMonth.keyFor(month);
-    state = {...state}..remove(key);
-    await _persist();
+    final next = {...state}..remove(key);
+    await _persist(next);
+    state = next;
   }
 }
 

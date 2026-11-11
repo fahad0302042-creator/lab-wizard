@@ -222,6 +222,17 @@ class PreferencesController extends Notifier<AppPreferences> {
     );
   }
 
+  /// Refresh the zone and schedule when the app opens or returns to foreground.
+  Future<void> refreshDailyReminder() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (preferences.getBool('daily_check') != true) return;
+    await ref.read(notificationServiceProvider).scheduleDailyReminder(
+      hour: preferences.getInt('daily_check_hour') ?? 9,
+      title: 'Lab Wizard check',
+      body: 'Open the app to see what needs ordering.',
+    );
+  }
+
   Future<void> setTheme(ThemeMode value) async {
     state = state.copyWith(themeMode: value);
     final preferences = await SharedPreferences.getInstance();
@@ -257,19 +268,20 @@ class PreferencesController extends Notifier<AppPreferences> {
     return true;
   }
 
-  Future<void> setDailyCheckHour(int hour) async {
-    state = state.copyWith(dailyCheckHour: hour);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setInt('daily_check_hour', hour);
+  Future<bool> setDailyCheckHour(int hour) async {
     if (state.dailyCheck) {
-      await ref
-          .read(notificationServiceProvider)
+      final scheduled = await ref.read(notificationServiceProvider)
           .scheduleDailyReminder(
             hour: hour,
             title: 'Lab Wizard check',
             body: 'Open the app to see what needs ordering.',
           );
+      if (!scheduled) return false;
     }
+    state = state.copyWith(dailyCheckHour: hour);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setInt('daily_check_hour', hour);
+    return true;
   }
 
   Future<void> setCompactRows(bool value) async {

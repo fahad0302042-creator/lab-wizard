@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -36,14 +37,7 @@ class NotificationService {
 
   Future<void> init() async {
     if (!isSupported || _ready) return;
-    try {
-      tzdata.initializeTimeZones();
-      // A fixed local location is enough for a daily reminder and needs no
-      // extra plugin: the phone's own offset is read at scheduling time.
-      tz.setLocalLocation(tz.getLocation('Etc/GMT'));
-    } catch (error) {
-      debugPrint('time zone setup failed: $error');
-    }
+    tzdata.initializeTimeZones();
     try {
       await _plugin.initialize(
         const InitializationSettings(
@@ -108,13 +102,8 @@ class NotificationService {
     }
   }
 
-  /// Schedules the daily check for [hour]:00 local time.
-  ///
-  /// Inexact on purpose: an exact alarm needs a special Android permission and
-  /// a stock check is not worth waking the phone for. The time is computed in
-  /// UTC from the device's current offset, which is right for the year round in
-  /// places without daylight saving and drifts by an hour where there is one —
-  /// acceptable for a reminder, and noted here rather than hidden.
+  /// Schedules an inexact daily reminder in the phone's current time zone.
+  /// The IANA zone retains daylight-saving rules rather than a fixed offset.
   Future<bool> scheduleDailyReminder({
     required int hour,
     required String title,
@@ -124,6 +113,10 @@ class NotificationService {
     if (_android == null) return false;
     await _ensureChannel();
     try {
+      final zone = await const MethodChannel('lab_wizard/timezone')
+          .invokeMethod<String>('localTimeZone');
+      if (zone == null) return false;
+      tz.setLocalLocation(tz.getLocation(zone));
       await _plugin.zonedSchedule(
         _dailyId,
         title,
@@ -163,14 +156,14 @@ class NotificationService {
     }
   }
 
-  /// The next [hour]:00 on the phone's clock, expressed as the UTC instant it
-  /// actually is. Building it from the device's local wall clock is what makes
-  /// the reminder land at breakfast rather than at 9am UTC.
+  /// The next occurrence in the phone's time zone, including DST rules.
   tz.TZDateTime _nextInstanceOf(int hour) {
-    final now = DateTime.now();
-    var next = DateTime(now.year, now.month, now.day, hour);
-    if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
-    return tz.TZDateTime.from(next.toUtc(), tz.local);
+    final now = tz.TZDateTime.now(tz.local);
+    var next = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour);
+    if (!next.isAfter(now)) {
+      next = tz.TZDateTime(tz.local, now.year, now.month, now.day + 1, hour);
+    }
+    return next;
   }
 
   /// Posts one notification. [tag] keeps related notices from stacking up: a
