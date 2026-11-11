@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
@@ -158,6 +159,40 @@ class _ItemSheet extends ConsumerWidget {
               ),
             ],
           ),
+          if (item.isChemical) ...[
+            const SizedBox(height: 22),
+            Text('QR LABEL', style: context.label),
+            const SizedBox(height: 6),
+            if (item.qrCode.trim().isEmpty)
+              Text(
+                'No QR code is saved for this chemical.',
+                style: context.aside.copyWith(fontSize: 15),
+              )
+            else ...[
+              Text(
+                'Scan or screenshot this code to find this chemical.',
+                style: context.aside.copyWith(fontSize: 15),
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: Semantics(
+                  label: 'QR code for ${item.name}',
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: QrImageView(
+                      data: 'labwizard:chemical:${item.qrCode}',
+                      size: 152,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
           const SizedBox(height: 22),
           Text('HISTORY', style: context.label),
           const SizedBox(height: 8),

@@ -27,7 +27,9 @@ class _QrLabelScreenState extends ConsumerState<QrLabelScreen> {
   @override
   Widget build(BuildContext context) {
     final lab = context.lab;
-    final chemicals = ref.watch(inventoryProvider).chemicals;
+    final all = ref.watch(inventoryProvider).chemicals;
+    final chemicals = all.where((item) => item.qrCode.trim().isNotEmpty).toList();
+    final missing = all.length - chemicals.length;
     final pages = (chemicals.length / 40).ceil();
 
     return Scaffold(
@@ -40,7 +42,7 @@ class _QrLabelScreenState extends ConsumerState<QrLabelScreen> {
         children: [
           Text(
             chemicals.isEmpty
-                ? 'No reagents yet'
+                ? 'No QR labels available'
                 : '${chemicals.length} labels, $pages '
                       '${pages == 1 ? 'page' : 'pages'}',
             style: context.itemName.copyWith(fontSize: 20),
@@ -51,6 +53,14 @@ class _QrLabelScreenState extends ConsumerState<QrLabelScreen> {
             'scanner reads. Print on plain A4 and cut along the lines.',
             style: context.aside.copyWith(fontSize: LabType.small),
           ),
+          if (missing > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '$missing chemical${missing == 1 ? '' : 's'} without a saved '
+              'QR code cannot be printed.',
+              style: context.aside.copyWith(fontSize: LabType.small),
+            ),
+          ],
           const SizedBox(height: 18),
           for (final chemical in chemicals)
             Padding(
@@ -93,7 +103,10 @@ class _QrLabelScreenState extends ConsumerState<QrLabelScreen> {
   Future<void> _print() async {
     setState(() => _printing = true);
     try {
-      final chemicals = ref.read(inventoryProvider).chemicals;
+      final chemicals = ref.read(inventoryProvider).chemicals
+          .where((item) => item.qrCode.trim().isNotEmpty)
+          .toList();
+      if (chemicals.isEmpty) return;
       final document = pw.Document(title: 'Lab Wizard QR labels');
       for (var offset = 0; offset < chemicals.length; offset += 40) {
         final pageItems = chemicals.skip(offset).take(40).toList();

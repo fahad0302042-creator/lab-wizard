@@ -1,8 +1,13 @@
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:printing/printing.dart';
 
 import '../../../app/providers.dart';
@@ -29,6 +34,90 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   ItemKind _kind = ItemKind.chemical;
   bool _exporting = false;
+  bool _logoBusy = true;
+  Uint8List? _logo;
+  static const _logoKey = 'report_logo_png';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogo();
+  }
+
+  Future<void> _loadLogo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_logoKey);
+      if (!mounted) return;
+      setState(() => _logo = saved == null ? null : base64Decode(saved));
+    } catch (_) {
+      if (mounted) _logoMessage('Could not load the saved report logo.');
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
+  }
+
+  void _logoMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _chooseLogo() async {
+    setState(() => _logoBusy = true);
+    try {
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 90,
+      );
+      if (image == null) return;
+      if (await image.length() > 10 * 1024 * 1024) {
+        throw StateError('Image is too large');
+      }
+      final bytes = await image.readAsBytes();
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: 512,
+        allowUpscaling: false,
+      );
+      try {
+        final frame = await codec.getNextFrame();
+        try {
+          final png = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+          if (png == null) throw StateError('Could not read image');
+          final logo = png.buffer.asUint8List();
+          final prefs = await SharedPreferences.getInstance();
+          if (!await prefs.setString(_logoKey, base64Encode(logo))) {
+            throw StateError('Could not save logo');
+          }
+          if (mounted) setState(() => _logo = logo);
+        } finally {
+          frame.image.dispose();
+        }
+      } finally {
+        codec.dispose();
+      }
+    } catch (_) {
+      if (mounted) {
+        _logoMessage('Could not use that image. Please choose a valid image.');
+      }
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
+  }
+
+  Future<void> _removeLogo() async {
+    setState(() => _logoBusy = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.remove(_logoKey)) throw StateError('Could not remove');
+      if (mounted) setState(() => _logo = null);
+    } catch (_) {
+      if (mounted) _logoMessage('Could not remove the report logo.');
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
+  }
 
   /// Cards unless the reader asks for columns: six numbers do not fit a phone.
   bool _asCards = true;
@@ -128,8 +217,40 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         if (!report.isEmpty)
           Text(report.footnote, style: context.aside.copyWith(fontSize: 15)),
         const SizedBox(height: 18),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: _logo == null
+              ? const Icon(Icons.image_outlined)
+              : Image.memory(_logo!, width: 48, height: 48, fit: BoxFit.contain),
+          title: const Text('Report logo'),
+          subtitle: Text(_logo == null
+              ? 'Optional · saved on this device'
+              : 'Added to PDF reports · saved on this device'),
+          onTap: _logoBusy || _exporting ? null : _chooseLogo,
+          trailing: _logo == null
+              ? TextButton(
+                  onPressed: _logoBusy || _exporting ? null : _chooseLogo,
+                  child: const Text('Add'),
+                )
+              : PopupMenuButton<String>(
+                  tooltip: 'Report logo options',
+                  enabled: !_logoBusy && !_exporting,
+                  onSelected: (value) {
+                    if (value == 'change') {
+                      _chooseLogo();
+                    } else if (value == 'remove') {
+                      _removeLogo();
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'change', child: Text('Change logo')),
+                    PopupMenuItem(value: 'remove', child: Text('Remove logo')),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 8),
         FilledButton.icon(
-          onPressed: _exporting ? null : () => _export(state),
+          onPressed: _exporting || _logoBusy ? null : () => _export(state),
           icon: _exporting
               ? const SizedBox.square(
                   dimension: 16,
@@ -257,6 +378,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       final bytes = await ReportPdf.build(
         reports: reports,
         generatedAt: DateTime.now(),
+        logoBytes: _logo,
       );
       await Printing.sharePdf(
         bytes: bytes,
