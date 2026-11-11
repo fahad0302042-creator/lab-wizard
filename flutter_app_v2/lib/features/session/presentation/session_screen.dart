@@ -79,10 +79,14 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         item.id: item,
     };
     var saved = 0;
+    final savedIds = <String>[];
     final failures = <String>[];
     for (final entry in _amounts.entries) {
       final item = views[entry.key];
-      if (item == null) continue;
+      if (item == null) {
+        failures.add('An item is no longer on the shelf.');
+        continue;
+      }
       try {
         await ref
             .read(inventoryProvider.notifier)
@@ -97,12 +101,18 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               date: _date,
             );
         saved++;
+        savedIds.add(entry.key);
       } catch (error) {
         failures.add('${item.name}: ${friendlyError(error)}');
       }
     }
     if (!mounted) return;
-    setState(() => _saving = false);
+    setState(() {
+      for (final id in savedIds) {
+        _amounts.remove(id);
+      }
+      _saving = false;
+    });
     final messenger = ScaffoldMessenger.of(context);
     if (failures.isEmpty) {
       HapticFeedback.mediumImpact();
@@ -114,7 +124,8 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '${failures.length} could not be logged — ${failures.first}',
+            '$saved saved; ${failures.length} could not be logged. '
+            'Only the remaining items will be retried. ${failures.first}',
           ),
         ),
       );
@@ -142,7 +153,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                 lastDate: DateTime.now(),
                 helpText: 'When was the session?',
               );
-              if (picked != null) setState(() => _date = picked);
+              if (picked != null && mounted) setState(() => _date = picked);
             },
             icon: const Icon(Icons.event_outlined, size: 16),
             label: Text(
@@ -249,9 +260,8 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'One less',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: selected ? () => _bump(item, -1) : null,
+                        tooltip: 'Remove one ${item.unit} from ${item.name}',
+                        onPressed: selected && !_saving ? () => _bump(item, -1) : null,
                         icon: const Icon(Icons.remove_circle_outline, size: 20),
                       ),
                       SizedBox(
@@ -266,9 +276,8 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'One more',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => _bump(item, 1),
+                        tooltip: 'Add one ${item.unit} to ${item.name}',
+                        onPressed: _saving ? null : () => _bump(item, 1),
                         icon: const Icon(Icons.add_circle_outline, size: 20),
                       ),
                     ],

@@ -51,11 +51,15 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
   /// hint looks read-only. Shown on the first shelf opened, then never again.
   Future<void> _maybeShowHint() async {
     final preferences = await SharedPreferences.getInstance();
-    final seen = preferences.getBool('swipe_hint_seen') ?? false;
+    final seen = preferences.getBool('shelf_gestures_hint_seen_v2') ?? false;
     if (seen || !mounted) return;
-    await preferences.setBool('swipe_hint_seen', true);
-    if (!mounted) return;
     setState(() => _showHint = true);
+  }
+
+  Future<void> _dismissHint() async {
+    setState(() => _showHint = false);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('shelf_gestures_hint_seen_v2', true);
   }
 
   @override
@@ -121,10 +125,10 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
                   onShowOrder: () => setState(() => _filter = _Filter.order),
                 ),
               ),
-              if (_showHint)
+              if (_showHint && items.isNotEmpty)
                 SliverToBoxAdapter(
                   child: _SwipeHint(
-                    onDismiss: () => setState(() => _showHint = false),
+                    onDismiss: _dismissHint,
                   ),
                 ),
               if (state.error != null || state.pendingCount > 0)
@@ -158,29 +162,54 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
               else
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                  sliver: SliverList.separated(
-                    itemCount: items.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return ShelfRowIn(
-                        index: index,
-                        child: ShelfRow(
-                          item: item,
-                          compact: ref.watch(preferencesProvider).compactRows,
-                          onTap: () => _openDetail(context, item),
-                          onSwipe: (swipe) => _log(
-                            context,
-                            ref,
-                            item,
-                            swipe == RowSwipe.use
-                                ? (_isChemical
-                                      ? InventoryAction.consume
-                                      : InventoryAction.breakage)
-                                : InventoryAction.restock,
+                  sliver: SliverLayoutBuilder(
+                    builder: (context, constraints) {
+                      Widget row(BuildContext context, int index) {
+                        final item = items[index];
+                        return ShelfRowIn(
+                          key: ValueKey(item.id),
+                          index: index,
+                          child: ShelfRow(
+                            item: item,
+                            compact: ref.watch(preferencesProvider).compactRows,
+                            onTap: () => _openDetail(context, item),
+                            onSwipe: (swipe) => _log(
+                              context,
+                              ref,
+                              item,
+                              swipe == RowSwipe.use
+                                  ? (_isChemical
+                                        ? InventoryAction.consume
+                                        : InventoryAction.breakage)
+                                  : InventoryAction.restock,
+                            ),
+                            onLongPress: () => _rowActions(context, ref, item),
                           ),
-                          onLongPress: () => _rowActions(context, ref, item),
-                        ),
+                        );
+                      }
+
+                      // At large text sizes use natural-height rows instead of
+                      // forcing text into a fixed-height grid cell.
+                      final scale = MediaQuery.textScalerOf(context).scale(1);
+                      if (constraints.crossAxisExtent >= 700 && scale <= 1.2) {
+                        final compact = ref.watch(preferencesProvider).compactRows;
+                        return SliverGrid(
+                          delegate: SliverChildBuilderDelegate(
+                            row,
+                            childCount: items.length,
+                          ),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            mainAxisExtent: (compact ? 82 : 115) * scale,
+                          ),
+                        );
+                      }
+                      return SliverList.separated(
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: row,
                       );
                     },
                   ),
@@ -575,8 +604,8 @@ class _SwipeHint extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Swipe right to log use, left to restock. Tap a row for '
-                  'everything else.',
+                  'Swipe to open a use or restock panel; nothing is saved '
+                  'until you confirm. Hold a row for more actions.',
                   style: context.aside.copyWith(
                     fontSize: LabType.small + 1,
                     color: lab.sage,

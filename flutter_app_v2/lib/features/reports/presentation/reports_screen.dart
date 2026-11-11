@@ -157,7 +157,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               'Closing keeps a copy of these numbers, so editing an old entry '
-              'later cannot change a report you have already filed.',
+              'later cannot change this copy. It is saved only on this device; '
+              'share a PDF to keep a copy elsewhere.',
               textAlign: TextAlign.center,
               style: context.aside.copyWith(fontSize: 14),
             ),
@@ -173,7 +174,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         title: Text('Close ${report.periodLabel}?'),
         content: const Text(
           'The numbers stop changing. You can reopen the month if something '
-          'turns out to be wrong.',
+          'turns out to be wrong. This copy is saved only on this device, '
+          'not shared with other devices. Share a PDF for safekeeping.',
         ),
         actions: [
           TextButton(
@@ -198,7 +200,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           month: _month,
         ),
     ];
-    await ref.read(closedMonthsProvider.notifier).close(reports, _month);
+    try {
+      await ref.read(closedMonthsProvider.notifier).close(reports, _month);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not save the closed report on this device.'),
+      ));
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${report.periodLabel} closed')),
@@ -206,7 +216,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Future<void> _reopen(ClosedMonth closed) async {
-    await ref.read(closedMonthsProvider.notifier).reopen(_month);
+    try {
+      await ref.read(closedMonthsProvider.notifier).reopen(_month);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not reopen the report on this device.'),
+      ));
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${closed.monthKey} reopened')),
@@ -216,15 +234,19 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Future<void> _export(InventoryState state) async {
     setState(() => _exporting = true);
     try {
+      final closed = await ref.read(closedMonthsProvider.notifier).closedFor(_month);
       final reports = [
         for (final kind in ItemKind.values)
-          buildMonthlyReport(
-            kind: kind,
-            chemicals: state.chemicals,
-            apparatus: state.apparatus,
-            logs: state.logs,
-            month: _month,
-          ),
+          if (closed != null)
+            frozenReport(closed, kind, _month)
+          else
+            buildMonthlyReport(
+              kind: kind,
+              chemicals: state.chemicals,
+              apparatus: state.apparatus,
+              logs: state.logs,
+              month: _month,
+            ),
       ]..removeWhere((report) => report.isEmpty);
 
       if (reports.isEmpty) {
@@ -657,7 +679,7 @@ class _ClosedNote extends StatelessWidget {
           Expanded(
             child: Text(
               'Closed ${DateFormat('d MMM').format(closedAt)} — these are the '
-              'numbers you filed.',
+              'numbers saved on this device only. Share a PDF for safekeeping.',
               style: context.aside.copyWith(
                 fontSize: LabType.small,
                 color: lab.sage,

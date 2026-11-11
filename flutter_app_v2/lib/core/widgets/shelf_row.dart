@@ -62,7 +62,9 @@ class _ShelfRowState extends State<ShelfRow> {
         : '';
     final compact = widget.compact;
 
-    return Dismissible(
+    return Semantics(
+      hint: 'Tap to open. Hold for more actions. Swipe opens a confirmation panel.',
+      child: Dismissible(
       key: ValueKey('row-${item.id}'),
       direction: DismissDirection.horizontal,
       dismissThresholds: const {
@@ -201,6 +203,7 @@ class _ShelfRowState extends State<ShelfRow> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

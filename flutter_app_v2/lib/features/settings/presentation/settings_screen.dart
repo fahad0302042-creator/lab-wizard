@@ -86,8 +86,8 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text(
               preferences.dailyCheck
                   ? 'One quiet reminder at ${preferences.dailyCheckHour}:00 '
-                        'if anything is below its level'
-                  : 'No reminder — the app only speaks while you are in it',
+                        'to check the shelf. Android may deliver it a little later.'
+                  : 'Off. When enabled, a daily reminder opens the shelf check.',
             ),
             value: preferences.dailyCheck,
             onChanged: (value) async {
@@ -118,15 +118,22 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () async {
                 final picked = await showTimePicker(
                   context: context,
+                  helpText: 'Choose an hour (minutes are ignored)',
                   initialTime: TimeOfDay(
                     hour: preferences.dailyCheckHour,
                     minute: 0,
                   ),
                 );
                 if (picked == null) return;
-                await ref
+                final saved = await ref
                     .read(preferencesProvider.notifier)
                     .setDailyCheckHour(picked.hour);
+                if (!context.mounted) return;
+                if (!saved) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Could not change the reminder time.'),
+                  ));
+                }
               },
             ),
           SwitchListTile(
