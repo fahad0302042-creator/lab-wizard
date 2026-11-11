@@ -31,10 +31,13 @@ class ReportsScreen extends ConsumerStatefulWidget {
   ConsumerState<ReportsScreen> createState() => _ReportsScreenState();
 }
 
+enum _PdfScope { both, chemicals, apparatus }
+
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   ItemKind _kind = ItemKind.chemical;
   bool _exporting = false;
+  _PdfScope _pdfScope = _PdfScope.both;
   bool _logoBusy = true;
   Uint8List? _logo;
   String _organizationName = '';
@@ -307,6 +310,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 ),
         ),
         const SizedBox(height: 8),
+        Text('INCLUDE IN PDF', style: context.label),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final scope in _PdfScope.values)
+              ChoiceChip(
+                label: Text(switch (scope) {
+                  _PdfScope.both => 'Both shelves',
+                  _PdfScope.chemicals => 'Chemicals',
+                  _PdfScope.apparatus => 'Apparatus',
+                }),
+                selected: _pdfScope == scope,
+                onSelected: _exporting
+                    ? null
+                    : (_) => setState(() => _pdfScope = scope),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
         FilledButton.icon(
           onPressed: _exporting || _logoBusy ? null : () => _export(state),
           icon: _exporting
@@ -315,12 +337,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.ios_share, size: 18),
-          label: Text(_exporting ? 'Preparing…' : 'Share this month as PDF'),
+          label: Text(_exporting ? 'Preparing…' : 'Preview report PDF'),
         ),
         const SizedBox(height: 8),
         Text(
-          'The PDF has both shelves, chemicals first, each starting on its own '
-          'page.',
+          'Preview, print or share your selected shelves.',
           textAlign: TextAlign.center,
           style: context.aside.copyWith(fontSize: 14),
         ),
@@ -412,24 +433,29 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   Future<void> _export(InventoryState state) async {
     setState(() => _exporting = true);
+    final month = _month;
+    final scope = _pdfScope;
     try {
-      final closed = await ref.read(closedMonthsProvider.notifier).closedFor(_month);
+      final closed = await ref.read(closedMonthsProvider.notifier).closedFor(month);
       final reports = [
         for (final kind in ItemKind.values)
+          if (scope == _PdfScope.both ||
+              (scope == _PdfScope.chemicals && kind == ItemKind.chemical) ||
+              (scope == _PdfScope.apparatus && kind == ItemKind.apparatus))
           if (closed != null)
-            frozenReport(closed, kind, _month)
+            frozenReport(closed, kind, month)
           else
             buildMonthlyReport(
               kind: kind,
               chemicals: state.chemicals,
               apparatus: state.apparatus,
               logs: state.logs,
-              month: _month,
+              month: month,
             ),
       ]..removeWhere((report) => report.isEmpty);
 
       if (reports.isEmpty) {
-        final label = DateFormat('MMMM yyyy').format(_month);
+        final label = DateFormat('MMMM yyyy').format(month);
         throw StateError('Nothing to report for $label.');
       }
 
@@ -439,10 +465,20 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         logoBytes: _logo,
         organizationName: _organizationName,
       );
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: 'lab-wizard-${DateFormat('yyyy-MM').format(_month)}.pdf',
-      );
+      if (!mounted) return;
+      final filename = 'lab-wizard-${DateFormat('yyyy-MM').format(month)}.pdf';
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Report preview')),
+          body: PdfPreview(
+            build: (_) async => bytes,
+            pdfFileName: filename,
+            canChangePageFormat: false,
+            canChangeOrientation: false,
+            canDebug: false,
+          ),
+        ),
+      ));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(

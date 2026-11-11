@@ -67,6 +67,67 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
     });
   }
 
+  Future<void> _enterAmount(ItemView item) async {
+    final input = TextEditingController(
+      text: _amounts[item.id] == null ? '' : formatQuantity(_amounts[item.id]!),
+    );
+    final form = GlobalKey<FormState>();
+    final result = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(item.name),
+        content: Form(
+          key: form,
+          child: TextFormField(
+            controller: input,
+            autofocus: true,
+            keyboardType: TextInputType.numberWithOptions(
+              decimal: item.isChemical,
+            ),
+            decoration: InputDecoration(
+              labelText: item.isChemical ? 'Amount used' : 'Number broken',
+              suffixText: item.unit,
+              helperText: 'Enter 0 to remove this item from the session.',
+            ),
+            validator: (text) {
+              final value = double.tryParse((text ?? '').trim());
+              if (value == null || !value.isFinite || value < 0) {
+                return 'Enter a valid amount of 0 or more';
+              }
+              if (item.piecewise && value != value.roundToDouble()) {
+                return 'Enter a whole number';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(dialogContext, double.parse(input.text.trim()));
+              }
+            },
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+    input.dispose();
+    if (result == null || !mounted) return;
+    setState(() {
+      if (result == 0) {
+        _amounts.remove(item.id);
+      } else {
+        _amounts[item.id] = result;
+      }
+    });
+  }
+
   Future<void> _save() async {
     if (_amounts.isEmpty || _saving) return;
     setState(() => _saving = true);
@@ -174,7 +235,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               children: [
                 Text(
                   count == 0
-                      ? 'Tap + on what you used'
+                      ? 'Enter amounts or tap + on what you used'
                       : '$count item${count == 1 ? '' : 's'} ready',
                   style: context.itemName.copyWith(fontSize: 19),
                 ),
@@ -265,13 +326,21 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                         icon: const Icon(Icons.remove_circle_outline, size: 20),
                       ),
                       SizedBox(
-                        width: 54,
-                        child: Text(
-                          selected ? formatQuantity(amount) : '—',
-                          textAlign: TextAlign.center,
-                          style: context.figure.copyWith(
-                            fontSize: LabType.small + 1,
-                            color: selected ? lab.clay : lab.soft,
+                        width: 64,
+                        child: TextButton(
+                          onPressed: _saving ? null : () => _enterAmount(item),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(48, 48),
+                          ),
+                          child: Text(
+                            selected ? formatQuantity(amount) : 'Enter',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.figure.copyWith(
+                              fontSize: LabType.small + 1,
+                              color: selected ? lab.clay : lab.soft,
+                            ),
                           ),
                         ),
                       ),
