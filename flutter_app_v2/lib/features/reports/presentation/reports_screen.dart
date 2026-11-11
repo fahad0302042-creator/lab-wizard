@@ -16,6 +16,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../inventory/domain/models.dart';
 import '../data/closed_months.dart';
 import '../data/report_pdf.dart';
+import '../data/report_organization.dart';
 import '../domain/monthly_report.dart';
 
 /// The monthly sheet, on screen and on paper.
@@ -36,22 +37,27 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   bool _exporting = false;
   bool _logoBusy = true;
   Uint8List? _logo;
+  String _organizationName = '';
   static const _logoKey = 'report_logo_png';
 
   @override
   void initState() {
     super.initState();
-    _loadLogo();
+    _loadReportIdentity();
   }
 
-  Future<void> _loadLogo() async {
+  Future<void> _loadReportIdentity() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_logoKey);
+      final name = await ReportOrganization.load();
       if (!mounted) return;
-      setState(() => _logo = saved == null ? null : base64Decode(saved));
+      setState(() {
+        _organizationName = name;
+        _logo = saved == null ? null : base64Decode(saved);
+      });
     } catch (_) {
-      if (mounted) _logoMessage('Could not load the saved report logo.');
+      if (mounted) _logoMessage('Could not load the saved report details.');
     } finally {
       if (mounted) setState(() => _logoBusy = false);
     }
@@ -59,6 +65,48 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   void _logoMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _editOrganization() async {
+    final controller = TextEditingController(text: _organizationName);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Organization name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 100,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Name on reports',
+            hintText: 'Your school, lab or organization',
+            helperText: 'Leave blank for a generic report heading.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || !mounted) return;
+    setState(() => _logoBusy = true);
+    try {
+      final name = await ReportOrganization.save(result);
+      if (mounted) setState(() => _organizationName = name);
+    } catch (_) {
+      if (mounted) _logoMessage('Could not save the organization name.');
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
   }
 
   Future<void> _chooseLogo() async {
@@ -217,6 +265,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         if (!report.isEmpty)
           Text(report.footnote, style: context.aside.copyWith(fontSize: 15)),
         const SizedBox(height: 18),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.business_outlined),
+          title: const Text('Organization name'),
+          subtitle: Text(_organizationName.isEmpty
+              ? 'Not set · saved on this device'
+              : '$_organizationName · saved on this device'),
+          trailing: const Icon(Icons.edit_outlined),
+          onTap: _logoBusy || _exporting ? null : _editOrganization,
+        ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: _logo == null
@@ -379,6 +437,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         reports: reports,
         generatedAt: DateTime.now(),
         logoBytes: _logo,
+        organizationName: _organizationName,
       );
       await Printing.sharePdf(
         bytes: bytes,

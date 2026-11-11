@@ -19,6 +19,7 @@ class ReportPdf {
     required List<MonthlyReport> reports,
     required DateTime generatedAt,
     Uint8List? logoBytes,
+    String organizationName = '',
   }) async {
     // Two passes: the first measures how long the document is, the second
     // prints "Page 3 of 7" on it. A footer written during a single pass cannot
@@ -28,6 +29,7 @@ class ReportPdf {
       generatedAt: generatedAt,
       totalPages: null,
       logoBytes: logoBytes,
+      organizationName: organizationName.trim(),
     );
     final totalPages = probe.document.pdfPageList.pages.length;
     final document = _compose(
@@ -35,6 +37,7 @@ class ReportPdf {
       generatedAt: generatedAt,
       totalPages: totalPages,
       logoBytes: logoBytes,
+      organizationName: organizationName.trim(),
     );
     return document.save();
   }
@@ -44,6 +47,7 @@ class ReportPdf {
     required DateTime generatedAt,
     required int? totalPages,
     required Uint8List? logoBytes,
+    required String organizationName,
   }) {
     final document = pw.Document(
       title: 'Lab Wizard report',
@@ -55,7 +59,9 @@ class ReportPdf {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.fromLTRB(34, 34, 34, 26),
-          header: (context) => _masthead(report, generatedAt, logoBytes),
+          header: (context) => _masthead(
+            report, generatedAt, logoBytes, organizationName,
+          ),
           footer: (context) => _footer(report, context, totalPages),
           build: (context) => [
             if (!report.isEmpty) _kpis(report),
@@ -84,6 +90,7 @@ class ReportPdf {
     MonthlyReport report,
     DateTime generatedAt,
     Uint8List? logoBytes,
+    String organizationName,
   ) {
     final generated = DateFormat(
       'd MMM yyyy, HH:mm',
@@ -108,27 +115,23 @@ class ReportPdf {
             ),
             pw.SizedBox(width: 9),
           ],
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                'Lab Wizard',
-                style: pw.TextStyle(
-                  fontSize: 19,
-                  fontWeight: pw.FontWeight.bold,
-                  letterSpacing: -0.4,
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  organizationName.isEmpty
+                      ? 'Inventory report'
+                      : organizationName,
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
-              ),
-              pw.Text(
-                'bench inventory',
-                style: const pw.TextStyle(
-                  fontSize: 9,
-                  color: PdfColors.grey700,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-          pw.Spacer(),
+          pw.SizedBox(width: 12),
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
@@ -172,7 +175,7 @@ class ReportPdf {
       child: pw.Row(
         children: [
           pw.Text(
-            'Lab Wizard - ${report.title}',
+            report.title,
             style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700),
           ),
           pw.Spacer(),
