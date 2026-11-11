@@ -30,6 +30,27 @@ void main() {
     expect(saved.keys, containsAll(['2026-09', '2026-10']));
   });
 
+  test('closing an already saved month cannot replace its snapshot', () async {
+    final old = ClosedMonth(
+      monthKey: '2026-10',
+      closedAt: DateTime(2026, 11),
+      reports: const {},
+      events: const {'chemical': 4},
+      lowStock: const {},
+    );
+    SharedPreferences.setMockInitialValues({
+      'closed_months': jsonEncode({'2026-10': old.toJson()}),
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(closedMonthsProvider.notifier);
+    await expectLater(
+      controller.close([], DateTime(2026, 10)),
+      throwsStateError,
+    );
+    expect((await controller.closedFor(DateTime(2026, 10)))!.events['chemical'], 4);
+  });
+
   test('unreadable saved reports are not overwritten', () async {
     SharedPreferences.setMockInitialValues({'closed_months': 'not json'});
     final container = ProviderContainer();

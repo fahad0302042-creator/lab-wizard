@@ -190,6 +190,9 @@ class ClosedMonthsController extends Notifier<Map<String, ClosedMonth>> {
   Future<void> close(List<MonthlyReport> reports, DateTime month) async {
     await _ready;
     if (_restoreFailed) throw StateError('Saved reports could not be read');
+    if (state.containsKey(ClosedMonth.keyFor(month))) {
+      throw StateError('This month is already closed');
+    }
     final closed = ClosedMonth(
       monthKey: ClosedMonth.keyFor(month),
       closedAt: DateTime.now(),
