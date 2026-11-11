@@ -69,7 +69,9 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
       return 'Enter an amount above zero';
     }
     if (widget.log.itemType == ItemKind.apparatus &&
-        value != value.roundToDouble()) return 'Enter a whole number';
+        value != value.roundToDouble()) {
+      return 'Enter a whole number';
+    }
     return null;
   }
 

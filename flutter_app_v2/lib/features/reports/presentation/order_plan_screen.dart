@@ -38,7 +38,22 @@ class _OrderPlanScreenState extends State<OrderPlanScreen> {
   }
 
   Future<void> _share({required bool pdf}) async {
-    if (_busy || !_form.currentState!.validate()) return;
+    if (_busy) return;
+    // Some rows may be off-screen, so validate every controller as well as
+    // the currently mounted form fields before sharing the draft.
+    _form.currentState!.validate();
+    for (final item in widget.items) {
+      final text = _amounts[item.id]!.text.trim();
+      if (text.isEmpty) continue;
+      final amount = double.tryParse(text);
+      if (amount == null || !amount.isFinite || amount <= 0 ||
+          (item.piecewise && amount != amount.roundToDouble())) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Check the amount to order for ${item.name}.'),
+        ));
+        return;
+      }
+    }
     FocusScope.of(context).unfocus();
     final plan = {
       for (final item in widget.items)
