@@ -396,11 +396,11 @@
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>
             <span class="tl">HOME</span>
           </button>
-          <button class="tab" data-tab="shelf">
+          <button class="tab" data-tab="shelf" data-kind="chemical">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 3h6M10 3v5L5 19a2 2 0 0 0 1.8 2h10.4A2 2 0 0 0 19 19L14 8V3"/><path d="M7.5 14h9"/></svg>
             <span class="tl">CHEMS</span>
           </button>
-          <button class="tab" data-tab="shelf">
+          <button class="tab" data-tab="shelf" data-kind="apparatus">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v6M9 9h6l2 11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z"/></svg>
             <span class="tl">GEAR</span>
           </button>
@@ -521,26 +521,39 @@ function jarMetrics({ quantity, initialQuantity, threshold, piecewise = false })
   const q = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
   const limit = Number.isFinite(threshold) && threshold > 0 ? threshold : 0;
   const hasLimit = limit > 0;
-  const capacity = Math.max(Number.isFinite(initialQuantity) ? initialQuantity : 0, q);
+  // Asked directly, not derived from capacity: capacity is the max with the
+  // current quantity, so it is never zero when something is left, and a
+  // "capacity <= 0" test is unreachable. That unreachable test is exactly how
+  // every imported row came to be drawn as a full bottle.
+  const recorded = Number.isFinite(initialQuantity) && initialQuantity > 0 ? initialQuantity : 0;
+  const hasCapacity = recorded > 0;
+  const capacity = Math.max(recorded, q);
 
+  // null, not 1: a record with no capacity cannot claim to be full.
   let fill;
   if (q <= 0) fill = 0;
-  else if (capacity <= 0) fill = 1;
+  else if (!hasCapacity) fill = null;
   else fill = Math.min(1, Math.max(0, q / capacity));
+
+  const partialFill = fill === null && q > 0 ? 0.42 : 0;
 
   let signal;
   if (q <= 0) signal = 'empty';
   else if (hasLimit && q <= limit) signal = 'order';
   else signal = 'fine';
 
-  const notch = !hasLimit ? null : capacity <= 0 ? 1 : Math.min(1, Math.max(0, limit / capacity));
+  const notch = !hasLimit ? null : !hasCapacity ? 1 : Math.min(1, Math.max(0, limit / capacity));
 
   let ticks;
-  if (piecewise && capacity > 0 && capacity <= 6) ticks = Math.round(q);
-  else if (fill <= 0) ticks = 0;
+  if (piecewise && hasCapacity && capacity <= 6) ticks = Math.round(q);
+  else if (fill === null || fill <= 0) ticks = 0;
   else ticks = Math.min(5, Math.max(1, Math.floor(fill * 5)));
 
-  return { fill, notch, ticks, signal, hasLimit, capacity };
+  return {
+    fill, partialFill, notch, ticks, signal, hasLimit, capacity, hasCapacity,
+    levelUnknown: fill === null,
+    drawn: fill === null ? partialFill : fill,
+  };
 }
 
 function stateColor(signal) {
@@ -636,11 +649,17 @@ class Vessel {
     ctx.clip();
 
     // ---- liquid, world-level ---------------------------------------------
+    // Corner-aware correction, not a flat clamp: the surface must stay inside
+    // the vessel under any lean, without flattening a genuinely low fill.
     const fill = this.shown;
     if (fill > 0) {
-      const surfaceY = body.y + body.h * (1 - fill);
+      const waveAmpFrac = big ? 0.05 : 0.085;
+      const halfDiag = 0.5 * Math.sqrt(body.w * body.w + body.h * body.h);
+      const swing = (halfDiag * Math.sin(Math.abs(tip)) + body.h * waveAmpFrac) / body.h;
+      const drawn = Math.min(0.97 - swing * 0.5, Math.max(0.03 + swing, fill));
+      const surfaceY = body.y + body.h * (1 - drawn);
       const reach = body.h * 1.3;
-      const amp = o.wave * body.h * (big ? 0.035 : 0.05);
+      const amp = o.wave * body.h * (big ? 0.05 : 0.085);
       const cx = body.x + body.w / 2, cy = body.y + body.h / 2;
 
       ctx.save();
@@ -697,10 +716,13 @@ class Vessel {
     ctx.restore();
 
     // ---- notch + rim, leaning with the glass -----------------------------
+    // The whole vessel turns with the phone; only the surface inside it stays
+    // level with the ground. Turning the glass by a third of the tip is what
+    // made a 40° tilt look like nothing.
     const cx = body.x + body.w / 2, cy = body.y + body.h / 2;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(tip * 0.35);
+    ctx.rotate(tip);
     ctx.translate(-cx, -cy);
 
     if (o.notchOn && o.notch != null) {
@@ -731,12 +753,24 @@ class Vessel {
     ctx.stroke();
     ctx.restore();
 
-    // ---- cap -------------------------------------------------------------
-    if (!big) {
+    // ---- mouth: stopper for a bottle, open rim + lip for a beaker --------
+    if (!big && o.shape !== 'beaker') {
       const capW = w * 0.46, capH = h * 0.14;
       rr((w - capW) / 2, 0.6, capW, capH, 1.6);
       ctx.fillStyle = rgba(PAL.ink, 0.55);
       ctx.fill();
+    } else if (o.shape === 'beaker') {
+      ctx.strokeStyle = rgba(PAL.ink, 0.7);
+      ctx.lineWidth = Math.max(1, w * 0.06);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(body.x, body.y);
+      ctx.lineTo(body.x + body.w, body.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(body.x + body.w, body.y);
+      ctx.lineTo(body.x + body.w + w * 0.07, body.y - h * 0.07);
+      ctx.stroke();
     }
   }
 }
@@ -752,10 +786,26 @@ const RAW = [
   { name: 'Phenolphthalein', sub: 'C₂₀H₁₄O₄', qty: 42, initial: 100, limit: 0, unit: 'mL' },
   { name: 'Benedict’s solution', sub: 'Cu²⁺ complex', qty: 640, initial: 1000, limit: 300, unit: 'mL' },
   { name: 'Silver nitrate', sub: 'AgNO₃', qty: 18, initial: 50, limit: 25, unit: 'g' },
+  // Imported rows, the way the real store room actually looks: a quantity and
+  // no capacity at all. These are the ones that used to draw as full bottles.
+  { name: '2-Butanol', sub: 'C4H10O', qty: 27170, initial: 0, limit: 0, unit: 'mL' },
+  { name: 'Acetone', sub: 'C3H6O', qty: 6400, initial: 0, limit: 0, unit: 'mL' },
+];
+const APPARATUS = [
+  { name: 'Beaker 1000ml', sub: 'glassware', qty: 5, initial: 0, limit: 0, unit: 'pcs' },
+  { name: 'Boiling Tube', sub: 'glassware', qty: 592, initial: 0, limit: 0, unit: 'pcs' },
+  { name: 'Bunsen Burner', sub: 'heating', qty: 102, initial: 0, limit: 0, unit: 'pcs' },
+  { name: 'Test Tubes', sub: 'glassware', qty: 24, initial: 30, limit: 10, unit: 'pcs' },
 ];
 const ITEMS = RAW.map((r, i) => ({
-  ...r, id: 'i' + i, metrics: jarMetrics({
+  ...r, kind: 'chemical', id: 'c' + i, metrics: jarMetrics({
     quantity: r.qty, initialQuantity: r.initial, threshold: r.limit,
+  }),
+}));
+const GEAR = APPARATUS.map((r, i) => ({
+  ...r, kind: 'apparatus', id: 'a' + i, metrics: jarMetrics({
+    quantity: r.qty, initialQuantity: r.initial, threshold: r.limit,
+    piecewise: true,
   }),
 }));
 
@@ -772,7 +822,7 @@ const vessels = [];
 
 const heroCanvas = document.getElementById('heroCanvas');
 const heroVessel = new Vessel(heroCanvas, {
-  big: true, fill: HERO.metrics.fill, notch: HERO.metrics.notch,
+  big: true, fill: HERO.metrics.drawn, notch: HERO.metrics.notch,
   signal: HERO.metrics.signal, tip: 0,
 });
 vessels.push(heroVessel);
@@ -786,8 +836,9 @@ NEEDS_ORDER.slice(0, 3).forEach(item => {
   c.className = 'mini'; c.width = 22; c.height = 28;
   wrap.appendChild(c);
   const v = new Vessel(c, {
-    fill: item.metrics.fill, notch: item.metrics.notch,
+    fill: item.metrics.drawn, notch: item.metrics.notch,
     signal: item.metrics.signal, tipScale: 1.8,
+    shape: item.kind === 'apparatus' ? 'beaker' : 'bottle',
   });
   vessels.push(v);
   const name = document.createElement('div');
@@ -818,11 +869,13 @@ const todayRows = document.getElementById('todayRows');
 
 // shelf rows
 const shelfRows = document.getElementById('shelfRows');
+let shelfKind = 'chemical';
 function drawShelf(filter) {
   shelfRows.innerHTML = '';
   // drop the old row vessels from the paint list
   for (let i = vessels.length - 1; i >= 0; i--) if (vessels[i].row) vessels.splice(i, 1);
-  const list = ITEMS.filter(item => {
+  const source = shelfKind === 'apparatus' ? GEAR : ITEMS;
+  const list = source.filter(item => {
     if (filter === 'order') return item.metrics.signal !== 'fine';
     if (filter === 'empty') return item.qty <= 0;
     return true;
@@ -837,7 +890,8 @@ function drawShelf(filter) {
     c.width = 30; c.height = 40; c.style.width = '30px'; c.style.height = '40px';
     well.appendChild(c);
     const v = new Vessel(c, {
-      fill: m.fill, notch: m.notch, signal: m.signal, tipScale: 1.5,
+      fill: m.drawn, notch: m.notch, signal: m.signal, tipScale: 1.5,
+      shape: item.kind === 'apparatus' ? 'beaker' : 'bottle',
     });
     v.row = true;
     vessels.push(v);
@@ -846,8 +900,10 @@ function drawShelf(filter) {
     mid.className = 'mid';
     mid.innerHTML = `<div class="item" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
       <div class="f">${item.sub}</div>
-      <div class="ticks">${Array.from({ length: 5 }, (_, i) =>
-        `<span class="tick${i < m.ticks ? ' on' : ''}"></span>`).join('')}</div>`;
+      <div class="ticks">${m.levelUnknown
+        ? `<span class="tick"></span><span style="font-family:PlexMono;font-size:9px;letter-spacing:.6px;color:var(--ink-faint);margin-left:3px">level not set</span>`
+        : Array.from({ length: 5 }, (_, i) =>
+            `<span class="tick${i < m.ticks ? ' on' : ''}"></span>`).join('')}</div>`;
 
     const right = document.createElement('div');
     right.className = 'right';
@@ -911,8 +967,11 @@ document.getElementById('heroFormula').textContent =
 document.getElementById('heroQty').textContent = HERO.qty;
 document.getElementById('heroUnit').textContent = ' ' + HERO.unit;
 document.getElementById('heroOrder').textContent = HERO.metrics.hasLimit
-  ? 'ORDER AT ' + HERO.limit + ' ' + HERO.unit + ' · ' + Math.round(HERO.metrics.fill * 100) + '% FULL'
-  : 'NO ORDER LEVEL SET';
+  ? 'ORDER AT ' + HERO.limit + ' ' + HERO.unit +
+    (HERO.metrics.fill === null ? '' : ' · ' + Math.round(HERO.metrics.fill * 100) + '% FULL')
+  : HERO.metrics.levelUnknown
+    ? HERO.qty + ' ' + HERO.unit.toUpperCase() + ' ON HAND · NO ORDER LEVEL'
+    : 'NO ORDER LEVEL SET';
 document.getElementById('heroDot').style.background = stateColor(HERO.metrics.signal);
 document.getElementById('heroDot').style.boxShadow = '0 0 7px ' + stateColor(HERO.metrics.signal);
 
@@ -1011,6 +1070,14 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
     tab.classList.add('on');
     const shelf = tab.dataset.tab === 'shelf';
+    if (shelf && tab.dataset.kind) {
+      shelfKind = tab.dataset.kind;
+      drawShelf(document.querySelector('.chip.on')?.dataset.f ?? 'all');
+      const eyebrow = document.querySelector('#view-shelf .eyebrow.on');
+      if (eyebrow) {
+        eyebrow.textContent = '· ' + (shelfKind === 'apparatus' ? 'APPARATUS' : 'CHEMICALS');
+      }
+    }
     document.getElementById('view-home').classList.toggle('on', !shelf);
     document.getElementById('view-shelf').classList.toggle('on', shelf);
     scroll.scrollTop = 0;

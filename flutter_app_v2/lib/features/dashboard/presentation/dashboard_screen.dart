@@ -101,6 +101,12 @@ class DashboardScreen extends ConsumerWidget {
                   ? 'add a reagent to begin'
                   : hero.metrics.hasLimit
                   ? 'order at ${formatQuantity(hero.threshold)} ${hero.unit}'
+                  // Most imported rows have no capacity at all, so the order
+                  // line is set on quantity, not on a fraction. Saying so is
+                  // better than implying a full bottle that was never recorded.
+                  : hero.metrics.levelUnknown
+                  ? '${formatQuantity(hero.quantity)} ${hero.unit} on hand · '
+                        'no order level'
                   : 'no order level set',
               placeholder: hero == null,
               onTap: hero == null
@@ -233,10 +239,12 @@ class DashboardScreen extends ConsumerWidget {
 
   static const _emptyMetrics = JarMetrics(
     fill: 0,
+    partialFill: 0,
     notch: null,
     ticks: 0,
     signal: StockSignal.fine,
     hasLimit: false,
+    basis: LevelBasis.ofCapacity,
   );
 
   static String? _firstName(String? full) {

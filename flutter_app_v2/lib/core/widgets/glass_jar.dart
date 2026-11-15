@@ -1,11 +1,3 @@
-import 'dart:math' as math;
-
-import 'package:flutter/material.dart';
-
-import '../motion.dart';
-import '../theme/app_theme.dart';
-import 'jar_metrics.dart';
-
 /// The store room vessel: a small vial whose liquid level *is* the stock bar,
 /// and whose liquid tips when the phone tips.
 ///
@@ -26,6 +18,30 @@ import 'jar_metrics.dart';
 /// decoration) in the stock state's colour; the glass on top of it is a cool
 /// translucent wash with a rim light, so the tint stays glass and the colour
 /// stays data.
+library;
+
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../motion.dart';
+import '../theme/app_theme.dart';
+import 'jar_metrics.dart';
+import 'vessel_level.dart';
+
+/// What the vessel is drawn as. Shape carries meaning: reagents live in
+/// stoppered bottles, apparatus on open beakers. Drawing GEAR rows as bottles
+/// was the one thing on that tab that read as a mistake.
+enum VesselShape {
+  /// A reagent bottle: narrow stopper, shouldered body.
+  bottle,
+
+  /// Apparatus: an open vessel with a lip and no stopper.
+  beaker,
+}
+
+/// A shelf vessel: the liquid level is the stock bar, and the liquid finds its
+/// level when the phone tips.
 class Vessel extends StatefulWidget {
   const Vessel({
     required this.metrics,
@@ -35,12 +51,16 @@ class Vessel extends StatefulWidget {
     this.onTap,
     this.semanticLabel,
     this.tiltSensitivity = 1.0,
+    this.shape = VesselShape.bottle,
     super.key,
   });
 
   final JarMetrics metrics;
   final double width;
   final double height;
+
+  /// Bottle for chemicals, beaker for apparatus.
+  final VesselShape shape;
 
   /// How far the liquid should lean, in degrees. Supplied by a [VesselTilt]
   /// ancestor (or a drag); the vessel itself never reads the sensor.
@@ -72,12 +92,12 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
     value: 1,
   );
 
-  late double _shownFill = widget.metrics.fill;
+  late double _shownFill = widget.metrics.fill ?? widget.metrics.partialFill;
 
   @override
   void didUpdateWidget(covariant Vessel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final next = widget.metrics.fill;
+    final next = widget.metrics.fill ?? widget.metrics.partialFill;
     if ((next - _shownFill).abs() > .001) {
       _shownFill = next;
       if (!LabMotion.reduced(context)) {
@@ -108,6 +128,9 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
     final lab = context.lab;
     final color = lab.forState(widget.metrics.signal);
     final reduce = LabMotion.reduced(context);
+    // A record with no known capacity still has stock, so it shows a sliver
+    // rather than a still, full-looking body.
+    final target = widget.metrics.fill ?? widget.metrics.partialFill;
 
     return Semantics(
       label: widget.semanticLabel,
@@ -127,7 +150,7 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
               return Transform.scale(
                 scale: scale,
                 child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: _shownFill),
+                  tween: Tween<double>(end: target),
                   duration: reduce ? Duration.zero : LabMotion.wave,
                   curve: Curves.easeOutCubic,
                   builder: (context, fill, _) => CustomPaint(
@@ -145,8 +168,9 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
                                     math.pi /
                                     180,
                       wavePhase: t * math.pi * 2.2,
-                      waveAmplitude: (reduce ? 0.0 : amplitude) * .05,
+                      waveAmplitude: (reduce ? 0.0 : amplitude) * .085,
                       dark: lab.canvas,
+                      shape: widget.shape,
                     ),
                   ),
                 ),
@@ -170,6 +194,7 @@ class _VesselPainter extends CustomPainter {
     required this.wavePhase,
     required this.waveAmplitude,
     required this.dark,
+    required this.shape,
   });
 
   final double fill;
@@ -193,6 +218,8 @@ class _VesselPainter extends CustomPainter {
   /// The page colour, so the liquid is drawn over the background rather than
   /// over whatever happens to be behind the widget.
   final Color dark;
+
+  final VesselShape shape;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -220,7 +247,18 @@ class _VesselPainter extends CustomPainter {
       canvas.save();
       canvas.clipRRect(bodyRRect);
 
-      final surfaceY = body.bottom - body.height * fill;
+      // The surface stays level in *world* terms but must sit inside the
+      // vessel in *body* terms. Under a hard lean a lightly-filled bottle
+      // would otherwise lift its surface past the shoulder, out of the clip,
+      // and the whole body fills — still, and apparently full.
+      final drawn = ensureVisibleFill(
+        fill: fill,
+        tipRadians: tipRadians,
+        bodyWidth: body.width,
+        bodyHeight: body.height,
+        waveFraction: waveAmplitude,
+      );
+      final surfaceY = body.bottom - body.height * drawn;
       final wave = body.height * waveAmplitude;
 
       // World "down" expressed in the glass's frame: tilting the phone by θ
@@ -297,11 +335,13 @@ class _VesselPainter extends CustomPainter {
     }
 
     // --- Glass: a cool wash over the liquid, then the rim. ------------------
-    // Rotating here as well means one glass, one lean: the body and its
-    // contents are the same object.
+    // The *whole* vessel turns with the phone: body, rim, cap and all. Only the
+    // surface inside it stays level with the ground. That difference is the
+    // entire illusion — when the outline stood still and only the liquid
+    // moved, a 40° tilt looked like nothing at all on a 30 dp vessel.
     canvas.save();
     canvas.translate(body.center.dx, body.center.dy);
-    canvas.rotate(tipRadians * .35); // the glass leans less than the liquid
+    canvas.rotate(tipRadians);
     canvas.translate(-body.center.dx, -body.center.dy);
 
     canvas.drawRRect(
@@ -358,13 +398,34 @@ class _VesselPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Cap.
-    final capWidth = w * .46;
-    final cap = RRect.fromRectAndRadius(
-      Rect.fromLTWH((w - capWidth) / 2, .6, capWidth, capHeight),
-      const Radius.circular(1.6),
-    );
-    canvas.drawRRect(cap, Paint()..color = line.withValues(alpha: .55));
+    // The mouth. A bottle gets a stopper sitting proud of the body; a beaker
+    // gets an open rim with a lip on one side, which is what makes it read as
+    // apparatus rather than as a bottle with its lid missing.
+    if (shape == VesselShape.bottle) {
+      final capWidth = w * .46;
+      final cap = RRect.fromRectAndRadius(
+        Rect.fromLTWH((w - capWidth) / 2, .6, capWidth, capHeight),
+        const Radius.circular(1.6),
+      );
+      canvas.drawRRect(cap, Paint()..color = line.withValues(alpha: .55));
+    } else {
+      final rim = Paint()
+        ..color = line.withValues(alpha: .7)
+        ..strokeWidth = math.max(1, w * .06)
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(
+        Offset(body.left, body.top),
+        Offset(body.right, body.top),
+        rim,
+      );
+      // The lip: a short flare above the rim on the right, so the open end is
+      // legible even at 30 dp.
+      canvas.drawLine(
+        Offset(body.right, body.top),
+        Offset(body.right + w * .07, body.top - capHeight * .5),
+        rim,
+      );
+    }
     canvas.restore();
   }
 
@@ -378,7 +439,8 @@ class _VesselPainter extends CustomPainter {
       old.tipRadians != tipRadians ||
       old.wavePhase != wavePhase ||
       old.waveAmplitude != waveAmplitude ||
-      old.dark != dark;
+      old.dark != dark ||
+      old.shape != shape;
 }
 
 /// The five segments under a vessel. Rounded down in [jarMetrics] so a
@@ -387,6 +449,7 @@ class JarTicks extends StatelessWidget {
   const JarTicks({
     required this.count,
     required this.color,
+    this.unknown = false,
     this.segments = 5,
     this.width = 15,
     this.height = 3.5,
@@ -395,6 +458,12 @@ class JarTicks extends StatelessWidget {
 
   final int count;
   final Color color;
+
+  /// No known capacity, so there is no fraction to show. The row becomes a
+  /// single dash rather than five lit segments — five green bars under "5 pcs"
+  /// reads as *full*, which is the opposite of what a record with no capacity
+  /// can actually claim.
+  final bool unknown;
   final int segments;
   final double width;
   final double height;
@@ -402,6 +471,30 @@ class JarTicks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hair = context.lab.hairStrong;
+    if (unknown) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: width * .8,
+            height: height,
+            decoration: BoxDecoration(
+              color: hair,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          SizedBox(width: width * .35),
+          Text(
+            'level not set',
+            style: context.label.copyWith(
+              fontSize: 9,
+              letterSpacing: .6,
+              color: context.lab.inkFaint,
+            ),
+          ),
+        ],
+      );
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(segments, (index) {

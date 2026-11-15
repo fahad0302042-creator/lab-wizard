@@ -197,12 +197,16 @@ class LeaningVessel extends StatefulWidget {
     this.onTap,
     this.semanticLabel,
     this.sensitivity = 1,
+    this.shape = VesselShape.bottle,
     super.key,
   });
 
   final JarMetrics metrics;
   final double width;
   final double height;
+
+  /// A bottle for reagents, a beaker for apparatus.
+  final VesselShape shape;
   final VoidCallback? onTap;
   final String? semanticLabel;
   final double sensitivity;
@@ -229,6 +233,7 @@ class _LeaningVesselState extends State<LeaningVessel> {
           metrics: widget.metrics,
           width: widget.width,
           height: widget.height,
+          shape: widget.shape,
           onTap: widget.onTap,
           semanticLabel: widget.semanticLabel,
           tiltSensitivity: widget.sensitivity,

@@ -149,6 +149,12 @@ class _ShelfRowState extends State<ShelfRow> {
                       width: compact ? 22 : 30,
                       height: compact ? 30 : 40,
                       sensitivity: 1.5,
+                      // Bottle for reagents, beaker for apparatus. One row
+                      // widget serves both shelves, so the shape comes from the
+                      // item rather than from which screen drew it.
+                      shape: item.isChemical
+                          ? VesselShape.bottle
+                          : VesselShape.beaker,
                       onTap: widget.onTap,
                       semanticLabel:
                           '${item.name}, ${formatQuantity(item.quantity)} '
@@ -179,7 +185,11 @@ class _ShelfRowState extends State<ShelfRow> {
                           ),
                         if (!compact) ...[
                           const SizedBox(height: 8),
-                          JarTicks(count: metrics.ticks, color: color),
+                          JarTicks(
+                            count: metrics.ticks,
+                            color: color,
+                            unknown: metrics.levelUnknown,
+                          ),
                         ],
                       ],
                     ),

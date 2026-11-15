@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../motion.dart';
 import '../theme/app_theme.dart';
 import 'jar_metrics.dart';
+import 'vessel_level.dart';
 import 'vessel_tilt.dart';
 
 /// The screen's one instrument: a large vessel for whichever reagent is
@@ -67,7 +68,9 @@ class _VesselHeroState extends State<VesselHero>
   @override
   void didUpdateWidget(covariant VesselHero oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((widget.metrics.fill - oldWidget.metrics.fill).abs() > .001 &&
+    final now = widget.metrics.fill ?? widget.metrics.partialFill;
+    final before = oldWidget.metrics.fill ?? oldWidget.metrics.partialFill;
+    if ((now - before).abs() > .001 &&
         !LabMotion.reduced(context)) {
       _surface
         ..reset()
@@ -161,7 +164,7 @@ class _VesselHeroState extends State<VesselHero>
               // The instrument. Tall enough that a 40° lean moves the surface
               // by a visible amount, short enough to leave the order list room.
               SizedBox(
-                height: 138,
+                height: 152,
                 width: double.infinity,
                 child: RepaintBoundary(
                   // The hero leans by thumb as well as by sensor. The drag is
@@ -174,32 +177,35 @@ class _VesselHeroState extends State<VesselHero>
                     onHorizontalDragEnd: (_) => TiltNudge.release(context),
                     onHorizontalDragCancel: () => TiltNudge.release(context),
                     child: TiltReadout(
-                    builder: (context, lean) => AnimatedBuilder(
-                    animation: _surface,
-                    builder: (context, _) {
-                      final t = _surface.value;
-                      final amplitude = reduce
-                          ? 0.0
-                          : math.sin(math.pi * t).clamp(0.0, 1.0);
-                      return CustomPaint(
-                        painter: _HeroPainter(
-                          fill: widget.placeholder ? 0 : widget.metrics.fill,
-                          notch: widget.placeholder
-                              ? null
-                              : widget.metrics.notch,
-                          liquid: color,
-                          glass: lab.glass,
-                          line: lab.ink,
-                          pageColor: lab.canvas,
-                          tipRadians:
-                              reduce ? 0 : lean * math.pi / 180,
-                          wavePhase: t * math.pi * 2.2,
-                          waveAmplitude: (reduce ? 0.0 : amplitude) * .035,
-                        ),
-                      );
-                    },
-                  ),
-                  ),
+                      builder: (context, lean) => AnimatedBuilder(
+                        animation: _surface,
+                        builder: (context, _) {
+                          final t = _surface.value;
+                          final amplitude = reduce
+                              ? 0.0
+                              : math.sin(math.pi * t).clamp(0.0, 1.0);
+                          return CustomPaint(
+                            painter: _HeroPainter(
+                              fill: widget.placeholder
+                                  ? 0
+                                  : (widget.metrics.fill ??
+                                        widget.metrics.partialFill),
+                              notch: widget.placeholder
+                                  ? null
+                                  : widget.metrics.notch,
+                              liquid: color,
+                              glass: lab.glass,
+                              line: lab.ink,
+                              pageColor: lab.canvas,
+                              tipRadians:
+                                  reduce ? 0 : lean * math.pi / 180,
+                              wavePhase: t * math.pi * 2.2,
+                              waveAmplitude: (reduce ? 0.0 : amplitude) * .035,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -329,11 +335,15 @@ class _HeroPainter extends CustomPainter {
   static Rect _body(Size size) {
     final w = size.width;
     final h = size.height;
-    final outerW = math.min(w * .56, h * .62);
+    // Tall and narrow rather than squat: a bottle that is nearly as wide as it
+    // is tall hides the tilt, because a rotated square looks like the same
+    // square. 0.34 of the width by 0.86 of the height gives the lean somewhere
+    // to go without the bottle turning into a test tube.
+    final outerW = math.min(w * .34, h * .5);
     final outer = Rect.fromCenter(
-      center: Offset(w / 2, h / 2 + h * .04),
+      center: Offset(w / 2, h / 2 + h * .02),
       width: outerW,
-      height: h * .78,
+      height: h * .86,
     );
     return outer.deflate(2);
   }
@@ -362,7 +372,18 @@ class _HeroPainter extends CustomPainter {
     canvas.clipRRect(bodyRRect);
 
     // World-level surface, leaning by -tip in the glass's frame.
-    final surfaceY = body.bottom - body.height * fill.clamp(0.0, 1.0);
+    // Same reasoning as the small vessel: the surface must stay inside the
+    // glass under any lean, or the body fills edge to edge and stops reading
+    // as a level liquid. The hero's body is wide and shallow, so this usually
+    // leaves the fill untouched.
+    final drawn = ensureVisibleFill(
+      fill: fill,
+      tipRadians: tipRadians,
+      bodyWidth: body.width,
+      bodyHeight: body.height,
+      waveFraction: waveAmplitude,
+    );
+    final surfaceY = body.bottom - body.height * drawn;
     final reach = body.height * 1.4;
     final wave = body.height * waveAmplitude;
 
@@ -437,9 +458,12 @@ class _HeroPainter extends CustomPainter {
 
     // Notch, in the same leaning frame as the liquid.
     final n = notch;
+    // The vessel turns with the phone — rim, notch and all — while the surface
+    // inside it stays level with the ground. The old version turned the glass
+    // by a third of the tip, which is why a 40° tilt barely moved it.
     canvas.save();
     canvas.translate(body.center.dx, body.center.dy);
-    canvas.rotate(tipRadians * .35);
+    canvas.rotate(tipRadians);
     canvas.translate(-body.center.dx, -body.center.dy);
 
     if (n != null) {
