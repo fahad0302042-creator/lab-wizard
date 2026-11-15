@@ -319,12 +319,13 @@ String runwayCaption(Forecast forecast) {
 String? forecastSilence(ForecastBoard board) {
   if (!board.hasEnoughHistory) {
     final need = kMinimumHistoryDays - board.historyDays;
-    return 'Runway appears after ${kMinimumHistoryDays} days of logging — '
-        '${need == 1 ? '1 day' : '$need days'} to go.';
+    final remaining = need == 1 ? '1 day' : '$need days';
+    return 'Runway appears after $kMinimumHistoryDays days of logging — '
+        '$remaining to go.';
   }
   if (board.isEmpty) {
     return 'No runway yet. It takes $kMinimumUsageDays logged uses over '
-        '${kMinimumHistoryDays}+ days before a rate means anything.';
+        '$kMinimumHistoryDays+ days before a rate means anything.';
   }
   return null;
 }

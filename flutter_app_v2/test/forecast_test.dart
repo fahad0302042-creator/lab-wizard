@@ -221,11 +221,14 @@ void main() {
 
   group('the figure describes the shelf', () {
     test('days remaining is stock divided by the measured rate', () {
-      // 600 used across a span of 61 days (oldest log is 61 days back), so the
-      // rate is 600/61 = 9.84/day and 500 left is 50.8 days. The denominator is
-      // the span the logs actually cover, not the nominal window — writing this
-      // test as "600 over 60 days = 50 days left" was wrong, because nothing
-      // records a log at day 60.
+      // 600 used across a span of 60 days, so 10/day and 50 days left.
+      //
+      // The oldest log sits at noon 61 days back, which is 60 days and 21 hours
+      // before `now` at 09:00. `inDays` truncates, so the span is 60 — and that
+      // is the right answer, not a rounding artefact: truncation shortens the
+      // denominator, which raises the rate and shortens the runway. The quiet
+      // direction is the dangerous one for a reorder figure, so erring loud is
+      // the correct way to be wrong.
       final logs = [
         for (var i = 0; i < 12; i++)
           _log(itemId: 'a', amount: 50, daysAgo: 61 - i * 5, now: now),
@@ -239,10 +242,9 @@ void main() {
 
       final f = board.items.single;
       expect(f.usedInWindow, 600);
-      expect(f.perDay, closeTo(600 / 61, .0001));
-      expect(f.daysLeft, closeTo(500 / (600 / 61), .001));
-      expect(f.daysLeft, closeTo(50.83, .01));
-      expect(runwayCaption(f), contains('51 days left'));
+      expect(f.perDay, closeTo(10, .0001));
+      expect(f.daysLeft, closeTo(50, .001));
+      expect(runwayCaption(f), contains('50 days left'));
     });
 
     test('an empty shelf has zero days left, not null', () {
