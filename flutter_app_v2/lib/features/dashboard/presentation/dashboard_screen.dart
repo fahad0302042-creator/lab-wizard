@@ -244,7 +244,6 @@ class DashboardScreen extends ConsumerWidget {
     ticks: 0,
     signal: StockSignal.fine,
     hasLimit: false,
-    basis: LevelBasis.ofCapacity,
   );
 
   static String? _firstName(String? full) {

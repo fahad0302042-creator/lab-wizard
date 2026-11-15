@@ -1,11 +1,13 @@
-import 'dart:math' as math;
-
-import '../../core/theme/app_theme.dart';
-
 /// Everything the jar needs to draw itself, derived from the three numbers we
 /// already store. Kept free of Flutter widgets so it can be unit-tested — which
 /// matters here, because this is the one rule that decides whether someone
 /// reorders a reagent in time.
+library;
+
+import 'dart:math' as math;
+
+import '../../core/theme/app_theme.dart';
+
 /// What the vessel's height is allowed to mean.
 enum LevelBasis {
   /// `quantity / capacity` is a real fraction: this vessel is 24% full.
@@ -24,7 +26,6 @@ class JarMetrics {
     required this.ticks,
     required this.signal,
     required this.hasLimit,
-    required this.basis,
   });
 
   /// How full the vessel is, 0–1 — or null when the record has no upper bound
