@@ -1,6 +1,12 @@
--- Lab Wizard Flutter compatibility migration
--- ADDITIVE ONLY: existing web inserts/selects continue to work unchanged.
+-- Lab Wizard inventory actions — the transactional path used by the app.
+-- ADDITIVE ONLY: existing web inserts and selects continue to work unchanged.
 -- Run in the Supabase SQL editor before relying on queued/offline actions.
+--
+-- This file used to live under the retired first Flutter app, which is where it
+-- was written. The rebuilt app in this folder is its only caller: it invokes
+-- public.apply_inventory_action for every logged action, and falls back to the
+-- non-atomic compatibility path when the function is absent. It is deployed
+-- SQL, not source code, so deleting the old app must not delete this.
 
 alter table public.chemicals
   add column if not exists low_stock_threshold numeric not null default 0;

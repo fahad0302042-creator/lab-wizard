@@ -210,7 +210,7 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 Text(
-                  'Lab Wizard 2 · the store room',
+                  'Lab Wizard · the store room',
                   style: context.aside.copyWith(fontSize: 14),
                 ),
                 const SizedBox(height: 2),

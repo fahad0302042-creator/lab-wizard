@@ -6,7 +6,6 @@ name: Flutter checks
 on:
   pull_request:
     paths:
-      - "flutter_app/**"
       - "flutter_app_v2/**"
       - ".github/workflows/**"
   workflow_dispatch:
@@ -57,15 +56,11 @@ jobs:
           PY
 
   checks:
-    name: Check ${{ matrix.app }}
+    name: Check flutter_app_v2
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [flutter_app, flutter_app_v2]
     defaults:
       run:
-        working-directory: ${{ matrix.app }}
+        working-directory: flutter_app_v2
 
     steps:
       - name: Check out source
@@ -100,7 +95,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-          APP: ${{ matrix.app }}
+          APP: flutter_app_v2
           ANALYZE: ${{ steps.analyze.outcome }}
           TESTS: ${{ steps.test.outcome }}
         run: |

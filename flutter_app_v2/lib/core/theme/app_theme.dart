@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Instrument panel — the design language for Lab Wizard 2.
+/// Instrument panel — the design language for Lab Wizard.
 ///
 /// Three rules hold the whole thing together:
 ///

@@ -1,7 +1,14 @@
-# Lab Wizard 2 — design spec
+# Lab Wizard — design spec
 
-Direction **C · The Store Room**. This file is the contract I build against: the jar
-maths, the gestures, the motion. No database changes are required for any of it.
+**Instrument panel**, built on the Store Room's jar rule. This file is the
+contract: the vessel maths, the gestures, the motion. It began as Direction C
+(warm bone paper, handwriting) and was retuned to a dark instrument panel with
+IBM Plex; the jar rules and the motion budget below survived that change
+unchanged, which is why they are still written as the spec rather than a history.
+
+Sections marked *"the polish pass"* and earlier describe the notebook-era
+typography (Caveat, Kalam, five fixed steps). Where the type section and the
+instrument panel disagree, `lib/core/theme/app_theme.dart` is the truth.
 
 ---
 

@@ -1,5 +1,5 @@
 name: lab_wizard_v2
-description: "Lab Wizard 2 — instrument-panel chemistry lab inventory."
+description: "Lab Wizard — instrument-panel chemistry lab inventory."
 publish_to: 'none'
 
 version: 2.0.0+1
