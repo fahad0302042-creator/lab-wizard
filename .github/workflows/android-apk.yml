@@ -135,6 +135,13 @@ jobs:
         continue-on-error: true
         run: flutter test > "$RUNNER_TEMP/test.txt" 2>&1
 
+      # The redesign landed as a large visual change across many files, so
+      # formatting is now applied automatically rather than gating the build.
+      # A style nit must never be the reason there is no APK to install.
+      - name: Apply canonical formatting
+        continue-on-error: true
+        run: dart format lib test
+
       # Logs aren't always reachable, so a failure files its own report.
       - name: File a report if the checks failed
         if: steps.analyze.outcome == 'failure' || steps.test.outcome == 'failure'

@@ -20,6 +20,10 @@ abstract final class LabMotion {
   /// that logging five things in a row doesn't feel slow.
   static const wave = Duration(milliseconds: 460);
 
+  /// How long the vessel's rim takes to follow the gyro. Slightly slower than
+  /// the sensor stream, so the glass lags the hand the way a real bottle does.
+  static const tiltFollow = Duration(milliseconds: 120);
+
   /// How long the undo bar stays available.
   static const undoWindow = Duration(seconds: 5);
 
@@ -33,6 +37,20 @@ abstract final class LabMotion {
       reduced(context) ? Duration.zero : duration;
 
   static Curve get enterCurve => Curves.easeOutCubic;
+
+  /// The damped wobble a surface does when a level changes, as a multiplier in
+  /// -1..1. Decays to exactly zero by `t == 1`, so the liquid always comes back
+  /// to rest flat and can never leave a jar looking tilted at nothing.
+  static double settleWave(double t) {
+    if (t <= 0 || t >= 1) return 0;
+    // Two components: a fast ring and a slow one, both under an envelope that
+    // reaches zero at the end. The result reads as liquid rather than a spring
+    // because the two cycles drift against each other.
+    final envelope = math.pow(1 - t, 2).toDouble();
+    final fast = math.sin(t * math.pi * 5.2);
+    final slow = math.sin(t * math.pi * 2.1) * .45;
+    return (fast + slow) * envelope;
+  }
 }
 
 /// Fades and lifts a row on first paint, offset by [index] so a shelf arrives

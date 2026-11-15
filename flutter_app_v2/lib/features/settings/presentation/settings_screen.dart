@@ -23,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
     final inventory = ref.watch(inventoryProvider);
 
     return Scaffold(
-      backgroundColor: lab.bone,
+      backgroundColor: lab.canvas,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         title: const Text('Settings'),
@@ -40,19 +40,31 @@ class SettingsScreen extends ConsumerWidget {
           Text(auth.user?.email ?? '', style: context.formula),
           const SizedBox(height: 22),
           Text('APPEARANCE', style: context.label),
+          // There is one mode now — the instrument panel — so the old "desk
+          // lamp" toggle has nothing left to switch. The control that replaced
+          // it is the gyro, which is the setting people actually want to reach
+          // for: the liquid leaning with the phone is either delightful or
+          // unwelcome, and both answers deserve a switch.
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Desk-lamp mode'),
-            subtitle: const Text('Dark paper for the evening shift'),
-            value: preferences.themeMode == ThemeMode.dark,
-            onChanged: (value) => ref
-                .read(preferencesProvider.notifier)
-                .setTheme(value ? ThemeMode.dark : ThemeMode.light),
+            title: const Text('Tilt the liquid'),
+            subtitle: Text(
+              preferences.tiltEnabled
+                  ? 'Tip the phone and the liquid finds its level. Drag '
+                        'sideways on any shelf to lean it by thumb instead.'
+                  : 'Off. The vessels sit level.',
+            ),
+            value: preferences.tiltEnabled,
+            onChanged: preferences.reduceMotion
+                ? null
+                : ref.read(preferencesProvider.notifier).setTiltEnabled,
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Reduce motion'),
-            subtitle: const Text('Instant transitions, no sloshing'),
+            subtitle: const Text(
+              'Instant transitions, no sloshing, and tilt switched off',
+            ),
             value: preferences.reduceMotion,
             onChanged: ref.read(preferencesProvider.notifier).setReduceMotion,
           ),
@@ -154,7 +166,7 @@ class SettingsScreen extends ConsumerWidget {
                 : '${inventory.pendingCount} change'
                       '${inventory.pendingCount == 1 ? '' : 's'} waiting to '
                       'upload.',
-            style: TextStyle(fontSize: 13, height: 1.5, color: lab.soft),
+            style: TextStyle(fontSize: 13, height: 1.5, color: lab.inkSoft),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -176,7 +188,7 @@ class SettingsScreen extends ConsumerWidget {
             '${inventory.chemicals.length} reagents · '
             '${inventory.apparatus.length} apparatus · '
             '${inventory.logs.length} log entries',
-            style: TextStyle(fontSize: 13, color: lab.soft),
+            style: TextStyle(fontSize: 13, color: lab.inkSoft),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(

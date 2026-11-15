@@ -152,16 +152,20 @@ class AuthController extends Notifier<AuthState> {
 
 class AppPreferences {
   const AppPreferences({
-    this.themeMode = ThemeMode.system,
     this.reduceMotion = false,
     this.lowStockAlerts = false,
     this.compactRows = false,
     this.dailyCheck = false,
     this.dailyCheckHour = 9,
+    this.tiltEnabled = true,
   });
 
-  final ThemeMode themeMode;
   final bool reduceMotion;
+
+  /// Whether the liquid follows the phone's gyro. On by default because it is
+  /// the app's signature interaction; it can be switched off, and turning on
+  /// reduced motion switches it off implicitly, so nothing depends on it.
+  final bool tiltEnabled;
 
   /// Drops subtitles and jar ticks so a long shelf fits more per screen.
   final bool compactRows;
@@ -177,19 +181,19 @@ class AppPreferences {
   final bool lowStockAlerts;
 
   AppPreferences copyWith({
-    ThemeMode? themeMode,
     bool? reduceMotion,
     bool? lowStockAlerts,
     bool? compactRows,
     bool? dailyCheck,
     int? dailyCheckHour,
+    bool? tiltEnabled,
   }) => AppPreferences(
-    themeMode: themeMode ?? this.themeMode,
     reduceMotion: reduceMotion ?? this.reduceMotion,
     lowStockAlerts: lowStockAlerts ?? this.lowStockAlerts,
     compactRows: compactRows ?? this.compactRows,
     dailyCheck: dailyCheck ?? this.dailyCheck,
     dailyCheckHour: dailyCheckHour ?? this.dailyCheckHour,
+    tiltEnabled: tiltEnabled ?? this.tiltEnabled,
   );
 }
 
@@ -207,18 +211,13 @@ class PreferencesController extends Notifier<AppPreferences> {
 
   Future<void> _restore() async {
     final preferences = await SharedPreferences.getInstance();
-    final savedTheme = preferences.getString('theme');
     state = AppPreferences(
-      themeMode: switch (savedTheme) {
-        'light' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      },
       reduceMotion: preferences.getBool('reduce_motion') ?? false,
       lowStockAlerts: preferences.getBool('low_stock_alerts') ?? false,
       compactRows: preferences.getBool('compact_rows') ?? false,
       dailyCheck: preferences.getBool('daily_check') ?? false,
       dailyCheckHour: preferences.getInt('daily_check_hour') ?? 9,
+      tiltEnabled: preferences.getBool('tilt_enabled') ?? true,
     );
   }
 
@@ -233,16 +232,23 @@ class PreferencesController extends Notifier<AppPreferences> {
     );
   }
 
-  Future<void> setTheme(ThemeMode value) async {
-    state = state.copyWith(themeMode: value);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString('theme', value.name);
-  }
-
   Future<void> setReduceMotion(bool value) async {
-    state = state.copyWith(reduceMotion: value);
+    // Turning on reduced motion silences the gyro too, in one lever. A user who
+    // has asked the phone to stop animating has asked for exactly this, and
+    // leaving the liquid lurching would contradict them.
+    state = state.copyWith(
+      reduceMotion: value,
+      tiltEnabled: value ? false : state.tiltEnabled,
+    );
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('reduce_motion', value);
+    if (value) await preferences.setBool('tilt_enabled', false);
+  }
+
+  Future<void> setTiltEnabled(bool value) async {
+    state = state.copyWith(tiltEnabled: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('tilt_enabled', value);
   }
 
   /// Turning the daily check on asks for notification permission and schedules

@@ -6,8 +6,8 @@ import 'package:intl/intl.dart';
 import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/glass_jar.dart';
 import '../../../core/widgets/jar_metrics.dart';
+import '../../../core/widgets/vessel_tilt.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
 
@@ -172,11 +172,16 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
       piecewise: item.piecewise,
     );
 
-    return Padding(
+    // A sheet is its own route, so it does not inherit a tilt scope from the
+    // shelf. Giving it one means the preview vessel in the sheet leans with the
+    // phone too — the same liquid, in the same frame, while you decide.
+    return VesselTilt(
+      enabled: ref.watch(preferencesProvider).tiltEnabled,
+      child: Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: lab.bone,
+          color: lab.canvas,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -207,7 +212,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                             ? (item.isChemical ? 'Log use' : 'Log breakage')
                             : 'Restock',
                         style: TextStyle(
-                          fontFamily: 'Caveat',
+                          fontFamily: 'PlexSans',
                           fontSize: 30,
                           height: 1,
                           fontWeight: FontWeight.w700,
@@ -219,7 +224,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                     ],
                   ),
                 ),
-                GlassJar(metrics: metrics, width: 40, height: 50),
+                LeaningVessel(metrics: metrics, width: 40, height: 50, sensitivity: 1.2),
               ],
             ),
             const SizedBox(height: 18),
@@ -291,7 +296,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                   icon: const Icon(Icons.event_outlined, size: 17),
                   label: Text(
                     DateFormat('d MMM').format(_date),
-                    style: const TextStyle(fontFamily: 'Caveat', fontSize: 18),
+                    style: const TextStyle(fontFamily: 'PlexSans', fontSize: 18),
                   ),
                 ),
                 const Spacer(),
@@ -308,6 +313,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -345,7 +351,7 @@ class _RecentAmountChip extends StatelessWidget {
             label,
             style: context.figure.copyWith(
               fontSize: 12,
-              color: selected ? lab.bone : lab.soft,
+              color: selected ? lab.canvas : lab.inkSoft,
             ),
           ),
         ),

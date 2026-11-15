@@ -90,7 +90,7 @@ class _OrderLevelSheetState extends ConsumerState<_OrderLevelSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: lab.bone,
+          color: lab.canvas,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -112,7 +112,7 @@ class _OrderLevelSheetState extends ConsumerState<_OrderLevelSheet> {
             Text(
               'Order level',
               style: TextStyle(
-                fontFamily: 'Caveat',
+                fontFamily: 'PlexSans',
                 fontSize: 30,
                 height: 1,
                 fontWeight: FontWeight.w700,
@@ -272,7 +272,7 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: lab.bone,
+          color: lab.canvas,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -295,7 +295,7 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
               Text(
                 'Edit item',
                 style: TextStyle(
-                  fontFamily: 'Caveat',
+                  fontFamily: 'PlexSans',
                   fontSize: 30,
                   height: 1,
                   fontWeight: FontWeight.w700,

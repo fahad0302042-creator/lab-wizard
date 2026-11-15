@@ -7,6 +7,7 @@ import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass_jar.dart';
+import '../../../core/widgets/vessel_tilt.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
 import 'action_sheet.dart';
@@ -23,7 +24,7 @@ Future<void> showItemSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: context.lab.bone,
+    backgroundColor: context.lab.canvas,
     builder: (_) => _ItemSheet(itemId: itemId, kind: kind),
   );
 }
@@ -57,7 +58,11 @@ class _ItemSheet extends ConsumerWidget {
     final restocks = logs.where((log) => log.action == InventoryAction.restock);
     final lastRestock = restocks.isEmpty ? null : restocks.first;
 
-    return DraggableScrollableSheet(
+    // The sheet previews the vessel at the top, so it needs the same lean the
+    // row had. A modal route does not inherit the shelf's tilt scope.
+    return VesselTilt(
+      enabled: ref.watch(preferencesProvider).tiltEnabled,
+      child: DraggableScrollableSheet(
       expand: false,
       initialChildSize: .74,
       minChildSize: .44,
@@ -129,7 +134,7 @@ class _ItemSheet extends ConsumerWidget {
                   ),
                   icon: const Icon(Icons.qr_code_2),
                 ),
-              GlassJar(metrics: metrics, width: 46, height: 58),
+              LeaningVessel(metrics: metrics, width: 46, height: 58, sensitivity: 1.1),
             ],
           ),
           const SizedBox(height: 18),
@@ -266,7 +271,7 @@ class _ItemSheet extends ConsumerWidget {
                         InventoryAction.breakage => Icons.close,
                       },
                       size: 14,
-                      color: lab.soft,
+                      color: lab.inkSoft,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -303,7 +308,7 @@ class _ItemSheet extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               item.notes,
-              style: TextStyle(fontSize: 13, height: 1.5, color: lab.soft),
+              style: TextStyle(fontSize: 13, height: 1.5, color: lab.inkSoft),
             ),
           ],
           const SizedBox(height: 18),
@@ -330,6 +335,7 @@ class _ItemSheet extends ConsumerWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -413,7 +419,7 @@ class _OrderLevelRow extends ConsumerWidget {
             Icon(
               hasLevel ? Icons.notifications_none : Icons.notifications_off,
               size: 16,
-              color: hasLevel ? lab.soft : lab.clay,
+              color: hasLevel ? lab.inkSoft : lab.clay,
             ),
             const SizedBox(width: 9),
             Expanded(
@@ -433,7 +439,7 @@ class _OrderLevelRow extends ConsumerWidget {
                         : 'Set one to let this shelf warn you.',
                     style: context.aside.copyWith(
                       fontSize: 14,
-                      color: hasLevel ? lab.soft : lab.clay,
+                      color: hasLevel ? lab.inkSoft : lab.clay,
                     ),
                   ),
                 ],
@@ -444,7 +450,7 @@ class _OrderLevelRow extends ConsumerWidget {
               style: context.label.copyWith(
                 fontSize: LabType.micro,
                 letterSpacing: 1,
-                color: hasLevel ? lab.soft : lab.clay,
+                color: hasLevel ? lab.inkSoft : lab.clay,
               ),
             ),
           ],

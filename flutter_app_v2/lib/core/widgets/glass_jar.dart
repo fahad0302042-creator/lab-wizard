@@ -6,31 +6,57 @@ import '../motion.dart';
 import '../theme/app_theme.dart';
 import 'jar_metrics.dart';
 
-/// The store-room jar: a small vial whose liquid level *is* the stock bar.
+/// The store room vessel: a small vial whose liquid level *is* the stock bar,
+/// and whose liquid tips when the phone tips.
 ///
-/// The jar answers "how much is left" and the colour answers "does it need
-/// attention". They are independent on purpose — see [jarMetrics].
-class GlassJar extends StatefulWidget {
-  const GlassJar({
+/// Two things make the tilt honest, and they are the whole point of this file:
+///
+/// 1. **Gravity, not the widget, defines "down".** The liquid surface is drawn
+///    in the *world* frame: it stays level with the ground while the glass leans
+///    around it. A drop that merely rotated the whole jar would read as a
+///    sticker turning, not a liquid finding its level.
+/// 2. **The order-level notch lives in the same frame as the liquid.** It is a
+///    ring painted onto the glass at world height `limit / capacity`, so when
+///    the liquid tips, the line tips with the glass and the comparison between
+///    them is still true. A line pinned to the screen instead would quietly lie
+///    every time the phone was tilted — which is the exact moment the app is
+///    asking to be believed.
+///
+/// The liquid is drawn at full strength (it is a real quantity, not a
+/// decoration) in the stock state's colour; the glass on top of it is a cool
+/// translucent wash with a rim light, so the tint stays glass and the colour
+/// stays data.
+class Vessel extends StatefulWidget {
+  const Vessel({
     required this.metrics,
     this.width = 34,
     this.height = 42,
+    this.tipDegrees = 0,
     this.onTap,
     this.semanticLabel,
+    this.tiltSensitivity = 1.0,
     super.key,
   });
 
   final JarMetrics metrics;
   final double width;
   final double height;
+
+  /// How far the liquid should lean, in degrees. Supplied by a [VesselTilt]
+  /// ancestor (or a drag); the vessel itself never reads the sensor.
+  final double tipDegrees;
+
   final VoidCallback? onTap;
   final String? semanticLabel;
 
+  /// Multiplier on [tipDegrees]. Small vessels need more lean to read at all.
+  final double tiltSensitivity;
+
   @override
-  State<GlassJar> createState() => _GlassJarState();
+  State<Vessel> createState() => _VesselState();
 }
 
-class _GlassJarState extends State<GlassJar> with TickerProviderStateMixin {
+class _VesselState extends State<Vessel> with TickerProviderStateMixin {
   /// Drives the surface. Runs 0→1 whenever the level changes; the painter turns
   /// that into a damped wave so the liquid sloshes and settles.
   late final AnimationController _surface = AnimationController(
@@ -39,7 +65,7 @@ class _GlassJarState extends State<GlassJar> with TickerProviderStateMixin {
     value: 1,
   );
 
-  /// A single pulse when a jar becomes empty. Not a shake, not a loop.
+  /// A single pulse when a vessel becomes empty. Not a shake, not a loop.
   late final AnimationController _pulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 320),
@@ -49,7 +75,7 @@ class _GlassJarState extends State<GlassJar> with TickerProviderStateMixin {
   late double _shownFill = widget.metrics.fill;
 
   @override
-  void didUpdateWidget(covariant GlassJar oldWidget) {
+  void didUpdateWidget(covariant Vessel oldWidget) {
     super.didUpdateWidget(oldWidget);
     final next = widget.metrics.fill;
     if ((next - _shownFill).abs() > .001) {
@@ -81,6 +107,7 @@ class _GlassJarState extends State<GlassJar> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final lab = context.lab;
     final color = lab.forState(widget.metrics.signal);
+    final reduce = LabMotion.reduced(context);
 
     return Semantics(
       label: widget.semanticLabel,
@@ -89,91 +116,132 @@ class _GlassJarState extends State<GlassJar> with TickerProviderStateMixin {
       child: GestureDetector(
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_surface, _pulse]),
-          builder: (context, _) {
-            // Decay the wave as the settle progresses. sin(π·t) peaks halfway
-            // and is exactly zero at both ends, so the surface always comes
-            // back to rest flat.
-            final t = _surface.value;
-            final amplitude = math.sin(math.pi * t).clamp(0.0, 1.0);
-            final scale = 1 + .02 * (1 - _pulse.value);
+        child: RepaintBoundary(
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_surface, _pulse]),
+            builder: (context, _) {
+              final t = _surface.value;
+              final amplitude = reduce ? 0.0 : math.sin(math.pi * t).clamp(0.0, 1.0);
+              final scale = 1 + .02 * (1 - _pulse.value);
 
-            return Transform.scale(
-              scale: scale,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(end: _shownFill),
-                duration: LabMotion.reduced(context)
-                    ? Duration.zero
-                    : LabMotion.wave,
-                curve: Curves.easeOutCubic,
-                builder: (context, fill, _) => CustomPaint(
-                  size: Size(widget.width, widget.height),
-                  painter: _JarPainter(
-                    fill: fill,
-                    notch: widget.metrics.notch,
-                    liquid: color,
-                    ink: lab.ink,
-                    card: lab.card,
-                    wavePhase: t * math.pi * 2.2,
-                    waveAmplitude: amplitude * 0.055,
+              return Transform.scale(
+                scale: scale,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: _shownFill),
+                  duration: reduce ? Duration.zero : LabMotion.wave,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, fill, _) => CustomPaint(
+                    size: Size(widget.width, widget.height),
+                    painter: _VesselPainter(
+                      fill: fill,
+                      notch: widget.metrics.notch,
+                      liquid: color,
+                      glass: lab.glass,
+                      line: lab.ink,
+                      tipRadians:
+                          reduce
+                              ? 0
+                              : (widget.tipDegrees * widget.tiltSensitivity) *
+                                    math.pi /
+                                    180,
+                      wavePhase: t * math.pi * 2.2,
+                      waveAmplitude: (reduce ? 0.0 : amplitude) * .05,
+                      dark: lab.canvas,
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _JarPainter extends CustomPainter {
-  const _JarPainter({
+class _VesselPainter extends CustomPainter {
+  const _VesselPainter({
     required this.fill,
     required this.notch,
     required this.liquid,
-    required this.ink,
-    required this.card,
+    required this.glass,
+    required this.line,
+    required this.tipRadians,
     required this.wavePhase,
     required this.waveAmplitude,
+    required this.dark,
   });
 
   final double fill;
   final double? notch;
+
+  /// The stock state's colour. The only colour the liquid is ever drawn in.
   final Color liquid;
-  final Color ink;
-  final Color card;
+
+  /// Cool glass wash laid over the liquid so the tint reads as glass.
+  final Color glass;
+
+  /// Outline, cap and notch ink.
+  final Color line;
+
+  final double tipRadians;
   final double wavePhase;
 
-  /// Expressed as a fraction of the jar height so it scales with the widget.
+  /// As a fraction of the vessel height, so it scales with the widget.
   final double waveAmplitude;
+
+  /// The page colour, so the liquid is drawn over the background rather than
+  /// over whatever happens to be behind the widget.
+  final Color dark;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
     final capHeight = h * .14;
-    final body = Rect.fromLTWH(.7, capHeight, w - 1.4, h - capHeight - .7);
+    // The body, in its own (unrotated) frame: the shape the liquid fills.
+    final body = Rect.fromLTWH(
+      .7,
+      capHeight,
+      w - 1.4,
+      h - capHeight - .7,
+    );
     final bodyRRect = RRect.fromRectAndRadius(
       body,
       Radius.circular(w * .16),
     );
 
-    // Body, filled with the page colour first so the liquid sits behind glass
-    // rather than floating on the background.
-    canvas.drawRRect(bodyRRect, Paint()..color = card);
+    // Body, filled with the page colour first so the vessel reads as an object
+    // against the row rather than a hole in it.
+    canvas.drawRRect(bodyRRect, Paint()..color = dark);
 
+    // --- The settled-world ring the notch needs, in body space. -------------
     if (fill > 0) {
       canvas.save();
       canvas.clipRRect(bodyRRect);
 
       final surfaceY = body.bottom - body.height * fill;
       final wave = body.height * waveAmplitude;
-      final path = Path()..moveTo(body.left, surfaceY);
-      const steps = 14;
+
+      // World "down" expressed in the glass's frame: tilting the phone by θ
+      // means the liquid surface, which stays level with the ground, appears to
+      // the glass to be rotated by -θ. Drawing the surface under that rotation
+      // is what keeps it level on screen.
+      final lean = -tipRadians;
+
+      // Liquid is a large region; rotate about the body's centre and extend it
+      // well past the edges so no corner is ever exposed by the lean.
+      canvas.save();
+      canvas.translate(body.center.dx, body.center.dy);
+      canvas.rotate(lean);
+      canvas.translate(-body.center.dx, -body.center.dy);
+
+      // Extend horizontally past the body so rotation can't reveal a gap.
+      final reach = body.height * 1.2;
+      final path = Path()..moveTo(body.left - reach, surfaceY);
+      const steps = 16;
       for (var i = 0; i <= steps; i++) {
-        final x = body.left + body.width * (i / steps);
+        final x = body.left - reach + (body.width + reach * 2) * (i / steps);
         final y =
             surfaceY +
             math.sin(wavePhase + i / steps * math.pi * 1.6) * wave +
@@ -182,56 +250,112 @@ class _JarPainter extends CustomPainter {
         path.lineTo(x, y);
       }
       path
-        ..lineTo(body.right, body.bottom)
-        ..lineTo(body.left, body.bottom)
+        ..lineTo(body.right + reach, body.bottom + reach)
+        ..lineTo(body.left - reach, body.bottom + reach)
         ..close();
 
-      canvas.drawPath(path, Paint()..color = liquid.withValues(alpha: .34));
-
-      // A slightly darker meniscus so the surface reads as a surface.
+      // Full-strength liquid: a real quantity, so it is allowed to be the
+      // loudest thing in the widget. A vertical shade gives it depth without
+      // inventing a colour.
       canvas.drawPath(
         path,
         Paint()
-          ..color = liquid.withValues(alpha: .55)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .9,
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              liquid.withValues(alpha: .55),
+              liquid.withValues(alpha: .78),
+            ],
+          ).createShader(body),
       );
+
+      // Meniscus: a brighter hairline on the surface, which is what makes the
+      // tilt readable at a glance. Drawn along the same leaning path.
+      final surface = Path()
+        ..moveTo(body.left - reach, surfaceY);
+      for (var i = 0; i <= steps; i++) {
+        final x = body.left - reach + (body.width + reach * 2) * (i / steps);
+        final y =
+            surfaceY +
+            math.sin(wavePhase + i / steps * math.pi * 1.6) * wave +
+            math.sin(wavePhase * .6 + i / steps * math.pi * .9) * wave * .4;
+        if (i > 0) {
+          surface.lineTo(x, y);
+        }
+      }
+      canvas.drawPath(
+        surface,
+        Paint()
+          ..color = liquid.withValues(alpha: .95)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(.9, h * .022),
+      );
+      canvas.restore();
+
       canvas.restore();
     }
 
-    // Order-level notch: a hairline across the jar where "order" begins, so you
-    // can see the level and the line at the same time.
-    final n = notch;
-    if (n != null) {
-      final y = body.bottom - body.height * n;
-      final line = Paint()
-        ..color = ink.withValues(alpha: .5)
-        ..strokeWidth = 1;
-      canvas.drawLine(
-        Offset(body.left + 1, y),
-        Offset(body.right - 1, y),
-        line,
-      );
-      // Small ticks either side so the line reads as a marker, not a fill edge.
-      canvas.drawLine(
-        Offset(body.left, y - 1.6),
-        Offset(body.left, y + 1.6),
-        line,
-      );
-      canvas.drawLine(
-        Offset(body.right, y - 1.6),
-        Offset(body.right, y + 1.6),
-        line,
-      );
-    }
+    // --- Glass: a cool wash over the liquid, then the rim. ------------------
+    // Rotating here as well means one glass, one lean: the body and its
+    // contents are the same object.
+    canvas.save();
+    canvas.translate(body.center.dx, body.center.dy);
+    canvas.rotate(tipRadians * .35); // the glass leans less than the liquid
+    canvas.translate(-body.center.dx, -body.center.dy);
 
-    // Glass outline.
     canvas.drawRRect(
       bodyRRect,
       Paint()
-        ..color = ink.withValues(alpha: .8)
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            glass.withValues(alpha: .16),
+            glass.withValues(alpha: .02),
+          ],
+        ).createShader(body),
+    );
+
+    // The order-level notch. In body space, so it tips with the glass and can
+    // never disagree with the liquid it is comparing itself to.
+    final n = notch;
+    if (n != null) {
+      final y = body.bottom - body.height * n.clamp(0.0, 1.0);
+      final notchPaint = Paint()
+        ..color = line.withValues(alpha: .62)
+        ..strokeWidth = math.max(.8, h * .018);
+      final inset = body.width * .12;
+      canvas.drawLine(
+        Offset(body.left + inset, y),
+        Offset(body.right - inset, y),
+        notchPaint,
+      );
+      // Short ticks at both ends so it reads as a marker, not a fill edge.
+      for (final x in [body.left + inset, body.right - inset]) {
+        canvas.drawLine(
+          Offset(x, y - h * .028),
+          Offset(x, y + h * .028),
+          notchPaint,
+        );
+      }
+    }
+
+    // Rim: hairline plus a highlight down one side, so it reads as glass.
+    canvas.drawRRect(
+      bodyRRect,
+      Paint()
+        ..color = line.withValues(alpha: .82)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.3,
+        ..strokeWidth = math.max(1, w * .032),
+    );
+    canvas.drawLine(
+      Offset(body.left + w * .17, body.top + body.height * .18),
+      Offset(body.left + w * .17, body.top + body.height * .55),
+      Paint()
+        ..color = line.withValues(alpha: .18)
+        ..strokeWidth = math.max(1, w * .05)
+        ..strokeCap = StrokeCap.round,
     );
 
     // Cap.
@@ -240,22 +364,25 @@ class _JarPainter extends CustomPainter {
       Rect.fromLTWH((w - capWidth) / 2, .6, capWidth, capHeight),
       const Radius.circular(1.6),
     );
-    canvas.drawRRect(cap, Paint()..color = ink.withValues(alpha: .72));
+    canvas.drawRRect(cap, Paint()..color = line.withValues(alpha: .55));
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _JarPainter old) =>
+  bool shouldRepaint(covariant _VesselPainter old) =>
       old.fill != fill ||
       old.notch != notch ||
       old.liquid != liquid ||
-      old.ink != ink ||
-      old.card != card ||
+      old.glass != glass ||
+      old.line != line ||
+      old.tipRadians != tipRadians ||
       old.wavePhase != wavePhase ||
-      old.waveAmplitude != waveAmplitude;
+      old.waveAmplitude != waveAmplitude ||
+      old.dark != dark;
 }
 
-/// The five segments under the jar. Rounded down in [jarMetrics] so a
-/// nearly-full jar never reads as full.
+/// The five segments under a vessel. Rounded down in [jarMetrics] so a
+/// nearly-full vessel never reads as full.
 class JarTicks extends StatelessWidget {
   const JarTicks({
     required this.count,
@@ -274,7 +401,7 @@ class JarTicks extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hair = context.lab.hair;
+    final hair = context.lab.hairStrong;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(segments, (index) {
