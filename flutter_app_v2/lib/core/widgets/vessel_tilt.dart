@@ -53,7 +53,10 @@ class _VesselTiltState extends ConsumerState<VesselTilt>
     // subtree. Only the model — and therefore only the vessels that depend on
     // it — hears about them.
     ref.listenManual<AsyncValue<TiltReading>>(tiltProvider, (previous, next) {
-      final reading = next.valueOrNull;
+      // `asData?.value` rather than `.value`: the latter is the *previous* data
+      // while a stream is reconnecting in some Riverpod versions, and a stale
+      // tilt is a lie the glass would tell. This only reads a delivered sample.
+      final reading = next.asData?.value;
       if (reading == null) return;
       if (!reading.supported || !widget.enabled) {
         _sensorTip = 0;
@@ -132,6 +135,17 @@ class _TiltModel extends ChangeNotifier {
     _controller
       ..reset()
       ..forward();
+  }
+
+  /// A thumb's lean, applied immediately. Deliberately does not touch
+  /// [_sensorTarget]: releasing must settle back to what the phone is doing,
+  /// not to flat.
+  void setLean(double value) {
+    final clamped = value.clamp(-46.0, 46.0);
+    _from = clamped;
+    _to = clamped;
+    lean = clamped;
+    notifyListeners();
   }
 
   /// Returns to the sensor's lean after a thumb lets go.
@@ -227,18 +241,6 @@ class _LeaningVesselState extends State<LeaningVessel> {
 
 /// A hard, immediate set used by the drag. Kept on the model so the lean has a
 /// single owner and a single clamp.
-extension on _TiltModel {
-  /// A thumb's lean. Deliberately does not touch [_sensorTarget]: releasing must
-  /// settle back to what the phone is doing, not to flat.
-  void setLean(double value) {
-    final clamped = value.clamp(-46.0, 46.0);
-    _from = clamped;
-    _to = clamped;
-    lean = clamped;
-    notifyListeners();
-  }
-}
-
 /// The drag half of the lean, shared by [LeaningVessel] and any bespoke
 /// painted vessel (the dashboard hero has its own painter, but it must lean by
 /// thumb exactly like every other one).

@@ -9,6 +9,7 @@ import '../../../core/motion.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/jar_metrics.dart';
 import '../../../core/widgets/vessel_hero.dart';
+import '../../../core/widgets/vessel_tilt.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
 import '../../reports/data/order_list.dart';

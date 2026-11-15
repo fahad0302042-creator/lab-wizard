@@ -209,7 +209,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const SizedBox(height: 10),
                   Center(
                     child: Text(
-                      '$buildStamp',
+                      buildStamp,
                       style: context.label.copyWith(
                         fontSize: LabType.micro,
                         letterSpacing: 1,

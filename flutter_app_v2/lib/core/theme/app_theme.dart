@@ -1,5 +1,3 @@
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
 
 /// Instrument panel — the design language for Lab Wizard 2.
@@ -324,7 +322,6 @@ abstract final class LabTheme {
       canvasColor: lab.canvas,
       extensions: [lab],
       splashFactory: InkSparkle.splashFactory,
-      fontFamily: kSans,
       textTheme: base.textTheme
           .apply(bodyColor: lab.ink, displayColor: lab.ink, fontFamily: kSans),
       dividerTheme: DividerThemeData(color: lab.hair, thickness: 1, space: 1),
