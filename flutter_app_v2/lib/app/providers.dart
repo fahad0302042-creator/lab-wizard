@@ -14,6 +14,7 @@ import '../core/theme/app_theme.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/item_view.dart';
 import '../features/inventory/domain/models.dart';
+import '../features/reports/domain/forecast.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
   return AppConfig.hasSupabase ? Supabase.instance.client : null;
@@ -383,6 +384,24 @@ class InventoryState {
 final inventoryProvider = NotifierProvider<InventoryController, InventoryState>(
   InventoryController.new,
 );
+
+/// The runway board, rebuilt whenever the inventory changes.
+///
+/// Derived rather than stored: it is a pure function of the logs and the
+/// quantities, so there is nothing to keep in sync and no way for it to go
+/// stale behind an edit.
+///
+/// `DateTime.now()` is read here, at the edge, so the domain function underneath
+/// stays clock-free and testable.
+final forecastProvider = Provider<ForecastBoard>((ref) {
+  final state = ref.watch(inventoryProvider);
+  return buildForecastBoard(
+    chemicals: state.chemicals,
+    apparatus: state.apparatus,
+    logs: state.logs,
+    now: DateTime.now(),
+  );
+});
 
 class InventoryController extends Notifier<InventoryState> {
   String? _activeUserId;

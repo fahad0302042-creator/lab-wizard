@@ -13,6 +13,7 @@ import '../../../core/widgets/vessel_tilt.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
 import '../../reports/data/order_list.dart';
+import '../../reports/domain/forecast.dart';
 import '../../session/presentation/session_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../shelf/presentation/item_sheet.dart';
@@ -36,6 +37,7 @@ class DashboardScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final preferences = ref.watch(preferencesProvider);
     final ordering = state.needsOrdering;
+    final forecast = ref.watch(forecastProvider);
     final todayKey = localDayKey(DateTime.now());
     final today = state.logs
         .where((log) => localDayKey(log.loggedAt) == todayKey)
@@ -127,9 +129,17 @@ class DashboardScreen extends ConsumerWidget {
               onShare: () => shareOrderList(context, ordering),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           ShelfRowIn(
             index: 2,
+            child: _RunwayCard(
+              board: forecast,
+              onOpenTab: onOpenTab,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ShelfRowIn(
+            index: 3,
             child: Row(
               children: [
                 Expanded(
@@ -214,7 +224,7 @@ class DashboardScreen extends ConsumerWidget {
             )
           else
             for (var i = 0; i < today.length && i < 6; i++)
-              _TodayRow(log: today[i], state: state, index: i + 3),
+              _TodayRow(log: today[i], state: state, index: i + 4),
           if (today.length > 6)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -463,6 +473,132 @@ class _OrderCard extends StatelessWidget {
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RunwayCard extends StatelessWidget {
+  const _RunwayCard({required this.board, required this.onOpenTab});
+
+  final ForecastBoard board;
+  final ValueChanged<HomeTab> onOpenTab;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    final soon = board.runningOut;
+    final alarm = soon.isNotEmpty;
+    final accent = alarm ? lab.berry : lab.accent;
+    final silence = forecastSilence(board);
+
+    return GestureDetector(
+      // Tapping the card opens the shelf, which is where the items named here
+      // actually live. An alarm with no way to act on it is just noise.
+      onTap: alarm ? () => onOpenTab(HomeTab.chemicals) : null,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+        decoration: BoxDecoration(
+          color: alarm ? lab.wash(accent, .06) : lab.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: alarm ? accent.withValues(alpha: .42) : lab.hair,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _runwayHeadline(board).toUpperCase(),
+                    style: context.label.copyWith(
+                      fontSize: 9.5,
+                      letterSpacing: 1,
+                      color: alarm ? accent : lab.inkSoft,
+                    ),
+                  ),
+                ),
+                if (alarm)
+                  Text(
+                    '${soon.length}',
+                    style: context.figure.copyWith(fontSize: 14, color: accent),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            // A quiet board must say *why* it is quiet. An empty card reads as
+            // "everything is fine", which is a different claim from "there is
+            // not enough history to know yet".
+            if (silence != null)
+              Text(silence, style: context.aside.copyWith(fontSize: 12.5))
+            else
+              ...board.items.take(3).map((f) => _RunwayLine(forecast: f)),
+            if (silence == null && board.items.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '+ ${board.items.length - 3} more with a runway',
+                  style: context.aside.copyWith(fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The card's headline. Facts only: how many run out this month, or how long
+/// the measurement covers.
+String _runwayHeadline(ForecastBoard board) {
+  final soon = board.runningOut.length;
+  if (soon == 1) return '1 runs out this month';
+  if (soon > 1) return '$soon run out this month';
+  if (!board.hasEnoughHistory || board.isEmpty) return 'Runway not ready';
+  // Something is measured and nothing is due this month. Say that, rather than
+  // "stock is holding", which would claim more than the logs can support.
+  return 'Nothing due this month';
+}
+
+class _RunwayLine extends StatelessWidget {
+  const _RunwayLine({required this.forecast});
+
+  final Forecast forecast;
+
+  @override
+  Widget build(BuildContext context) {
+    final lab = context.lab;
+    final color = forecast.soon ? lab.berry : lab.ink;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              forecast.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.itemName.copyWith(fontSize: 14),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            runwayCaption(forecast),
+            style: context.formula.copyWith(
+              fontSize: 12,
+              color: color,
+            ),
+          ),
         ],
       ),
     );

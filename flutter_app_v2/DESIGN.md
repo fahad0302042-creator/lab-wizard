@@ -92,7 +92,30 @@ so "3 of 5 beakers" is literally 3 ticks, not a percentage.
 with no limit are never counted as needing attention — otherwise the number cries wolf
 and you stop trusting it.
 
----
+### Runway — the only number the app predicts
+
+Days of stock left, from what has actually been logged. It is the one question a paper
+register cannot answer, so it is worth being strict about the answer.
+
+- **Usage is `consume` and `breakage` only.** A restock is the opposite direction; letting
+  it into a rate would make an item appear to drain faster every time it was topped up.
+- **The denominator is the span the logs actually cover**, not the nominal 90-day window.
+  Dividing three days of use by 90 understates the rate, and for a reorder figure the
+  quiet direction is the dangerous one.
+- **No history, no number.** Below 21 days of logs, or below 5 separate days of use, the
+  card says so and shows nothing. A rate extrapolated from a week is a guess wearing a
+  number's clothes, and someone acts on a reorder date.
+- **Lumpiness is measured against the median day, not the mean.** A session booked across
+  several days drags the mean up with it and hides the spike; measured that way, a 900-unit
+  day among ten-unit days looked steady. Even-count medians are averaged so the measure has
+  no bias.
+- **Steady vs rough is said in words.** `lasting 30 days` versus `roughly 30 days`. Never a
+  confidence percentage — a bar invites trust the data cannot support.
+- **An item nobody has used is left off the board entirely.** Not "infinite supply": we
+  have never seen it move, which is a different sentence.
+- **"Runway not ready" is not "stock is holding".** An empty card must never read as
+  reassurance.
+
 
 ## 2. Gestures
 
