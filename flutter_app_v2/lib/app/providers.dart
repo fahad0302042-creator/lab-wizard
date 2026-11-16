@@ -11,9 +11,11 @@ import '../core/config/app_config.dart';
 import '../core/database/local_database.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/jar_metrics.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/item_view.dart';
 import '../features/inventory/domain/models.dart';
+import '../features/reports/domain/forecast.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
   return AppConfig.hasSupabase ? Supabase.instance.client : null;
@@ -152,7 +154,6 @@ class AuthController extends Notifier<AuthState> {
 
 class AppPreferences {
   const AppPreferences({
-    this.themeMode = ThemeMode.system,
     this.reduceMotion = false,
     this.lowStockAlerts = false,
     this.compactRows = false,
@@ -160,7 +161,6 @@ class AppPreferences {
     this.dailyCheckHour = 9,
   });
 
-  final ThemeMode themeMode;
   final bool reduceMotion;
 
   /// Drops subtitles and jar ticks so a long shelf fits more per screen.
@@ -177,14 +177,12 @@ class AppPreferences {
   final bool lowStockAlerts;
 
   AppPreferences copyWith({
-    ThemeMode? themeMode,
     bool? reduceMotion,
     bool? lowStockAlerts,
     bool? compactRows,
     bool? dailyCheck,
     int? dailyCheckHour,
   }) => AppPreferences(
-    themeMode: themeMode ?? this.themeMode,
     reduceMotion: reduceMotion ?? this.reduceMotion,
     lowStockAlerts: lowStockAlerts ?? this.lowStockAlerts,
     compactRows: compactRows ?? this.compactRows,
@@ -207,13 +205,7 @@ class PreferencesController extends Notifier<AppPreferences> {
 
   Future<void> _restore() async {
     final preferences = await SharedPreferences.getInstance();
-    final savedTheme = preferences.getString('theme');
     state = AppPreferences(
-      themeMode: switch (savedTheme) {
-        'light' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      },
       reduceMotion: preferences.getBool('reduce_motion') ?? false,
       lowStockAlerts: preferences.getBool('low_stock_alerts') ?? false,
       compactRows: preferences.getBool('compact_rows') ?? false,
@@ -233,13 +225,11 @@ class PreferencesController extends Notifier<AppPreferences> {
     );
   }
 
-  Future<void> setTheme(ThemeMode value) async {
-    state = state.copyWith(themeMode: value);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString('theme', value.name);
-  }
-
   Future<void> setReduceMotion(bool value) async {
+    // One lever. Reduced motion already short-circuits every animated widget in
+    // the app (`LabMotion.reduced`), so there is nothing else to switch off
+    // alongside it — the gyro switch that used to live here went with the gyro
+    // itself.
     state = state.copyWith(reduceMotion: value);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('reduce_motion', value);
@@ -377,6 +367,79 @@ class InventoryState {
 final inventoryProvider = NotifierProvider<InventoryController, InventoryState>(
   InventoryController.new,
 );
+
+/// The runway board, rebuilt whenever the inventory changes.
+///
+/// Derived rather than stored: it is a pure function of the logs and the
+/// quantities, so there is nothing to keep in sync and no way for it to go
+/// stale behind an edit.
+///
+/// `DateTime.now()` is read here, at the edge, so the domain function underneath
+/// stays clock-free and testable.
+/// What was just written to the ledger, for the confirmation.
+class LogEvent {
+  const LogEvent({
+    required this.id,
+    required this.itemId,
+    required this.name,
+    required this.detail,
+    required this.signal,
+    required this.rising,
+  });
+
+  /// Monotonic, so two identical logs in a row are still two separate events
+  /// and the second one is not swallowed as "no change".
+  final int id;
+  final String itemId;
+  final String name;
+  final String detail;
+  final StockSignal signal;
+  final bool rising;
+}
+
+/// The confirmation bus.
+///
+/// A stream rather than a callback threaded through every logging path: stock
+/// is logged from the shelf, from a sheet, from the session screen and from a
+/// scan, and none of them own the widget that should say "done". Broadcast, and
+/// the shell — which is alive for the whole session — shows it.
+final logEventProvider = StreamProvider<LogEvent>((ref) async* {
+  yield* _logEvents.stream;
+});
+
+final _logEvents = StreamController<LogEvent>.broadcast();
+int _logEventSeq = 0;
+
+/// Announces a log. Called by the controller, so no path can forget to.
+void publishLogEvent({
+  required String itemId,
+  required String name,
+  required String detail,
+  required StockSignal signal,
+  required bool rising,
+}) {
+  if (_logEvents.isClosed) return;
+  _logEvents.add(
+    LogEvent(
+      id: ++_logEventSeq,
+      itemId: itemId,
+      name: name,
+      detail: detail,
+      signal: signal,
+      rising: rising,
+    ),
+  );
+}
+
+final forecastProvider = Provider<ForecastBoard>((ref) {
+  final state = ref.watch(inventoryProvider);
+  return buildForecastBoard(
+    chemicals: state.chemicals,
+    apparatus: state.apparatus,
+    logs: state.logs,
+    now: DateTime.now(),
+  );
+});
 
 class InventoryController extends Notifier<InventoryState> {
   String? _activeUserId;
@@ -557,6 +620,26 @@ class InventoryController extends Notifier<InventoryState> {
       InventoryAction.restock => current + amount,
       InventoryAction.consume || InventoryAction.breakage => current - amount,
     };
+
+    // Announce the write here rather than in each screen: this is the one place
+    // every logging path has to pass through, so a new path cannot silently
+    // lose its confirmation. The signal is recomputed from the new quantity so
+    // the plate's colour matches the vessel the user is about to see.
+    final after = jarMetrics(
+      quantity: nextQuantity,
+      initialQuantity: view.initialQuantity,
+      threshold: view.threshold,
+      piecewise: view.piecewise,
+    );
+    publishLogEvent(
+      itemId: itemId,
+      name: view.name,
+      detail:
+          '${formatQuantity(current)} → ${formatQuantity(nextQuantity)} '
+          '${view.unit}',
+      signal: after.signal,
+      rising: action == InventoryAction.restock,
+    );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(
       chemicals: itemType == ItemKind.chemical

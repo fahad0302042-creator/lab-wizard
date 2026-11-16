@@ -67,7 +67,7 @@ class _QrLabelScreenState extends ConsumerState<QrLabelScreen> {
               padding: const EdgeInsets.only(bottom: 7),
               child: Row(
                 children: [
-                  Icon(Icons.qr_code_2, size: 17, color: lab.soft),
+                  Icon(Icons.qr_code_2, size: 17, color: lab.inkSoft),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

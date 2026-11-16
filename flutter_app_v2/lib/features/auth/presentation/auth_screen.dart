@@ -53,21 +53,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               children: [
                 Icon(Icons.mark_email_read_outlined, size: 40, color: lab.sage),
                 const SizedBox(height: 16),
-                Text(
-                  'Check your inbox',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -.6,
-                    color: lab.ink,
-                  ),
-                ),
-                const SizedBox(height: 6),
+                Text('Check your inbox', style: context.title),
+                const SizedBox(height: 8),
                 Text(
                   'We sent a confirmation link to ${_email.text}. '
                   'Confirm it, then sign in.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, height: 1.5, color: lab.soft),
+                  style: context.aside,
                 ),
               ],
             ),
@@ -86,36 +78,48 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Lab Wizard',
-                    style: TextStyle(
-                      fontSize: 12,
-                      letterSpacing: 2.4,
-                      fontWeight: FontWeight.w600,
-                      color: lab.soft,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: lab.accentWash,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: lab.accent.withValues(alpha: .45),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.science_outlined,
+                          size: 15,
+                          color: lab.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Text(
+                        'LAB WIZARD',
+                        style: context.label.copyWith(
+                          fontSize: 10.5,
+                          letterSpacing: 2.2,
+                          color: lab.inkSoft,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 22),
                   Text(
                     _signUp ? 'Start a shelf.' : 'Your shelf\nis waiting.',
-                    style: TextStyle(
-                      fontSize: 34,
-                      height: 1.03,
-                      letterSpacing: -1.6,
-                      fontWeight: FontWeight.w600,
-                      color: lab.ink,
-                    ),
+                    style: context.display.copyWith(fontSize: 34),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     _signUp
                         ? 'One account, same data as the web app.'
-                        : 'Sign in with the account you already use.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.5,
-                      color: lab.soft,
-                    ),
+                        : 'Sign in with the account you already use. The '
+                              'sensor turns the vessels; you can switch it off '
+                              'in Settings.',
+                    style: context.aside,
                   ),
                   const SizedBox(height: 30),
                   if (_signUp) ...[
@@ -205,7 +209,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const SizedBox(height: 10),
                   Center(
                     child: Text(
-                      'Lab Wizard 2 · $buildStamp',
+                      buildStamp,
                       style: context.label.copyWith(
                         fontSize: LabType.micro,
                         letterSpacing: 1,

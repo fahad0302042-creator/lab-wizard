@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab Wizard 2 — instrument panel preview</title>
+<style>
+  /* The same two families the Flutter app bundles, from the same files. */
+  @font-face { font-family: PlexSans; src: url('fonts/IBMPlexSans-Regular.ttf'); font-weight: 400; }
+  @font-face { font-family: PlexSans; src: url('fonts/IBMPlexSans-Medium.ttf'); font-weight: 500; }
+  @font-face { font-family: PlexSans; src: url('fonts/IBMPlexSans-SemiBold.ttf'); font-weight: 600; }
+  @font-face { font-family: PlexSans; src: url('fonts/IBMPlexSans-Bold.ttf'); font-weight: 700; }
+  @font-face { font-family: PlexMono; src: url('fonts/IBMPlexMono-Regular.ttf'); font-weight: 400; }
+  @font-face { font-family: PlexMono; src: url('fonts/IBMPlexMono-Medium.ttf'); font-weight: 500; }
+  @font-face { font-family: PlexMono; src: url('fonts/IBMPlexMono-SemiBold.ttf'); font-weight: 600; }
+
+  /* Tokens — a copy of LabPalette.dark in app_theme.dart. If they drift, this
+     preview is wrong, so they live at the top in one block. */
+  :root {
+    --canvas: #080C14;
+    --surface: #111827;
+    --surface-raised: #1B2740;
+    --ink: #F1F5F9;
+    --ink-soft: #94A3B8;
+    --ink-faint: #64748B;
+    --hair: rgba(255,255,255,0.09);
+    --hair-strong: rgba(255,255,255,0.18);
+    --accent: #38BDF8;
+    --accent-wash: rgba(56,189,248,0.16);
+    --sage: #4ADE80;
+    --clay: #FBBF24;
+    --berry: #F87171;
+    --glass: #7DD3FC;
+    --vignette: #16243D;
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: PlexSans, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #04060B;
+    color: var(--ink);
+    padding: 20px 14px 60px;
+    min-height: 100vh;
+  }
+
+  .layout { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 366px 1fr; gap: 34px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; justify-items: center; } }
+
+  /* ---------------- the phone ---------------- */
+  .phone {
+    width: 366px; height: 750px; border-radius: 44px; padding: 9px;
+    background: linear-gradient(150deg, #20293A, #0C111B);
+    box-shadow: 0 30px 70px rgba(0,0,0,.75), inset 0 0 0 1px rgba(255,255,255,.1);
+    position: sticky; top: 18px;
+  }
+  .screen {
+    width: 100%; height: 100%; border-radius: 36px; overflow: hidden;
+    background:
+      radial-gradient(120% 70% at 8% -10%, rgba(22,36,61,.95), transparent 62%),
+      var(--canvas);
+    display: flex; flex-direction: column; position: relative;
+  }
+  .statusbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px 4px; font-family: PlexMono; font-size: 10px;
+    letter-spacing: .6px; color: var(--ink-soft);
+  }
+  .island { width: 74px; height: 18px; border-radius: 99px; background: #04060B; margin: 0 auto; }
+  .scroll { flex: 1; overflow-y: auto; padding: 6px 14px 96px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* ---------------- type ladder (10 / 13 / 17 / 24 / 31) ---------------- */
+  .eyebrow { font-family: PlexMono; font-size: 9.5px; letter-spacing: 1.1px; font-weight: 500; color: var(--ink-faint); text-transform: uppercase; }
+  .eyebrow.on { color: var(--accent); }
+  .display { font-size: 30px; line-height: 1.06; letter-spacing: -1.1px; font-weight: 700; margin: 4px 0 0; }
+  .title { font-size: 24px; letter-spacing: -.7px; font-weight: 600; }
+  .item { font-size: 17px; font-weight: 500; letter-spacing: -.2px; }
+  .fig { font-family: PlexMono; font-weight: 600; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+  .label { font-family: PlexMono; font-size: 10px; letter-spacing: 1.2px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; }
+  .aside { font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+
+  /* ---------------- header ---------------- */
+  .head { display: flex; align-items: center; gap: 10px; }
+  .head .grow { flex: 1; min-width: 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 8px; border-radius: 7px; font-family: PlexMono;
+    font-size: 9px; letter-spacing: .7px; font-weight: 500;
+    border: 1px solid rgba(74,222,128,.3); background: rgba(74,222,128,.1); color: var(--sage);
+  }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--hair);
+    background: transparent; color: var(--ink-soft); display: grid; place-items: center; cursor: pointer;
+  }
+
+  /* ---------------- the vessel card ---------------- */
+  .card { border-radius: var(--radius); border: 1px solid var(--hair); background: var(--surface); }
+  .hero {
+    margin-top: 14px; overflow: hidden;
+    background: linear-gradient(140deg, var(--surface), #16213A);
+  }
+  .hero-top { display: flex; align-items: center; gap: 7px; padding: 11px 13px 0; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--clay); box-shadow: 0 0 7px var(--clay); }
+  .readout {
+    margin-left: auto; font-family: PlexMono; font-size: 9.5px; letter-spacing: .6px;
+    padding: 2px 6px; border-radius: 5px; color: var(--accent);
+    border: 1px solid var(--hair); background: rgba(8,12,20,.5);
+  }
+  .vessel-wrap { height: 150px; position: relative; }
+  canvas.vessel { width: 100%; height: 100%; display: block; }
+  .hero-foot { display: flex; align-items: flex-end; padding: 0 13px 12px; gap: 10px; }
+  .hero-foot .grow { flex: 1; min-width: 0; }
+  .formula { font-family: PlexMono; font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+  .big {
+    font-family: PlexMono; font-size: 26px; font-weight: 600; letter-spacing: -1px;
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .unit { font-family: PlexMono; font-size: 10px; letter-spacing: .8px; color: var(--ink-soft); }
+  .order-line { font-family: PlexMono; font-size: 9.5px; letter-spacing: .5px; color: var(--clay); margin-top: 3px; }
+
+  /* ---------------- order card ---------------- */
+  .order { margin-top: 12px; padding: 12px 13px; background: rgba(251,191,36,.06); border-color: rgba(251,191,36,.42); }
+  .order.calm { background: var(--surface); border-color: var(--hair); }
+  .order-head { display: flex; align-items: center; gap: 8px; }
+  .order-head .num { margin-left: auto; font-family: PlexMono; font-weight: 600; font-size: 14px; color: var(--clay); }
+  .order-line-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .mini { width: 22px; height: 28px; flex: none; }
+  .order-line-row .name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .order-line-row .qty { font-family: PlexMono; font-size: 12.5px; font-weight: 600; color: var(--berry); }
+
+  /* ---------------- doors ---------------- */
+  .doors { display: flex; gap: 9px; margin-top: 12px; }
+  .door {
+    flex: 1; height: 54px; border-radius: 14px; display: flex; align-items: center;
+    justify-content: center; gap: 7px; cursor: pointer; border: 1px solid transparent;
+    font-family: PlexMono; font-size: 10px; letter-spacing: .9px; font-weight: 600;
+  }
+  .door.primary { background: var(--accent); color: #020617; }
+  .door.secondary { background: var(--surface); color: var(--ink); border-color: var(--hair-strong); }
+
+  /* ---------------- stat strip ---------------- */
+  .strip { margin-top: 14px; display: flex; align-items: stretch; padding: 11px 0; }
+  .strip .cell { flex: 1; text-align: center; cursor: pointer; }
+  .strip .rule { width: 1px; background: var(--hair); }
+  .strip .n { font-family: PlexMono; font-size: 21px; font-weight: 600; letter-spacing: -.6px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .strip .l { font-family: PlexMono; font-size: 8.5px; letter-spacing: .6px; color: var(--ink-faint); margin-top: 5px; text-transform: uppercase; }
+
+  .sync { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-family: PlexMono; font-size: 9.5px; letter-spacing: .4px; color: var(--ink-faint); }
+
+  /* ---------------- section rules ---------------- */
+  .section { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; }
+  .section .line { flex: 1; height: 1px; background: var(--hair); }
+  .metrics { display: flex; }
+  .metric { flex: 1; }
+  .metric .v { font-family: PlexMono; font-size: 26px; font-weight: 600; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .metric .k { font-family: PlexMono; font-size: 8.5px; letter-spacing: .7px; color: var(--ink-faint); margin-top: 5px; text-transform: uppercase; }
+
+  .today-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .today-row .t { font-family: PlexMono; font-size: 10px; color: var(--ink-faint); letter-spacing: .4px; }
+  .today-row .bar { width: 3px; height: 22px; border-radius: 2px; }
+  .today-row .n { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .today-row .d { font-family: PlexMono; font-size: 12.5px; font-weight: 600; }
+
+  .alerts { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 12px; color: var(--ink-faint); }
+  .alerts .go { margin-left: auto; font-family: PlexMono; font-size: 9px; letter-spacing: .8px; }
+
+  /* ---------------- dock ---------------- */
+  .dock-wrap { position: absolute; left: 12px; right: 12px; bottom: 12px; }
+  .dock {
+    height: 64px; display: flex; align-items: center; gap: 2px; padding: 6px;
+    border-radius: 20px; border: 1px solid var(--hair-strong);
+    background: rgba(17,24,39,.96);
+    box-shadow: 0 10px 24px rgba(0,0,0,.5);
+  }
+  .tab {
+    flex: 1; height: 100%; border-radius: 14px; border: 1px solid transparent;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    cursor: pointer; color: var(--ink-faint); background: transparent;
+  }
+  .tab .tl { font-family: PlexMono; font-size: 8.5px; letter-spacing: .5px; font-weight: 500; }
+  .tab.on { color: var(--accent); background: var(--accent-wash); border-color: rgba(56,189,248,.45); }
+  .tab.on .tl { font-weight: 600; }
+  .dock .sep { width: 1px; height: 26px; background: var(--hair); margin: 0 3px; }
+  .dock .gear { width: 42px; height: 100%; display: grid; place-items: center; color: var(--ink-soft); cursor: pointer; }
+  svg { display: block; }
+
+  /* ---------------- shelf view ---------------- */
+  .shelf { display: none; }
+  .shelf.on, .home.on { display: block; }
+  .home { display: block; }
+  .hidden { display: none !important; }
+
+  .searchrow { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  .search {
+    flex: 1; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 11px;
+    border-radius: 12px; background: var(--surface); border: 1px solid var(--hair);
+    color: var(--ink-soft); font-size: 13px;
+  }
+  .filters { display: flex; gap: 7px; margin-top: 10px; }
+  .chip {
+    padding: 7px 12px; border-radius: 8px; border: 1px solid var(--hair);
+    font-family: PlexMono; font-size: 9.5px; letter-spacing: .9px; font-weight: 600;
+    color: var(--ink-soft); cursor: pointer; background: transparent;
+  }
+  .chip.on { color: var(--accent); border-color: rgba(56,189,248,.55); background: var(--accent-wash); font-weight: 600; }
+
+  .row {
+    display: flex; align-items: center; gap: 11px; padding: 11px 12px 11px 11px;
+    border-radius: 15px; background: var(--surface); border: 1px solid var(--hair);
+    margin-top: 8px; cursor: pointer;
+  }
+  .row.attn { background: rgba(251,191,36,.06); border-color: rgba(251,191,36,.42); }
+  .row.empty { background: rgba(248,113,113,.06); border-color: rgba(248,113,113,.42); }
+  .well {
+    padding: 3px; border-radius: 9px; background: rgba(8,12,20,.55);
+    border: 1px solid var(--hair); flex: none;
+  }
+  .row .mid { flex: 1; min-width: 0; }
+  .row .f { font-family: PlexMono; font-size: 12.5px; color: var(--ink-soft); margin-top: 1px; }
+  .ticks { display: flex; gap: 3px; margin-top: 8px; }
+  .tick { width: 15px; height: 3.5px; border-radius: 2px; background: var(--hair-strong); }
+  .tick.on { background: var(--sage); }
+  .row.attn .tick.on { background: var(--clay); }
+  .row .right { text-align: right; flex: none; }
+  .row .q { font-family: PlexMono; font-size: 17px; font-weight: 600; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+  .row .u { font-family: PlexMono; font-size: 10px; letter-spacing: .8px; color: var(--ink-faint); margin-top: 2px; }
+  .flag {
+    display: inline-block; margin-top: 4px; padding: 1px 5px; border-radius: 4px;
+    font-family: PlexMono; font-size: 9px; letter-spacing: .8px; font-weight: 600;
+    background: rgba(251,191,36,.16); color: var(--clay);
+  }
+  .flag.bad { background: rgba(248,113,113,.16); color: var(--berry); }
+
+  /* ---------------- control panel ---------------- */
+  .panel { display: flex; flex-direction: column; gap: 16px; }
+  .badge {
+    display: inline-block; align-self: flex-start; font-family: PlexMono; font-size: 10px;
+    letter-spacing: 1.4px; color: #7DD3FC; background: rgba(56,189,248,.12);
+    border: 1px solid rgba(56,189,248,.3); padding: 5px 11px; border-radius: 99px;
+  }
+  .panel h1 { font-size: clamp(24px, 3vw, 32px); line-height: 1.12; letter-spacing: -.9px; margin: 0; font-weight: 700; }
+  .panel p { margin: 0; color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; }
+  .panel p b { color: var(--ink); font-weight: 600; }
+  .panel code { font-family: PlexMono; font-size: 11.5px; background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 4px; }
+
+  .controls { display: flex; flex-direction: column; gap: 13px; padding: 16px; }
+  .controls h3 { margin: 0; font-size: 14px; font-weight: 600; }
+  .ctl { display: flex; align-items: center; gap: 12px; }
+  .ctl .k { font-family: PlexMono; font-size: 10px; letter-spacing: .8px; color: var(--ink-soft); width: 92px; text-transform: uppercase; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  .ctl .v { font-family: PlexMono; font-size: 11px; color: var(--accent); width: 52px; text-align: right; }
+  .note { font-size: 12px; line-height: 1.55; color: var(--ink-soft); }
+  .note b { color: var(--ink); }
+  .kbd { font-family: PlexMono; font-size: 10px; border: 1px solid var(--hair-strong); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; color: var(--ink); }
+  .sw { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); }
+  .sw input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .tag { font-family: PlexMono; font-size: 9px; letter-spacing: .7px; color: var(--ink-faint); text-transform: uppercase; }
+  .divider { height: 1px; background: var(--hair); }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============================ the phone ============================ -->
+  <div class="phone">
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><div class="island"></div><span>▮▮▮ 100%</span></div>
+
+      <div class="scroll" id="scroll">
+        <!-- ---------------- HOME ---------------- -->
+        <div class="home on" id="view-home">
+          <div class="head">
+            <div class="grow">
+              <div class="eyebrow" id="date">SUN, 15 NOV</div>
+              <h1 class="display">Hello, Fahad</h1>
+            </div>
+            <span class="pill" id="syncPill"><span>✓</span> SYNCED</span>
+            <button class="icon-btn" title="Settings">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"/><circle cx="14" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+            </button>
+          </div>
+
+          <!-- the one instrument -->
+          <div class="card hero">
+            <div class="hero-top">
+              <span class="dot" id="heroDot"></span>
+              <span class="eyebrow" style="letter-spacing:.9px">Closest to empty</span>
+              <span class="readout" id="readout">LEVEL</span>
+            </div>
+            <div class="vessel-wrap"><canvas class="vessel" id="heroCanvas"></canvas></div>
+            <div class="hero-foot">
+              <div class="grow">
+                <div class="item" style="font-size:18px" id="heroName">Hydrochloric acid</div>
+                <div class="formula" id="heroFormula">HCl · 500 mL bottle</div>
+              </div>
+              <div style="text-align:right">
+                <div><span class="big" id="heroQty">120</span><span class="unit" id="heroUnit"> mL</span></div>
+                <div class="order-line" id="heroOrder">ORDER AT 150 mL</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- what to order -->
+          <div class="card order" id="orderCard">
+            <div class="order-head">
+              <span class="dot" style="background:var(--clay);box-shadow:0 0 7px var(--clay)"></span>
+              <span class="eyebrow on" style="color:var(--clay)">2 THINGS NEED ORDERING</span>
+              <span class="num">2</span>
+            </div>
+            <div id="orderLines"></div>
+            <div style="display:flex;align-items:center;margin-top:4px">
+              <button class="icon-btn" style="width:auto;padding:0 8px;height:30px;font-family:PlexMono;font-size:9.5px;letter-spacing:.6px;color:var(--clay);border:none;background:transparent">SHARE LIST</button>
+            </div>
+          </div>
+
+          <div class="doors">
+            <div class="door primary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h3v3h-3z"/></svg>
+              SCAN A LABEL
+            </div>
+            <div class="door secondary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10M4 12h10M4 17h6"/><path d="M17 12v6M14 15h6"/></svg>
+              LOG A SESSION
+            </div>
+          </div>
+
+          <div class="card strip">
+            <div class="cell"><div class="n">14</div><div class="l">Reagents</div></div>
+            <div class="rule"></div>
+            <div class="cell"><div class="n">6</div><div class="l">Apparatus</div></div>
+            <div class="rule"></div>
+            <div class="cell"><div class="n">3</div><div class="l">Logged today</div></div>
+          </div>
+
+          <div class="sync">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg>
+            Up to date.
+          </div>
+
+          <div class="section"><span class="eyebrow">This month</span><span class="line"></span></div>
+          <div class="metrics">
+            <div class="metric"><div class="v">38</div><div class="k">Used</div></div>
+            <div class="metric"><div class="v">9</div><div class="k">Restocked</div></div>
+            <div class="metric"><div class="v" style="color:var(--berry)">1</div><div class="k">Empty now</div></div>
+          </div>
+
+          <div class="section"><span class="eyebrow">Today</span><span class="line"></span></div>
+          <div id="todayRows"></div>
+
+          <div class="alerts">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a5 5 0 0 0-5 5v4l-2 4h14l-2-4V8a5 5 0 0 0-5-5z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+            Low-stock alerts are on
+            <span class="go">SETTINGS</span>
+          </div>
+        </div>
+
+        <!-- ---------------- SHELF ---------------- -->
+        <div class="shelf" id="view-shelf">
+          <div class="head">
+            <div class="grow">
+              <div><span class="eyebrow">SUN, 15 NOV</span> <span class="eyebrow on">· CHEMS</span></div>
+              <h1 class="display" style="color:var(--clay);font-size:27px">2 need ordering</h1>
+              <div class="eyebrow" style="margin-top:5px;letter-spacing:.8px">14 REAGENTS ON THIS SHELF</div>
+            </div>
+            <button class="icon-btn" title="More">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+            </button>
+          </div>
+
+          <div class="searchrow">
+            <div class="search">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+              Search name, formula or note
+            </div>
+            <button class="icon-btn">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+
+          <div class="filters">
+            <div class="chip" data-f="all">ALL</div>
+            <div class="chip on" data-f="order">ORDER</div>
+            <div class="chip" data-f="empty">EMPTY</div>
+          </div>
+
+          <div id="shelfRows"></div>
+        </div>
+      </div>
+
+      <!-- dock -->
+      <div class="dock-wrap">
+        <div class="dock">
+          <button class="tab on" data-tab="home">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>
+            <span class="tl">HOME</span>
+          </button>
+          <button class="tab" data-tab="shelf" data-kind="chemical">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 3h6M10 3v5L5 19a2 2 0 0 0 1.8 2h10.4A2 2 0 0 0 19 19L14 8V3"/><path d="M7.5 14h9"/></svg>
+            <span class="tl">CHEMS</span>
+          </button>
+          <button class="tab" data-tab="shelf" data-kind="apparatus">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v6M9 9h6l2 11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z"/></svg>
+            <span class="tl">GEAR</span>
+          </button>
+          <button class="tab" data-tab="shelf">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3"/><rect x="8" y="8" width="8" height="8" rx="1.4"/></svg>
+            <span class="tl">SCAN</span>
+          </button>
+          <button class="tab" data-tab="shelf">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+            <span class="tl">REPORTS</span>
+          </button>
+          <div class="sep"></div>
+          <div class="gear">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"/><circle cx="14" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ the panel ============================ -->
+  <div class="panel">
+    <div>
+      <span class="badge">Instrument panel · flutter_app_v2</span>
+      <h1 style="margin-top:12px">The prototype's idea,<br>with the physics fixed.</h1>
+      <p style="margin-top:10px">This is a working model of the design now in <code>flutter_app_v2</code>. Same tokens, same rule for the
+      vessel, same type ladder. Move the phone — or use the sliders — and the liquid finds its own level
+      while the order notch stays on the glass.</p>
+    </div>
+
+    <div class="card controls">
+      <h3>Tilt</h3>
+      <div class="ctl">
+        <span class="k">Roll</span>
+        <input type="range" id="roll" min="-45" max="45" value="0" step="1">
+        <span class="v" id="rollV">0°</span>
+      </div>
+      <div class="ctl">
+        <span class="k">Pitch</span>
+        <input type="range" id="pitch" min="-30" max="30" value="0" step="1">
+        <span class="v" id="pitchV">0°</span>
+      </div>
+      <div class="note">
+        The sliders stand in for the gyro so this page works on a desktop.
+        On the phone, <b>dragging sideways anywhere on the screen</b> leans the vessel by thumb, and the sensor does
+        it hands-free. Release and the liquid finds its level again — it does not stay where you left it.
+      </div>
+      <div class="divider"></div>
+      <div class="sw"><input type="checkbox" id="gyro"><label for="gyro">Follow the real gyro (asked for permission on tap)</label></div>
+      <div class="sw"><input type="checkbox" id="reduced"><label for="reduced">Reduced motion — no slosh, no lean</label></div>
+      <div class="sw"><input type="checkbox" id="notch" checked><label for="notch">Draw the order-level notch</label></div>
+    </div>
+
+    <div class="card controls">
+      <h3>What changed from the mockup</h3>
+      <div class="note" style="display:grid;gap:9px">
+        <div><b>1. The threshold can no longer lie.</b> The notch is a ring painted on the glass at world height
+        <code>limit ÷ capacity</code>, so when the liquid tips, the line tips with it. A line pinned to the screen was
+        the one thing that would have made the whole gesture untrustworthy.</div>
+        <div><b>2. The liquid is data.</b> It is drawn in the stock state's colour at real strength, and the cool
+        glass wash sits on top of it. In the mockup the liquid was decorative cyan while a pulsing red border carried
+        the warning — the vessel would glow when everything was fine.</div>
+        <div><b>3. "Synced" is earned.</b> The pill reads the pending outbox and says <code>3 WAITING</code> when there
+        is work to upload. The old pulsing dot claimed a state it never checked.</div>
+        <div><b>4. Gyro cost stays flat.</b> One sensor subscription per shell, and samples repaint vessels only —
+        no screen rebuilds at 30 Hz. In the app that is an <code>InheritedNotifier</code>, not a <code>ref.watch</code>.</div>
+        <div><b>5. Ten pixels is the floor.</b> The mockup had 9–9.5 px labels everywhere; here nothing readable is
+        under 10, quantities are 17, and formulas are mono so <code>HCl</code> can't read as <code>HCI</code>.</div>
+          <div><b>6. Five tabs, not three.</b> Apparatus and reports keep their place; only the skin changed.</div>
+      </div>
+    </div>
+
+    <div class="card controls">
+      <h3>Vessel rule, as implemented</h3>
+      <div class="note" style="display:grid;gap:7px">
+        <div><span class="tag">level</span> &nbsp;<code>quantity ÷ max(initialQuantity, quantity)</code>, clamped 0–1</div>
+        <div><span class="tag">notch</span> &nbsp;<code>limit ÷ capacity</code>, pinned to the top when the limit exceeds the bottle</div>
+        <div><span class="tag">state</span> &nbsp;zero → <span style="color:var(--berry)">berry</span> · at or below limit →
+        <span style="color:var(--clay)">clay</span> · otherwise <span style="color:var(--sage)">sage</span></div>
+        <div><span class="tag">no limit</span> &nbsp;reads fine and is never counted as needing attention — except at zero</div>
+        <div><span class="tag">ticks</span> &nbsp;five segments, rounded down, minimum one when anything is left</div>
+      </div>
+    </div>
+
+    <p style="font-size:12px;color:var(--ink-faint)">
+      Browser note: iOS only grants motion access after a tap, which is what the gyro checkbox is for. Nothing on this
+      page needs it — the sliders and the drag are the same maths.
+    </p>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Tokens, mirrored from LabPalette.dark. Read from CSS so there is one source.
+// ---------------------------------------------------------------------------
+const css = getComputedStyle(document.documentElement);
+const T = (name) => css.getPropertyValue(name).trim();
+const PAL = {
+  canvas: T('--canvas'), surface: T('--surface'), ink: T('--ink'),
+  inkSoft: T('--ink-soft'), inkFaint: T('--ink-faint'),
+  accent: T('--accent'), sage: T('--sage'), clay: T('--clay'),
+  berry: T('--berry'), glass: T('--glass'),
+};
+
+// A tiny mixer so alphas are exact rather than string-concatenated hex.
+function rgba(hex, a) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+// ---------------------------------------------------------------------------
+// The jar rule — a faithful port of jarMetrics() from
+// lib/core/widgets/jar_metrics.dart, including the fallbacks. The preview has
+// to agree with the app or it is worse than no preview.
+// ---------------------------------------------------------------------------
+function jarMetrics({ quantity, initialQuantity, threshold, piecewise = false }) {
+  const q = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
+  const limit = Number.isFinite(threshold) && threshold > 0 ? threshold : 0;
+  const hasLimit = limit > 0;
+  // Asked directly, not derived from capacity: capacity is the max with the
+  // current quantity, so it is never zero when something is left, and a
+  // "capacity <= 0" test is unreachable. That unreachable test is exactly how
+  // every imported row came to be drawn as a full bottle.
+  const recorded = Number.isFinite(initialQuantity) && initialQuantity > 0 ? initialQuantity : 0;
+  const hasCapacity = recorded > 0;
+  const capacity = Math.max(recorded, q);
+
+  // null, not 1: a record with no capacity cannot claim to be full.
+  let fill;
+  if (q <= 0) fill = 0;
+  else if (!hasCapacity) fill = null;
+  else fill = Math.min(1, Math.max(0, q / capacity));
+
+  const partialFill = fill === null && q > 0 ? 0.42 : 0;
+
+  let signal;
+  if (q <= 0) signal = 'empty';
+  else if (hasLimit && q <= limit) signal = 'order';
+  else signal = 'fine';
+
+  const notch = !hasLimit ? null : !hasCapacity ? 1 : Math.min(1, Math.max(0, limit / capacity));
+
+  let ticks;
+  if (piecewise && hasCapacity && capacity <= 6) ticks = Math.round(q);
+  else if (fill === null || fill <= 0) ticks = 0;
+  else ticks = Math.min(5, Math.max(1, Math.floor(fill * 5)));
+
+  return {
+    fill, partialFill, notch, ticks, signal, hasLimit, capacity, hasCapacity,
+    levelUnknown: fill === null,
+    drawn: fill === null ? partialFill : fill,
+  };
+}
+
+function stateColor(signal) {
+  return signal === 'empty' ? PAL.berry : signal === 'order' ? PAL.clay : PAL.sage;
+}
+
+// ---------------------------------------------------------------------------
+// Vessel painter — the same drawing order as _VesselPainter:
+//   1. body in page colour, clipped
+//   2. liquid surface under -tip (world level), full strength + meniscus
+//   3. glass wash over it, rim, highlight
+//   4. notch in the same leaning frame as the glass
+// ---------------------------------------------------------------------------
+class Vessel {
+  constructor(canvas, opts = {}) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.opts = Object.assign({
+      fill: 0.5, notch: null, signal: 'fine', tip: 0, wave: 0,
+      notchOn: true, big: false,
+    }, opts);
+    this.shown = this.opts.fill;
+    this.resize();
+    if (!opts.big) {
+      // Small vessels use the same exaggeration the app applies (1.5–1.8) so a
+      // 40° lean is still visible at 22 dp.
+      this.opts.tipScale = opts.tipScale ?? 1.5;
+    }
+  }
+
+  resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const r = this.canvas.getBoundingClientRect();
+    this.w = Math.max(1, r.width); this.h = Math.max(1, r.height);
+    this.canvas.width = this.w * dpr; this.canvas.height = this.h * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  set(patch) { Object.assign(this.opts, patch); }
+
+  draw() {
+    const { ctx, w, h } = this;
+    const o = this.opts;
+    const tip = (o.tip || 0) * Math.PI / 180 * (o.tipScale ?? 1);
+    const big = o.big;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // ---- body geometry ----------------------------------------------------
+    let body;
+    if (big) {
+      const outerW = Math.min(w * 0.56, h * 0.62);
+      body = {
+        x: w / 2 - outerW / 2, y: h / 2 + h * 0.04 - (h * 0.78) / 2 + 2,
+        w: outerW - 4, h: h * 0.78 - 4,
+      };
+      body.y = h * 0.5 + h * 0.04 - h * 0.39 + 2;
+      body.h = h * 0.78 - 4;
+    } else {
+      const cap = h * 0.14;
+      body = { x: 0.7, y: cap, w: w - 1.4, h: h - cap - 0.7 };
+    }
+    const r = Math.min(body.w, body.h) * (big ? 0.2 : 0.16);
+
+    const rr = (x, y, ww, hh, rad) => {
+      ctx.beginPath();
+      ctx.moveTo(x + rad, y);
+      ctx.arcTo(x + ww, y, x + ww, y + hh, rad);
+      ctx.arcTo(x + ww, y + hh, x, y + hh, rad);
+      ctx.arcTo(x, y + hh, x, y, rad);
+      ctx.arcTo(x, y, x + ww, y, rad);
+      ctx.closePath();
+    };
+
+    // ground glow for the hero
+    if (big) {
+      ctx.save();
+      const g = ctx.createRadialGradient(w / 2, body.y + body.h + 3, 1, w / 2, body.y + body.h + 3, body.w * 0.8);
+      g.addColorStop(0, rgba(stateColor(o.signal), 0.18));
+      g.addColorStop(1, rgba(stateColor(o.signal), 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, body.y + body.h - 8, w, 22);
+      ctx.restore();
+    }
+
+    // body fill (page colour)
+    rr(body.x, body.y, body.w, body.h, r);
+    ctx.fillStyle = PAL.canvas;
+    ctx.fill();
+
+    ctx.save();
+    rr(body.x, body.y, body.w, body.h, r);
+    ctx.clip();
+
+    // ---- liquid, world-level ---------------------------------------------
+    // Corner-aware correction, not a flat clamp: the surface must stay inside
+    // the vessel under any lean, without flattening a genuinely low fill.
+    const fill = this.shown;
+    if (fill > 0) {
+      const waveAmpFrac = big ? 0.05 : 0.085;
+      const halfDiag = 0.5 * Math.sqrt(body.w * body.w + body.h * body.h);
+      const swing = (halfDiag * Math.sin(Math.abs(tip)) + body.h * waveAmpFrac) / body.h;
+      const drawn = Math.min(0.97 - swing * 0.5, Math.max(0.03 + swing, fill));
+      const surfaceY = body.y + body.h * (1 - drawn);
+      const reach = body.h * 1.3;
+      const amp = o.wave * body.h * (big ? 0.05 : 0.085);
+      const cx = body.x + body.w / 2, cy = body.y + body.h / 2;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-tip);
+      ctx.translate(-cx, -cy);
+
+      const surf = (i, steps) => {
+        const x = body.x - reach + (body.w + reach * 2) * (i / steps);
+        const y = surfaceY
+          + Math.sin(o.phase + i / steps * Math.PI * 1.7) * amp
+          + Math.sin(o.phase * 0.55 + i / steps * Math.PI * 0.8) * amp * 0.45;
+        return [x, y];
+      };
+      const steps = 24;
+
+      ctx.beginPath();
+      const [x0, y0] = surf(0, steps);
+      ctx.moveTo(x0, y0);
+      for (let i = 1; i <= steps; i++) { const [x, y] = surf(i, steps); ctx.lineTo(x, y); }
+      ctx.lineTo(body.x + body.w + reach, body.y + body.h + reach);
+      ctx.lineTo(body.x - reach, body.y + body.h + reach);
+      ctx.closePath();
+
+      const lg = ctx.createLinearGradient(0, surfaceY, 0, body.y + body.h);
+      const c = stateColor(o.signal);
+      lg.addColorStop(0, rgba(c, big ? 0.5 : 0.55));
+      lg.addColorStop(1, rgba(c, big ? 0.8 : 0.78));
+      ctx.fillStyle = lg;
+      ctx.fill();
+
+      // meniscus
+      ctx.beginPath();
+      const [mx, my] = surf(0, steps);
+      ctx.moveTo(mx, my);
+      for (let i = 1; i <= steps; i++) { const [x, y] = surf(i, steps); ctx.lineTo(x, y); }
+      ctx.strokeStyle = rgba(c, 0.95);
+      ctx.lineWidth = Math.max(0.9, h * (big ? 0.012 : 0.022));
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // ---- glass wash over the liquid --------------------------------------
+    ctx.save();
+    rr(body.x, body.y, body.w, body.h, r);
+    ctx.clip();
+    const gg = ctx.createLinearGradient(body.x, body.y, body.x + body.w, body.y + body.h);
+    gg.addColorStop(0, rgba(PAL.glass, big ? 0.12 : 0.16));
+    gg.addColorStop(0.55, rgba(PAL.glass, 0.02));
+    gg.addColorStop(1, rgba(PAL.glass, big ? 0.06 : 0.03));
+    ctx.fillStyle = gg;
+    ctx.fillRect(body.x, body.y, body.w, body.h);
+    ctx.restore();
+
+    // ---- notch + rim, leaning with the glass -----------------------------
+    // The whole vessel turns with the phone; only the surface inside it stays
+    // level with the ground. Turning the glass by a third of the tip is what
+    // made a 40° tilt look like nothing.
+    const cx = body.x + body.w / 2, cy = body.y + body.h / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(tip);
+    ctx.translate(-cx, -cy);
+
+    if (o.notchOn && o.notch != null) {
+      const ny = body.y + body.h * (1 - Math.min(1, Math.max(0, o.notch)));
+      const inset = body.w * (big ? 0.1 : 0.12);
+      ctx.strokeStyle = rgba(PAL.ink, big ? 0.55 : 0.62);
+      ctx.lineWidth = Math.max(0.8, h * (big ? 0.008 : 0.018));
+      ctx.beginPath();
+      ctx.moveTo(body.x + inset, ny); ctx.lineTo(body.x + body.w - inset, ny);
+      ctx.moveTo(body.x + inset, ny - h * 0.026); ctx.lineTo(body.x + inset, ny + h * 0.026);
+      ctx.moveTo(body.x + body.w - inset, ny - h * 0.026); ctx.lineTo(body.x + body.w - inset, ny + h * 0.026);
+      ctx.stroke();
+    }
+
+    rr(body.x, body.y, body.w, body.h, r);
+    ctx.strokeStyle = rgba(PAL.ink, big ? 0.7 : 0.82);
+    ctx.lineWidth = Math.max(1, w * (big ? 0.004 : 0.032));
+    ctx.stroke();
+
+    // highlight down the left
+    ctx.beginPath();
+    ctx.strokeStyle = rgba(PAL.ink, big ? 0.13 : 0.18);
+    ctx.lineWidth = Math.max(1, w * (big ? 0.008 : 0.05));
+    ctx.lineCap = 'round';
+    const hx = body.x + body.w * (big ? 0.16 : 0.17);
+    ctx.moveTo(hx, body.y + body.h * (big ? 0.1 : 0.18));
+    ctx.lineTo(hx, body.y + body.h * (big ? 0.45 : 0.55));
+    ctx.stroke();
+    ctx.restore();
+
+    // ---- mouth: stopper for a bottle, open rim + lip for a beaker --------
+    if (!big && o.shape !== 'beaker') {
+      const capW = w * 0.46, capH = h * 0.14;
+      rr((w - capW) / 2, 0.6, capW, capH, 1.6);
+      ctx.fillStyle = rgba(PAL.ink, 0.55);
+      ctx.fill();
+    } else if (o.shape === 'beaker') {
+      ctx.strokeStyle = rgba(PAL.ink, 0.7);
+      ctx.lineWidth = Math.max(1, w * 0.06);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(body.x, body.y);
+      ctx.lineTo(body.x + body.w, body.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(body.x + body.w, body.y);
+      ctx.lineTo(body.x + body.w + w * 0.07, body.y - h * 0.07);
+      ctx.stroke();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Data — shaped exactly like ItemView, with metrics computed by jarMetrics.
+// ---------------------------------------------------------------------------
+const RAW = [
+  { name: 'Hydrochloric acid', sub: 'HCl', qty: 120, initial: 500, limit: 150, unit: 'mL' },
+  { name: 'Sodium hydroxide', sub: 'NaOH', qty: 0, initial: 500, limit: 100, unit: 'g' },
+  { name: 'Ethanol 95%', sub: 'C₂H₅OH', qty: 320, initial: 1000, limit: 250, unit: 'mL' },
+  { name: 'Copper sulfate', sub: 'CuSO₄·5H₂O', qty: 480, initial: 500, limit: 0, unit: 'g' },
+  { name: 'Phenolphthalein', sub: 'C₂₀H₁₄O₄', qty: 42, initial: 100, limit: 0, unit: 'mL' },
+  { name: 'Benedict’s solution', sub: 'Cu²⁺ complex', qty: 640, initial: 1000, limit: 300, unit: 'mL' },
+  { name: 'Silver nitrate', sub: 'AgNO₃', qty: 18, initial: 50, limit: 25, unit: 'g' },
+  // Imported rows, the way the real store room actually looks: a quantity and
+  // no capacity at all. These are the ones that used to draw as full bottles.
+  { name: '2-Butanol', sub: 'C4H10O', qty: 27170, initial: 0, limit: 0, unit: 'mL' },
+  { name: 'Acetone', sub: 'C3H6O', qty: 6400, initial: 0, limit: 0, unit: 'mL' },
+];
+const APPARATUS = [
+  { name: 'Beaker 1000ml', sub: 'glassware', qty: 5, initial: 0, limit: 0, unit: 'pcs' },
+  { name: 'Boiling Tube', sub: 'glassware', qty: 592, initial: 0, limit: 0, unit: 'pcs' },
+  { name: 'Bunsen Burner', sub: 'heating', qty: 102, initial: 0, limit: 0, unit: 'pcs' },
+  { name: 'Test Tubes', sub: 'glassware', qty: 24, initial: 30, limit: 10, unit: 'pcs' },
+];
+const ITEMS = RAW.map((r, i) => ({
+  ...r, kind: 'chemical', id: 'c' + i, metrics: jarMetrics({
+    quantity: r.qty, initialQuantity: r.initial, threshold: r.limit,
+  }),
+}));
+const GEAR = APPARATUS.map((r, i) => ({
+  ...r, kind: 'apparatus', id: 'a' + i, metrics: jarMetrics({
+    quantity: r.qty, initialQuantity: r.initial, threshold: r.limit,
+    piecewise: true,
+  }),
+}));
+
+const NEEDS_ORDER = ITEMS.filter(i => i.metrics.signal !== 'fine');
+const HERO = NEEDS_ORDER[0] ?? ITEMS[0];
+
+// ---------------------------------------------------------------------------
+// Painting loop. One rAF for the page, not one per vessel: forty loops would
+// fight for the same frame, which is the thing the Flutter build avoids by
+// keeping a single tilt notifier.
+// ---------------------------------------------------------------------------
+const state = { roll: 0, pitch: 0, notchOn: true, reduced: false, target: 0, shown: 0 };
+const vessels = [];
+
+const heroCanvas = document.getElementById('heroCanvas');
+const heroVessel = new Vessel(heroCanvas, {
+  big: true, fill: HERO.metrics.drawn, notch: HERO.metrics.notch,
+  signal: HERO.metrics.signal, tip: 0,
+});
+vessels.push(heroVessel);
+
+// order card lines
+const orderLines = document.getElementById('orderLines');
+NEEDS_ORDER.slice(0, 3).forEach(item => {
+  const wrap = document.createElement('div');
+  wrap.className = 'order-line-row';
+  const c = document.createElement('canvas');
+  c.className = 'mini'; c.width = 22; c.height = 28;
+  wrap.appendChild(c);
+  const v = new Vessel(c, {
+    fill: item.metrics.drawn, notch: item.metrics.notch,
+    signal: item.metrics.signal, tipScale: 1.8,
+    shape: item.kind === 'apparatus' ? 'beaker' : 'bottle',
+  });
+  vessels.push(v);
+  const name = document.createElement('div');
+  name.className = 'name'; name.textContent = item.name;
+  const qty = document.createElement('div');
+  qty.className = 'qty';
+  qty.textContent = item.qty <= 0 ? 'empty' : item.qty + ' ' + item.unit;
+  qty.style.color = stateColor(item.metrics.signal);
+  wrap.append(name, qty);
+  orderLines.appendChild(wrap);
+});
+
+// today
+const todayRows = document.getElementById('todayRows');
+[
+  { t: '09:12', name: 'Hydrochloric acid', d: '−50 mL', down: true },
+  { t: '09:20', name: 'Ethanol 95%', d: '−200 mL', down: true },
+  { t: '11:04', name: 'Benedict’s solution', d: '+500 mL', down: false },
+].forEach(r => {
+  const row = document.createElement('div');
+  row.className = 'today-row';
+  row.innerHTML = `<span class="t">${r.t}</span>
+    <span class="bar" style="background:${r.down ? PAL.clay : PAL.sage}"></span>
+    <span class="n">${r.name}</span>
+    <span class="d" style="color:${r.down ? PAL.clay : PAL.sage}">${r.d}</span>`;
+  todayRows.appendChild(row);
+});
+
+// shelf rows
+const shelfRows = document.getElementById('shelfRows');
+let shelfKind = 'chemical';
+function drawShelf(filter) {
+  shelfRows.innerHTML = '';
+  // drop the old row vessels from the paint list
+  for (let i = vessels.length - 1; i >= 0; i--) if (vessels[i].row) vessels.splice(i, 1);
+  const source = shelfKind === 'apparatus' ? GEAR : ITEMS;
+  const list = source.filter(item => {
+    if (filter === 'order') return item.metrics.signal !== 'fine';
+    if (filter === 'empty') return item.qty <= 0;
+    return true;
+  });
+  list.forEach(item => {
+    const m = item.metrics;
+    const row = document.createElement('div');
+    row.className = 'row' + (m.signal === 'order' ? ' attn' : m.signal === 'empty' ? ' empty' : '');
+    const well = document.createElement('div');
+    well.className = 'well';
+    const c = document.createElement('canvas');
+    c.width = 30; c.height = 40; c.style.width = '30px'; c.style.height = '40px';
+    well.appendChild(c);
+    const v = new Vessel(c, {
+      fill: m.drawn, notch: m.notch, signal: m.signal, tipScale: 1.5,
+      shape: item.kind === 'apparatus' ? 'beaker' : 'bottle',
+    });
+    v.row = true;
+    vessels.push(v);
+
+    const mid = document.createElement('div');
+    mid.className = 'mid';
+    mid.innerHTML = `<div class="item" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
+      <div class="f">${item.sub}</div>
+      <div class="ticks">${m.levelUnknown
+        ? `<span class="tick"></span><span style="font-family:PlexMono;font-size:9px;letter-spacing:.6px;color:var(--ink-faint);margin-left:3px">level not set</span>`
+        : Array.from({ length: 5 }, (_, i) =>
+            `<span class="tick${i < m.ticks ? ' on' : ''}"></span>`).join('')}</div>`;
+
+    const right = document.createElement('div');
+    right.className = 'right';
+    const flag = m.signal === 'empty'
+      ? '<span class="flag bad">EMPTY</span>'
+      : m.signal === 'order' ? '<span class="flag">ORDER</span>' : '';
+    right.innerHTML = `<div class="q">${item.qty}</div>
+      <div class="u">${item.unit.toUpperCase()}</div>${flag}`;
+
+    row.append(well, mid, right);
+    shelfRows.appendChild(row);
+  });
+}
+drawShelf('order');
+
+// ---------------------------------------------------------------------------
+// Motion: the same damped settle as LabMotion.settleWave, and a lean that
+// eases toward the target the way the TiltModel does.
+// ---------------------------------------------------------------------------
+function settleWave(t) {
+  if (t <= 0 || t >= 1) return 0;
+  const env = Math.pow(1 - t, 2);
+  return (Math.sin(t * Math.PI * 5.2) + Math.sin(t * Math.PI * 2.1) * 0.45) * env;
+}
+
+let waveStart = 0;
+const WAVE_MS = 460;
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(64, now - last); last = now;
+
+  // lean follows the target with the app's 120 ms ease-out
+  const target = state.reduced ? 0 : (state.roll + state.drag || 0);
+  const k = 1 - Math.exp(-dt / 55);
+  state.shown += (target - state.shown) * k;
+
+  const waveT = Math.min(1, (now - waveStart) / WAVE_MS);
+  const wave = state.reduced ? 0 : settleWave(waveT);
+  const phase = waveT * Math.PI * 2.2;
+
+  for (const v of vessels) {
+    v.set({ tip: state.shown, wave, phase, notchOn: state.notchOn });
+    v.draw();
+  }
+
+  const deg = Math.abs(Math.round(state.shown));
+  const readout = document.getElementById('readout');
+  readout.textContent = deg === 0 ? 'LEVEL' : deg + '° ' + (state.shown > 0 ? 'R' : 'L');
+  readout.style.color = deg === 0 ? PAL.inkFaint : PAL.accent;
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// The hero is filled in after the paint loop exists: its canvas is the first
+// vessel in `vessels`, and the loop draws it every frame.
+document.getElementById('heroName').textContent = HERO.name;
+document.getElementById('heroFormula').textContent =
+  HERO.sub + ' · ' + HERO.initial + ' ' + HERO.unit + ' bottle';
+document.getElementById('heroQty').textContent = HERO.qty;
+document.getElementById('heroUnit').textContent = ' ' + HERO.unit;
+document.getElementById('heroOrder').textContent = HERO.metrics.hasLimit
+  ? 'ORDER AT ' + HERO.limit + ' ' + HERO.unit +
+    (HERO.metrics.fill === null ? '' : ' · ' + Math.round(HERO.metrics.fill * 100) + '% FULL')
+  : HERO.metrics.levelUnknown
+    ? HERO.qty + ' ' + HERO.unit.toUpperCase() + ' ON HAND · NO ORDER LEVEL'
+    : 'NO ORDER LEVEL SET';
+document.getElementById('heroDot').style.background = stateColor(HERO.metrics.signal);
+document.getElementById('heroDot').style.boxShadow = '0 0 7px ' + stateColor(HERO.metrics.signal);
+
+// ---------------------------------------------------------------------------
+// Input: sliders, drag, keyboard, and the real gyro when it is granted.
+// ---------------------------------------------------------------------------
+const rollEl = document.getElementById('roll');
+const pitchEl = document.getElementById('pitch');
+rollEl.addEventListener('input', () => {
+  state.roll = Number(rollEl.value);
+  document.getElementById('rollV').textContent = state.roll + '°';
+});
+pitchEl.addEventListener('input', () => {
+  state.pitch = Number(pitchEl.value);
+  document.getElementById('pitchV').textContent = state.pitch + '°';
+});
+
+document.getElementById('reduced').addEventListener('change', e => {
+  state.reduced = e.target.checked;
+  if (state.reduced) {
+    // A level change still sloshes once when motion is on; with it off the
+    // liquid simply is where it is.
+    state.shown = 0; state.roll = 0; rollEl.value = 0;
+    document.getElementById('rollV').textContent = '0°';
+  }
+});
+document.getElementById('notch').addEventListener('change', e => {
+  state.notchOn = e.target.checked;
+});
+
+// Drag anywhere on the scroll area leans the vessel, then it re-settles.
+const scroll = document.getElementById('scroll');
+let dragging = false, startX = 0;
+scroll.addEventListener('pointerdown', e => {
+  if (e.target.closest('.tab, .chip, .icon-btn, .door')) return;
+  dragging = true; startX = e.clientX; state.drag = 0;
+});
+window.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  state.drag = Math.max(-30, Math.min(30, (e.clientX - startX) * 0.5));
+  if (!state.reduced) {
+    state.roll = Math.round(state.drag);
+    rollEl.value = state.roll;
+    document.getElementById('rollV').textContent = state.roll + '°';
+  }
+});
+window.addEventListener('pointerup', () => {
+  if (!dragging) return;
+  dragging = false;
+  state.drag = 0;
+  state.roll = 0;
+  rollEl.value = 0;
+  document.getElementById('rollV').textContent = '0°';
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') { state.roll = Math.max(-45, state.roll - 4); }
+  else if (e.key === 'ArrowRight') { state.roll = Math.min(45, state.roll + 4); }
+  else return;
+  rollEl.value = state.roll;
+  document.getElementById('rollV').textContent = state.roll + '°';
+});
+
+// Real gyro. iOS needs a user gesture, so this is a checkbox rather than an
+// automatic request — the same trade the Flutter build makes.
+document.getElementById('gyro').addEventListener('change', async e => {
+  if (!e.target.checked) { window.removeEventListener('deviceorientation', onOrient); return; }
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const granted = await DeviceOrientationEvent.requestPermission();
+      if (granted !== 'granted') { e.target.checked = false; return; }
+    }
+    window.addEventListener('deviceorientation', onOrient);
+  } catch (_) {
+    e.target.checked = false;
+  }
+});
+function onOrient(ev) {
+  if (ev.gamma == null) return;
+  state.roll = Math.max(-45, Math.min(45, -ev.gamma));
+  rollEl.value = Math.round(state.roll);
+  document.getElementById('rollV').textContent = Math.round(state.roll) + '°';
+}
+
+// Filter chips + dock tabs keep the preview honest about the two views.
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    chip.classList.add('on');
+    drawShelf(chip.dataset.f);
+  });
+});
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+    tab.classList.add('on');
+    const shelf = tab.dataset.tab === 'shelf';
+    if (shelf && tab.dataset.kind) {
+      shelfKind = tab.dataset.kind;
+      drawShelf(document.querySelector('.chip.on')?.dataset.f ?? 'all');
+      const eyebrow = document.querySelector('#view-shelf .eyebrow.on');
+      if (eyebrow) {
+        eyebrow.textContent = '· ' + (shelfKind === 'apparatus' ? 'APPARATUS' : 'CHEMICALS');
+      }
+    }
+    document.getElementById('view-home').classList.toggle('on', !shelf);
+    document.getElementById('view-shelf').classList.toggle('on', shelf);
+    scroll.scrollTop = 0;
+    // Resize after the view swap: a canvas that was display:none measured 1×1.
+    requestAnimationFrame(() => {
+      for (const v of vessels) v.resize();
+    });
+  });
+});
+
+// A settle whenever a vessel appears, so the page opens with liquid in motion.
+waveStart = performance.now() - 200;
+window.addEventListener('resize', () => {
+  for (const v of vessels) v.resize();
+});
+</script>
+</body>
+</html>

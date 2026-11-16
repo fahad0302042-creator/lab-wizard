@@ -96,16 +96,49 @@ void main() {
       expect(metrics.ticks, 5);
     });
 
-    test('a record with no initial quantity reads full, not inventing a level',
-        () {
+    test('a record with no initial quantity claims no level at all', () {
       final metrics = jarMetrics(
         quantity: 50,
         initialQuantity: 0,
         threshold: 0,
       );
 
-      expect(metrics.fill, 1);
-      expect(metrics.ticks, 5);
+      // Null, not 1. Most of an imported store room has no capacity recorded,
+      // and drawing those as completely full is what put five green ticks under
+      // "27170 mL" and made the liquid look frozen — there was no surface to
+      // move because the vessel was full to the shoulder.
+      expect(metrics.fill, isNull);
+      expect(metrics.levelUnknown, isTrue);
+      expect(metrics.basis, LevelBasis.partial);
+      expect(metrics.ticks, 0, reason: 'no fraction to show, so no segments');
+
+      // It still draws a legible amount, because there *is* stock.
+      expect(metrics.partialFill, closeTo(.42, .001));
+    });
+
+    test('no capacity and nothing left is empty, not a sliver', () {
+      final metrics = jarMetrics(
+        quantity: 0,
+        initialQuantity: 0,
+        threshold: 0,
+      );
+
+      expect(metrics.fill, 0);
+      expect(metrics.partialFill, 0);
+      expect(metrics.signal, StockSignal.empty);
+    });
+
+    test('a known capacity still reports a real fraction', () {
+      final metrics = jarMetrics(
+        quantity: 250,
+        initialQuantity: 500,
+        threshold: 0,
+      );
+
+      expect(metrics.fill, closeTo(.5, .001));
+      expect(metrics.levelUnknown, isFalse);
+      expect(metrics.basis, LevelBasis.ofCapacity);
+      expect(metrics.partialFill, 0, reason: 'unused when fill is known');
     });
 
     test('nonsense values do not throw', () {

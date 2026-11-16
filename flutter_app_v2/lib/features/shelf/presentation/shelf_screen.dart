@@ -136,7 +136,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
         RefreshIndicator(
           onRefresh: ref.read(inventoryProvider.notifier).refresh,
           color: lab.sage,
-          backgroundColor: lab.card,
+          backgroundColor: lab.surface,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
@@ -375,7 +375,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
     HapticFeedback.selectionClick();
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: context.lab.bone,
+      backgroundColor: context.lab.canvas,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -438,7 +438,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: context.lab.bone,
+      backgroundColor: context.lab.canvas,
       builder: (_) => _AddItemSheet(kind: widget.kind),
     );
   }
@@ -446,7 +446,7 @@ class _ShelfScreenState extends ConsumerState<ShelfScreen> {
   Future<void> _openMenu(BuildContext context, WidgetRef ref) async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: context.lab.bone,
+      backgroundColor: context.lab.canvas,
       builder: (_) => _MenuSheet(
         kind: widget.kind,
         onAdd: () => _addItem(context, ref),
@@ -502,16 +502,28 @@ class _Header extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  DateFormat('EEEE, d MMMM').format(DateTime.now()),
-                  style: context.label.copyWith(letterSpacing: 1.1),
+              Text(
+                DateFormat('EEE, d MMM').format(DateTime.now()).toUpperCase(),
+                style: context.label.copyWith(
+                  fontSize: 9.5,
+                  letterSpacing: 1,
+                  color: lab.inkFaint,
                 ),
               ),
+              const SizedBox(width: 8),
+              Text(
+                '·  ${title.toUpperCase()}',
+                style: context.label.copyWith(
+                  fontSize: 9.5,
+                  letterSpacing: 1,
+                  color: lab.accent,
+                ),
+              ),
+              const Spacer(),
               IconButton(
                 tooltip: 'More',
                 onPressed: onMenu,
-                icon: Icon(Icons.more_horiz, size: 20, color: lab.soft),
+                icon: Icon(Icons.more_horiz, size: 20, color: lab.inkSoft),
               ),
             ],
           ),
@@ -536,11 +548,8 @@ class _Header extends StatelessWidget {
                             ? 'Everything above its level'
                             : '$attention ${attention == 1 ? 'needs' : 'need'} '
                                   'ordering',
-                        style: TextStyle(
-                          fontSize: LabType.display,
-                          height: 1.04,
-                          letterSpacing: -1.4,
-                          fontWeight: FontWeight.w600,
+                        style: context.display.copyWith(
+                          fontSize: 27,
                           color: calm ? lab.ink : lab.clay,
                         ),
                       ),
@@ -560,7 +569,11 @@ class _Header extends StatelessWidget {
           Text(
             '$total ${title == 'chemicals' ? 'reagents' : 'pieces'} on this '
             'shelf',
-            style: context.aside,
+            style: context.label.copyWith(
+              fontSize: 9.5,
+              letterSpacing: .8,
+              color: lab.inkFaint,
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -570,11 +583,15 @@ class _Header extends StatelessWidget {
                   controller: search,
                   onChanged: onSearchChanged,
                   onSubmitted: onSearchSubmitted,
-                  style: const TextStyle(fontSize: LabType.small),
+                  style: TextStyle(
+                    fontFamily: kSans,
+                    fontSize: LabType.small + 1,
+                    color: lab.ink,
+                  ),
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: 'Search name, formula or note',
-                    prefixIcon: Icon(Icons.search, size: 17, color: lab.soft),
+                    prefixIcon: Icon(Icons.search, size: 17, color: lab.inkSoft),
                     prefixIconConstraints: const BoxConstraints(
                       minWidth: 34,
                       minHeight: 34,
@@ -653,17 +670,21 @@ class _FilterChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? lab.ink : Colors.transparent,
+            color: selected ? lab.accentWash : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: selected ? lab.ink : lab.hair),
+            border: Border.all(
+              color: selected ? lab.accent.withValues(alpha: .55) : lab.hair,
+            ),
           ),
           child: Text(
             label,
             style: context.label.copyWith(
-              fontSize: LabType.micro,
-              color: selected ? lab.bone : lab.soft,
+              fontSize: 9.5,
+              letterSpacing: .9,
+              color: selected ? lab.accent : lab.inkSoft,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
         ),
@@ -702,7 +723,7 @@ class _SwipeHint extends StatelessWidget {
                   'Swipe to open a use or restock panel; nothing is saved '
                   'until you confirm. Hold a row for more actions.',
                   style: context.aside.copyWith(
-                    fontSize: LabType.small + 1,
+                    fontSize: 12,
                     color: lab.sage,
                   ),
                 ),
@@ -790,7 +811,7 @@ class _EmptyShelf extends StatelessWidget {
                   ? 'Try another name or formula.'
                   : 'Add your first item and the jar fills itself in.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, height: 1.45, color: lab.soft),
+              style: TextStyle(fontSize: 13, height: 1.45, color: lab.inkSoft),
             ),
             const SizedBox(height: 18),
             if (!searching)
@@ -875,7 +896,7 @@ class _UndoBar extends StatelessWidget {
                     Icon(
                       isUse ? Icons.arrow_downward : Icons.arrow_upward,
                       size: 15,
-                      color: lab.bone.withValues(alpha: .7),
+                      color: lab.canvas.withValues(alpha: .7),
                     ),
                     const SizedBox(width: 9),
                     Expanded(
@@ -886,13 +907,13 @@ class _UndoBar extends StatelessWidget {
                                   '${log!.action.name}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12.5, color: lab.bone),
+                        style: TextStyle(fontSize: 12.5, color: lab.canvas),
                       ),
                     ),
                     TextButton(
                       onPressed: onUndo,
                       style: TextButton.styleFrom(
-                        foregroundColor: lab.bone,
+                        foregroundColor: lab.canvas,
                         minimumSize: const Size(0, 36),
                       ),
                       child: const Text('Undo'),
@@ -1178,7 +1199,7 @@ class _MenuSheet extends ConsumerWidget {
             secondary: Icon(
               compact ? Icons.view_headline : Icons.view_agenda_outlined,
               size: 20,
-              color: lab.soft,
+              color: lab.inkSoft,
             ),
             title: const Text('Compact rows'),
             subtitle: Text(

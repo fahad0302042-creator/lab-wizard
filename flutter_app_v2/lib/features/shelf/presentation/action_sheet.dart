@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
+import '../../../core/motion.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass_jar.dart';
 import '../../../core/widgets/jar_metrics.dart';
+import '../../../core/widgets/vessel_tilt.dart';
 import '../../inventory/domain/item_view.dart';
 import '../../inventory/domain/models.dart';
 
@@ -109,6 +111,27 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
 
   double? get _parsed => double.tryParse(_amount.text.trim());
 
+  /// The quantity the sheet is previewing. One place, so the vessel, the arrow
+  /// text and the ring animation cannot disagree about what you are about to
+  /// commit.
+  double get _afterQuantity => switch (widget.action) {
+    InventoryAction.restock => widget.item.quantity + (_parsed ?? 0),
+    _ => (widget.item.quantity - (_parsed ?? 0))
+        .clamp(0, double.infinity)
+        .toDouble(),
+  };
+
+  /// A stamp that only changes when the *level* changes.
+  ///
+  /// Not `DateTime.now()`: re-deriving on every rebuild would re-ring the
+  /// surface while someone typed a note, which turns a deliberate feedback into
+  /// a twitch. Quantising to the drawn level means the vessel reacts when the
+  /// number moves and stays still otherwise.
+  DateTime? _levelStamp(double quantity) =>
+      _parsed == null ? null : DateTime.fromMillisecondsSinceEpoch(
+        (quantity * 1000).round(),
+      );
+
   String? get _error {
     final value = _parsed;
     if (value == null || value <= 0) return 'Enter an amount above zero';
@@ -159,12 +182,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
   Widget build(BuildContext context) {
     final lab = context.lab;
     final item = widget.item;
-    final after = switch (widget.action) {
-      InventoryAction.restock => item.quantity + (_parsed ?? 0),
-      _ => (item.quantity - (_parsed ?? 0))
-          .clamp(0, double.infinity)
-          .toDouble(),
-    };
+    final after = _afterQuantity;
     final metrics = jarMetrics(
       quantity: after,
       initialQuantity: item.initialQuantity,
@@ -172,11 +190,16 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
       piecewise: item.piecewise,
     );
 
-    return Padding(
+    // A sheet is its own route, so it does not inherit a lean scope from the
+    // shelf. Giving it one means the preview vessel can be leaned by thumb
+    // while you decide, exactly like the rows behind it.
+    return LeanScope(
+      enabled: !LabMotion.reduced(context),
+      child: Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: lab.bone,
+          color: lab.canvas,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -207,7 +230,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                             ? (item.isChemical ? 'Log use' : 'Log breakage')
                             : 'Restock',
                         style: TextStyle(
-                          fontFamily: 'Caveat',
+                          fontFamily: 'PlexSans',
                           fontSize: 30,
                           height: 1,
                           fontWeight: FontWeight.w700,
@@ -219,7 +242,24 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                     ],
                   ),
                 ),
-                GlassJar(metrics: metrics, width: 40, height: 50),
+                // The same vessel you will see on the shelf, at three times
+                // the size. It is the whole point of the sheet: you type a
+                // number and the liquid *moves*, so the thing you are about to
+                // write into the record is something you watched rather than
+                // something you typed.
+                LeaningVessel(
+                  metrics: metrics,
+                  width: 56,
+                  height: 72,
+                  sensitivity: 1.2,
+                  shape: item.isChemical
+                      ? VesselShape.bottle
+                      : VesselShape.beaker,
+                  // Every keystroke that changes the level rings the surface.
+                  // Derived from the live total, so it changes exactly when the
+                  // drawn level changes and not on a note being typed.
+                  pouredAt: _levelStamp(_afterQuantity),
+                ),
               ],
             ),
             const SizedBox(height: 18),
@@ -291,7 +331,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
                   icon: const Icon(Icons.event_outlined, size: 17),
                   label: Text(
                     DateFormat('d MMM').format(_date),
-                    style: const TextStyle(fontFamily: 'Caveat', fontSize: 18),
+                    style: const TextStyle(fontFamily: 'PlexSans', fontSize: 18),
                   ),
                 ),
                 const Spacer(),
@@ -308,6 +348,7 @@ class _ActionSheetState extends ConsumerState<_ActionSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -345,7 +386,7 @@ class _RecentAmountChip extends StatelessWidget {
             label,
             style: context.figure.copyWith(
               fontSize: 12,
-              color: selected ? lab.bone : lab.soft,
+              color: selected ? lab.canvas : lab.inkSoft,
             ),
           ),
         ),

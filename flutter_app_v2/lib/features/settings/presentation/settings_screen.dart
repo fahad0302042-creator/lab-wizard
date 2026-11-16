@@ -23,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
     final inventory = ref.watch(inventoryProvider);
 
     return Scaffold(
-      backgroundColor: lab.bone,
+      backgroundColor: lab.canvas,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         title: const Text('Settings'),
@@ -40,19 +40,17 @@ class SettingsScreen extends ConsumerWidget {
           Text(auth.user?.email ?? '', style: context.formula),
           const SizedBox(height: 22),
           Text('APPEARANCE', style: context.label),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Desk-lamp mode'),
-            subtitle: const Text('Dark paper for the evening shift'),
-            value: preferences.themeMode == ThemeMode.dark,
-            onChanged: (value) => ref
-                .read(preferencesProvider.notifier)
-                .setTheme(value ? ThemeMode.dark : ThemeMode.light),
-          ),
+          // The gyro switch is gone with the gyro. It was a setting for a
+          // decoration: turning it off stopped an animation that never did
+          // anything in the first place. Drag still leans a vessel, and logging
+          // still rocks it — neither needs a switch, because both only happen
+          // when you touch something.
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Reduce motion'),
-            subtitle: const Text('Instant transitions, no sloshing'),
+            subtitle: const Text(
+              'Instant transitions, no sloshing, and no log confirmation',
+            ),
             value: preferences.reduceMotion,
             onChanged: ref.read(preferencesProvider.notifier).setReduceMotion,
           ),
@@ -154,7 +152,7 @@ class SettingsScreen extends ConsumerWidget {
                 : '${inventory.pendingCount} change'
                       '${inventory.pendingCount == 1 ? '' : 's'} waiting to '
                       'upload.',
-            style: TextStyle(fontSize: 13, height: 1.5, color: lab.soft),
+            style: TextStyle(fontSize: 13, height: 1.5, color: lab.inkSoft),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -176,7 +174,7 @@ class SettingsScreen extends ConsumerWidget {
             '${inventory.chemicals.length} reagents · '
             '${inventory.apparatus.length} apparatus · '
             '${inventory.logs.length} log entries',
-            style: TextStyle(fontSize: 13, color: lab.soft),
+            style: TextStyle(fontSize: 13, color: lab.inkSoft),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -198,7 +196,7 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 Text(
-                  'Lab Wizard 2 · the store room',
+                  'Lab Wizard · the store room',
                   style: context.aside.copyWith(fontSize: 14),
                 ),
                 const SizedBox(height: 2),

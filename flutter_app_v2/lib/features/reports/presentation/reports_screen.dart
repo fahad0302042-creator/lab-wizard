@@ -526,7 +526,7 @@ class _ShelfTabs extends StatelessWidget {
                       style: context.label.copyWith(
                         fontSize: 10,
                         letterSpacing: 1.1,
-                        color: kind == value ? lab.bone : lab.soft,
+                        color: kind == value ? lab.canvas : lab.inkSoft,
                       ),
                     ),
                   ),
@@ -647,7 +647,7 @@ class _ReportTable extends StatelessWidget {
                 asCards ? 'See as table' : 'See as cards',
                 style: context.aside.copyWith(
                   fontSize: LabType.small,
-                  color: lab.soft,
+                  color: lab.inkSoft,
                 ),
               ),
             ),
@@ -729,7 +729,7 @@ class _ReportCard extends StatelessWidget {
             '$line − ${quantity(row.used)} used',
             style: context.aside.copyWith(
               fontSize: LabType.small + 1,
-              color: lab.soft,
+              color: lab.inkSoft,
             ),
           ),
         ],

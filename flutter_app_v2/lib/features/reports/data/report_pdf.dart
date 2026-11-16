@@ -52,7 +52,7 @@ class ReportPdf {
     final document = pw.Document(
       title: 'Lab Wizard report',
       author: 'Lab Wizard',
-      creator: 'Lab Wizard 2',
+      creator: 'Lab Wizard',
     );
     for (final report in reports) {
       document.addPage(

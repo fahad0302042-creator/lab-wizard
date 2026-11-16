@@ -1,7 +1,14 @@
-# Lab Wizard 2 — design spec
+# Lab Wizard — design spec
 
-Direction **C · The Store Room**. This file is the contract I build against: the jar
-maths, the gestures, the motion. No database changes are required for any of it.
+**Instrument panel**, built on the Store Room's jar rule. This file is the
+contract: the vessel maths, the gestures, the motion. It began as Direction C
+(warm bone paper, handwriting) and was retuned to a dark instrument panel with
+IBM Plex; the jar rules and the motion budget below survived that change
+unchanged, which is why they are still written as the spec rather than a history.
+
+Sections marked *"the polish pass"* and earlier describe the notebook-era
+typography (Caveat, Kalam, five fixed steps). Where the type section and the
+instrument panel disagree, `lib/core/theme/app_theme.dart` is the truth.
 
 ---
 
@@ -85,7 +92,30 @@ so "3 of 5 beakers" is literally 3 ticks, not a percentage.
 with no limit are never counted as needing attention — otherwise the number cries wolf
 and you stop trusting it.
 
----
+### Runway — the only number the app predicts
+
+Days of stock left, from what has actually been logged. It is the one question a paper
+register cannot answer, so it is worth being strict about the answer.
+
+- **Usage is `consume` and `breakage` only.** A restock is the opposite direction; letting
+  it into a rate would make an item appear to drain faster every time it was topped up.
+- **The denominator is the span the logs actually cover**, not the nominal 90-day window.
+  Dividing three days of use by 90 understates the rate, and for a reorder figure the
+  quiet direction is the dangerous one.
+- **No history, no number.** Below 21 days of logs, or below 5 separate days of use, the
+  card says so and shows nothing. A rate extrapolated from a week is a guess wearing a
+  number's clothes, and someone acts on a reorder date.
+- **Lumpiness is measured against the median day, not the mean.** A session booked across
+  several days drags the mean up with it and hides the spike; measured that way, a 900-unit
+  day among ten-unit days looked steady. Even-count medians are averaged so the measure has
+  no bias.
+- **Steady vs rough is said in words.** `lasting 30 days` versus `roughly 30 days`. Never a
+  confidence percentage — a bar invites trust the data cannot support.
+- **An item nobody has used is left off the board entirely.** Not "infinite supply": we
+  have never seen it move, which is a different sentence.
+- **"Runway not ready" is not "stock is holding".** An empty card must never read as
+  reassurance.
+
 
 ## 2. Gestures
 
@@ -117,7 +147,7 @@ explains a change.
 
 | Moment | Motion | Timing |
 |---|---|---|
-| **Level changes** | Liquid surface does a damped sine wave that settles — drops with a slight overshoot, rises with a small splash | spring, ~450 ms, stiffness 180 / damping 18 |
+| **Level changes** | The surface rocks as a body (higher at the wall it is pushed toward) **and** ripples, then settles exactly flat. Direction carries meaning: falling stock rocks one way, a restock the other | ~460 ms |
 | **Crossing into low** | Colour lerps sage → clay; `order` writes itself in left-to-right like pen | 300 ms, easeOut |
 | **Hitting empty** | Single pulse 1.0 → 1.02 → 1.0. Not a shake, not a loop | 320 ms |
 | **Number change** | Count up/down, tabular numerals so nothing reflows | 260 ms, easeOut |
@@ -129,9 +159,36 @@ explains a change.
 | **Pull-to-sync** | Ink line stretches, then snaps back and leaves a brief "synced" tick | 400 ms |
 | **Report bars** | Grow with easeOutBack, staggered 55 ms | 400 ms + 55/bar |
 
+### Motion only ever happens because you did something
+
+There used to be a gyroscope here: tilt the phone, the liquid finds its level. It was
+removed, and the reason is worth keeping, because "add a sensor" looks like a good idea
+about twice a year.
+
+**It only moved when you tilted the phone — which is the moment you are not reading the
+app.** Nothing ever asked you to tilt, so it animated beautifully in a demo and did nothing
+in use. A decoration on a stock ledger makes the ledger feel like a toy, which is the
+opposite of what an instrument should do.
+
+What replaced it is driven by the two things a person actually does: **dragging** a vessel,
+and **logging** stock. The animation survived; it just got attached to hands.
+
+Two curves, and they are deliberately different:
+
+- `settleWave` — the ripples crossing the surface. Fast, several crossings, damped.
+- `rockWave` — the whole body tilting and rocking back. Slower, peaks around a fifth of the
+  way in, and is **exactly zero at both ends**. A vessel left fractionally tilted is a
+  vessel claiming the floor slopes, so there is a test for it.
+
+**Logging gets a confirmation.** A scan line sweeps the panel, the item is named, and the
+level change is stated in the same mono figures the shelf uses. It is drawn on the Overlay,
+never as a dialog: a dialog pushes a route — and stock is usually logged from a sheet that
+is closing at that exact moment — and its barrier would absorb touches while someone is
+logging five items in a row during a lesson. Feedback must never take the screen hostage.
+
 **Reduced motion is a real setting, not an afterthought.** With it on (or Android's own
-setting), every spring becomes a 0 ms cut, the wave stops, the stagger goes, and lists
-appear instantly. The existing app already reads this — v2 keeps the same contract.
+setting), every spring becomes a 0 ms cut, the wave stops, the stagger goes, the log
+confirmation is skipped entirely, and lists appear instantly. The existing app already reads this — v2 keeps the same contract.
 
 **Performance:** the wave only repaints while a level is actually animating, each row sits
 in its own `RepaintBoundary`, and off-screen tabs stay frozen — the tab shell already

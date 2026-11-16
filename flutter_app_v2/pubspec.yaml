@@ -1,5 +1,5 @@
 name: lab_wizard_v2
-description: "Lab Wizard 2 — rebuild of the chemistry lab inventory app."
+description: "Lab Wizard — instrument-panel chemistry lab inventory."
 publish_to: 'none'
 
 version: 2.0.0+1
@@ -38,8 +38,16 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
-# Same bundled OFL fonts as the first app, so the redesign keeps a warm,
-# hand-set character without needing the network.
+# IBM Plex, bundled rather than fetched. Two families, both OFL:
+#
+#  * Plex Sans reads names, prose and buttons.
+#  * Plex Mono reads anything the app measures: quantities, units, formulas,
+#    states and dates. Formulas are mono because "HCl" must never be mistaken
+#    for "HCI" at 12 dp.
+#
+# Static weights rather than the variable font: Flutter matches static faces to
+# FontWeight reliably, and an unmatched variable axis is how a design ends up
+# rendering everything at 400.
 flutter:
   uses-material-design: true
 
@@ -47,22 +55,32 @@ flutter:
     - assets/images/
 
   fonts:
-    - family: Kalam
+    - family: PlexSans
       fonts:
-        - asset: assets/fonts/Kalam-Regular.ttf
+        - asset: assets/fonts/IBMPlexSans-Regular.ttf
           weight: 400
-        - asset: assets/fonts/Kalam-Bold.ttf
+        - asset: assets/fonts/IBMPlexSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSans-Bold.ttf
           weight: 700
-    - family: Caveat
+    # Styles outside a declared weight are drawn from the 700 face, so 600 and
+    # 700 deliberately share SemiBold: bolder, never synthetic.
+    - family: PlexMono
       fonts:
-        - asset: assets/fonts/Caveat-Variable.ttf
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
           weight: 400
-        - asset: assets/fonts/Caveat-Variable.ttf
+        - asset: assets/fonts/IBMPlexMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexMono-SemiBold.ttf
           weight: 700
 
 flutter_launcher_icons:
   android: true
   image_path: assets/images/logo.png
-  adaptive_icon_background: "#FBF7EC"
+  adaptive_icon_background: "#080C14"
   adaptive_icon_foreground: assets/images/logo.png
   min_sdk_android: 23

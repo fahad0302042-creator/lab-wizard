@@ -269,7 +269,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: 'Find an item',
-                    prefixIcon: Icon(Icons.search, size: 17, color: lab.soft),
+                    prefixIcon: Icon(Icons.search, size: 17, color: lab.inkSoft),
                     prefixIconConstraints: const BoxConstraints(
                       minWidth: 34,
                       minHeight: 34,
@@ -339,7 +339,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: context.figure.copyWith(
                               fontSize: LabType.small + 1,
-                              color: selected ? lab.clay : lab.soft,
+                              color: selected ? lab.clay : lab.inkSoft,
                             ),
                           ),
                         ),
@@ -417,7 +417,7 @@ class _KindTab extends StatelessWidget {
               label,
               style: context.label.copyWith(
                 fontSize: LabType.micro,
-                color: selected ? lab.bone : lab.soft,
+                color: selected ? lab.canvas : lab.inkSoft,
               ),
             ),
           ),

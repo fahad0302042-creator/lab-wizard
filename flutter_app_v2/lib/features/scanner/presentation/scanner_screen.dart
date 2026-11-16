@@ -191,7 +191,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           (item) => Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Material(
-              color: lab.card,
+              color: lab.surface,
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),

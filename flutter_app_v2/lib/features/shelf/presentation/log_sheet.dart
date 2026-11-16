@@ -212,7 +212,7 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: lab.bone,
+          color: lab.canvas,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -234,7 +234,7 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
             Text(
               'Fix this entry',
               style: TextStyle(
-                fontFamily: 'Caveat',
+                fontFamily: 'PlexSans',
                 fontSize: 30,
                 height: 1,
                 fontWeight: FontWeight.w700,
@@ -301,7 +301,7 @@ class _LogSheetState extends ConsumerState<_LogSheet> {
                   icon: const Icon(Icons.event_outlined, size: 17),
                   label: Text(
                     DateFormat('d MMM yyyy').format(_date),
-                    style: const TextStyle(fontFamily: 'Caveat', fontSize: 18),
+                    style: const TextStyle(fontFamily: 'PlexSans', fontSize: 18),
                   ),
                 ),
                 const Spacer(),
