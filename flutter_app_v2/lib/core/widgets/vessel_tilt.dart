@@ -185,6 +185,7 @@ class LeaningVessel extends StatefulWidget {
     this.semanticLabel,
     this.sensitivity = 1,
     this.shape = VesselShape.bottle,
+    this.pouredAt,
     super.key,
   });
 
@@ -194,6 +195,10 @@ class LeaningVessel extends StatefulWidget {
 
   /// A bottle for reagents, a beaker for apparatus.
   final VesselShape shape;
+
+  /// Passed straight through to the painter's swing trigger; see
+  /// `Vessel.pouredAt`.
+  final DateTime? pouredAt;
   final VoidCallback? onTap;
   final String? semanticLabel;
   final double sensitivity;
@@ -225,6 +230,7 @@ class _LeaningVesselState extends State<LeaningVessel> {
           semanticLabel: widget.semanticLabel,
           tiltSensitivity: widget.sensitivity,
           tipDegrees: lean,
+          pouredAt: widget.pouredAt,
         ),
       ),
     );
