@@ -63,14 +63,6 @@ class Vessel extends StatefulWidget {
   /// Bottle for chemicals, beaker for apparatus.
   final VesselShape shape;
 
-  /// Which way the liquid is currently rocking: 1 for a pour, -1 for a drain,
-  /// 0 when it is at rest. Zero-width so the resting surface is exactly flat.
-  final double swingSign;
-
-  /// How far through the swing, 0..1. The curve is [LabMotion.rockWave], which
-  /// is exactly zero at both ends, so a resting vessel is never left tilted.
-  final double swingProgress;
-
   /// How far the liquid should lean, in degrees. Supplied by the enclosing lean
   /// scope (or a thumb drag); the vessel itself never reads a sensor.
   final double tipDegrees;
@@ -282,6 +274,14 @@ class _VesselPainter extends CustomPainter {
   final Color dark;
 
   final VesselShape shape;
+
+  /// Which way the liquid is currently rocking: 1 for a pour, -1 for a drain,
+  /// 0 when it is at rest. Zero-width so the resting surface is exactly flat.
+  final double swingSign;
+
+  /// How far through the swing, 0..1. The curve is [LabMotion.rockWave], which
+  /// is exactly zero at both ends, so a resting vessel is never left tilted.
+  final double swingProgress;
 
   @override
   void paint(Canvas canvas, Size size) {
