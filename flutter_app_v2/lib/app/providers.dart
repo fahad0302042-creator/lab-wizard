@@ -11,6 +11,7 @@ import '../core/config/app_config.dart';
 import '../core/database/local_database.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/jar_metrics.dart';
 import '../features/inventory/data/inventory_repository.dart';
 import '../features/inventory/domain/item_view.dart';
 import '../features/inventory/domain/models.dart';
@@ -158,15 +159,9 @@ class AppPreferences {
     this.compactRows = false,
     this.dailyCheck = false,
     this.dailyCheckHour = 9,
-    this.tiltEnabled = true,
   });
 
   final bool reduceMotion;
-
-  /// Whether the liquid follows the phone's gyro. On by default because it is
-  /// the app's signature interaction; it can be switched off, and turning on
-  /// reduced motion switches it off implicitly, so nothing depends on it.
-  final bool tiltEnabled;
 
   /// Drops subtitles and jar ticks so a long shelf fits more per screen.
   final bool compactRows;
@@ -187,14 +182,12 @@ class AppPreferences {
     bool? compactRows,
     bool? dailyCheck,
     int? dailyCheckHour,
-    bool? tiltEnabled,
   }) => AppPreferences(
     reduceMotion: reduceMotion ?? this.reduceMotion,
     lowStockAlerts: lowStockAlerts ?? this.lowStockAlerts,
     compactRows: compactRows ?? this.compactRows,
     dailyCheck: dailyCheck ?? this.dailyCheck,
     dailyCheckHour: dailyCheckHour ?? this.dailyCheckHour,
-    tiltEnabled: tiltEnabled ?? this.tiltEnabled,
   );
 }
 
@@ -218,7 +211,6 @@ class PreferencesController extends Notifier<AppPreferences> {
       compactRows: preferences.getBool('compact_rows') ?? false,
       dailyCheck: preferences.getBool('daily_check') ?? false,
       dailyCheckHour: preferences.getInt('daily_check_hour') ?? 9,
-      tiltEnabled: preferences.getBool('tilt_enabled') ?? true,
     );
   }
 
@@ -234,22 +226,13 @@ class PreferencesController extends Notifier<AppPreferences> {
   }
 
   Future<void> setReduceMotion(bool value) async {
-    // Turning on reduced motion silences the gyro too, in one lever. A user who
-    // has asked the phone to stop animating has asked for exactly this, and
-    // leaving the liquid lurching would contradict them.
-    state = state.copyWith(
-      reduceMotion: value,
-      tiltEnabled: value ? false : state.tiltEnabled,
-    );
+    // One lever. Reduced motion already short-circuits every animated widget in
+    // the app (`LabMotion.reduced`), so there is nothing else to switch off
+    // alongside it — the gyro switch that used to live here went with the gyro
+    // itself.
+    state = state.copyWith(reduceMotion: value);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('reduce_motion', value);
-    if (value) await preferences.setBool('tilt_enabled', false);
-  }
-
-  Future<void> setTiltEnabled(bool value) async {
-    state = state.copyWith(tiltEnabled: value);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool('tilt_enabled', value);
   }
 
   /// Turning the daily check on asks for notification permission and schedules
@@ -393,6 +376,61 @@ final inventoryProvider = NotifierProvider<InventoryController, InventoryState>(
 ///
 /// `DateTime.now()` is read here, at the edge, so the domain function underneath
 /// stays clock-free and testable.
+/// What was just written to the ledger, for the confirmation.
+class LogEvent {
+  const LogEvent({
+    required this.id,
+    required this.itemId,
+    required this.name,
+    required this.detail,
+    required this.signal,
+    required this.rising,
+  });
+
+  /// Monotonic, so two identical logs in a row are still two separate events
+  /// and the second one is not swallowed as "no change".
+  final int id;
+  final String itemId;
+  final String name;
+  final String detail;
+  final StockSignal signal;
+  final bool rising;
+}
+
+/// The confirmation bus.
+///
+/// A stream rather than a callback threaded through every logging path: stock
+/// is logged from the shelf, from a sheet, from the session screen and from a
+/// scan, and none of them own the widget that should say "done". Broadcast, and
+/// the shell — which is alive for the whole session — shows it.
+final logEventProvider = StreamProvider<LogEvent>((ref) async* {
+  yield* _logEvents.stream;
+});
+
+final _logEvents = StreamController<LogEvent>.broadcast();
+int _logEventSeq = 0;
+
+/// Announces a log. Called by the controller, so no path can forget to.
+void publishLogEvent({
+  required String itemId,
+  required String name,
+  required String detail,
+  required StockSignal signal,
+  required bool rising,
+}) {
+  if (_logEvents.isClosed) return;
+  _logEvents.add(
+    LogEvent(
+      id: ++_logEventSeq,
+      itemId: itemId,
+      name: name,
+      detail: detail,
+      signal: signal,
+      rising: rising,
+    ),
+  );
+}
+
 final forecastProvider = Provider<ForecastBoard>((ref) {
   final state = ref.watch(inventoryProvider);
   return buildForecastBoard(
@@ -582,6 +620,26 @@ class InventoryController extends Notifier<InventoryState> {
       InventoryAction.restock => current + amount,
       InventoryAction.consume || InventoryAction.breakage => current - amount,
     };
+
+    // Announce the write here rather than in each screen: this is the one place
+    // every logging path has to pass through, so a new path cannot silently
+    // lose its confirmation. The signal is recomputed from the new quantity so
+    // the plate's colour matches the vessel the user is about to see.
+    final after = jarMetrics(
+      quantity: nextQuantity,
+      initialQuantity: view.initialQuantity,
+      threshold: view.threshold,
+      piecewise: view.piecewise,
+    );
+    publishLogEvent(
+      itemId: itemId,
+      name: view.name,
+      detail:
+          '${formatQuantity(current)} → ${formatQuantity(nextQuantity)} '
+          '${view.unit}',
+      signal: after.signal,
+      rising: action == InventoryAction.restock,
+    );
     final cached = await _repository.loadCached(userId);
     state = state.copyWith(
       chemicals: itemType == ItemKind.chemical

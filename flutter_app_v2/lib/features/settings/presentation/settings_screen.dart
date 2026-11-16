@@ -40,30 +40,16 @@ class SettingsScreen extends ConsumerWidget {
           Text(auth.user?.email ?? '', style: context.formula),
           const SizedBox(height: 22),
           Text('APPEARANCE', style: context.label),
-          // There is one mode now — the instrument panel — so the old "desk
-          // lamp" toggle has nothing left to switch. The control that replaced
-          // it is the gyro, which is the setting people actually want to reach
-          // for: the liquid leaning with the phone is either delightful or
-          // unwelcome, and both answers deserve a switch.
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Tilt the liquid'),
-            subtitle: Text(
-              preferences.tiltEnabled
-                  ? 'Tip the phone and the liquid finds its level. Drag '
-                        'sideways on any shelf to lean it by thumb instead.'
-                  : 'Off. The vessels sit level.',
-            ),
-            value: preferences.tiltEnabled,
-            onChanged: preferences.reduceMotion
-                ? null
-                : ref.read(preferencesProvider.notifier).setTiltEnabled,
-          ),
+          // The gyro switch is gone with the gyro. It was a setting for a
+          // decoration: turning it off stopped an animation that never did
+          // anything in the first place. Drag still leans a vessel, and logging
+          // still rocks it — neither needs a switch, because both only happen
+          // when you touch something.
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Reduce motion'),
             subtitle: const Text(
-              'Instant transitions, no sloshing, and tilt switched off',
+              'Instant transitions, no sloshing, and no log confirmation',
             ),
             value: preferences.reduceMotion,
             onChanged: ref.read(preferencesProvider.notifier).setReduceMotion,

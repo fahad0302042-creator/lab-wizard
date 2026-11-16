@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/motion.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/log_confirm.dart';
 import '../core/widgets/vessel_tilt.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
@@ -75,10 +77,36 @@ class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
   HomeTab _tab = HomeTab.dashboard;
 
+  /// Set so a log event is shown once and never on a rebuild.
+  int _lastLogEvent = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // The confirmation is shown from here because the shell outlives every tab
+    // and every sheet: whatever logged the stock has usually closed by the time
+    // the plate appears.
+    ref.listenManual<AsyncValue<LogEvent>>(logEventProvider, (_, next) {
+      final event = next.asData?.value;
+      if (event == null || event.id == _lastLogEvent) return;
+      _lastLogEvent = event.id;
+      // A listener can fire while a route is being popped, and pushing a dialog
+      // in the middle of that throws. One frame of separation is enough, and the
+      // plate is feedback rather than information — nothing is lost by waiting
+      // for the pop to finish.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        HapticFeedback.lightImpact();
+        showLogConfirm(
+          context,
+          name: event.name,
+          detail: event.detail,
+          signal: event.signal,
+          rising: event.rising,
+        );
+      });
+    });
     Future.microtask(() async {
       await ref.read(inventoryProvider.notifier).bootstrap(widget.user.id);
       await ref.read(notificationServiceProvider).init();
@@ -117,11 +145,11 @@ class _HomeShellState extends ConsumerState<HomeShell>
       const ReportsScreen(),
     ];
     final index = _tab.index;
-    // One tilt scope for every tab, inside the nav shell: the sensor is opened
-    // once and closed when the shell goes away, not once per screen. Screens
-    // brought up as routes (sheets, settings) open their own.
-    return VesselTilt(
-      enabled: ref.watch(preferencesProvider).tiltEnabled,
+    // One lean scope for every tab, inside the nav shell: the shared lean is
+    // created once and disposed when the shell goes away, not once per screen.
+    // Screens brought up as routes (sheets, settings) open their own.
+    return LeanScope(
+      enabled: !LabMotion.reduced(context),
       child: Scaffold(
       extendBody: true,
       body: Stack(
@@ -299,13 +327,13 @@ class _Dock extends StatelessWidget {
   }
 }
 
-/// Local alias so the dock's short durations stay readable at the call site
-/// without importing the whole motion library twice.
+/// Local alias so the dock's short durations stay readable at the call site.
+///
+/// Delegates to [LabMotion.of] rather than testing `disableAnimations` again:
+/// two copies of the reduced-motion rule is how one of them ends up stale.
 abstract final class LabMotionQuick {
   static Duration of(BuildContext context) =>
-      MediaQuery.disableAnimationsOf(context)
-      ? Duration.zero
-      : const Duration(milliseconds: 180);
+      LabMotion.of(context, const Duration(milliseconds: 180));
 }
 
 class _BackendMissing extends StatelessWidget {

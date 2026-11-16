@@ -1,5 +1,5 @@
 /// The store room vessel: a small vial whose liquid level *is* the stock bar,
-/// and whose liquid tips when the phone tips.
+/// and whose liquid moves when you touch it or log stock into it.
 ///
 /// Two things make the tilt honest, and they are the whole point of this file:
 ///
@@ -52,6 +52,7 @@ class Vessel extends StatefulWidget {
     this.semanticLabel,
     this.tiltSensitivity = 1.0,
     this.shape = VesselShape.bottle,
+    this.pouredAt,
     super.key,
   });
 
@@ -62,9 +63,26 @@ class Vessel extends StatefulWidget {
   /// Bottle for chemicals, beaker for apparatus.
   final VesselShape shape;
 
-  /// How far the liquid should lean, in degrees. Supplied by a [VesselTilt]
-  /// ancestor (or a drag); the vessel itself never reads the sensor.
+  /// Which way the liquid is currently rocking: 1 for a pour, -1 for a drain,
+  /// 0 when it is at rest. Zero-width so the resting surface is exactly flat.
+  final double swingSign;
+
+  /// How far through the swing, 0..1. The curve is [LabMotion.rockWave], which
+  /// is exactly zero at both ends, so a resting vessel is never left tilted.
+  final double swingProgress;
+
+  /// How far the liquid should lean, in degrees. Supplied by the enclosing lean
+  /// scope (or a thumb drag); the vessel itself never reads a sensor.
   final double tipDegrees;
+
+  /// Changes whenever stock was just logged into this item. Any new value makes
+  /// the vessel rock, even if the level did not visibly move — which is the case
+  /// that used to be silent: a small pour into a large vessel barely shifts the
+  /// surface, but a person who just logged 200 mL expects to see *something*.
+  ///
+  /// A timestamp rather than a counter so a rebuild for an unrelated reason can
+  /// never replay the swing.
+  final DateTime? pouredAt;
 
   final VoidCallback? onTap;
   final String? semanticLabel;
@@ -77,13 +95,26 @@ class Vessel extends StatefulWidget {
 }
 
 class _VesselState extends State<Vessel> with TickerProviderStateMixin {
-  /// Drives the surface. Runs 0→1 whenever the level changes; the painter turns
-  /// that into a damped wave so the liquid sloshes and settles.
+  /// Drives the surface. Two separate things feed it:
+  ///
+  /// - **a level change**, which is a pour: the surface drops or rises and then
+  ///   rings down;
+  /// - **an outward swing**, [Vessel.pouredAt], which is a shove: the whole
+  ///   liquid rocks and settles.
+  ///
+  /// They share one controller but not one curve. Restarting a single curve for
+  /// both is what made the old version read as a loop rather than as liquid: two
+  /// pours in quick succession played the same animation twice instead of
+  /// building on each other.
   late final AnimationController _surface = AnimationController(
     vsync: this,
     duration: LabMotion.wave,
     value: 1,
   );
+
+  /// Sign of the swinging component, so a pour rocks one way and a drain the
+  /// other rather than both kicking identically.
+  double _swingSign = 1;
 
   /// A single pulse when a vessel becomes empty. Not a shake, not a loop.
   late final AnimationController _pulse = AnimationController(
@@ -98,13 +129,21 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
   void didUpdateWidget(covariant Vessel oldWidget) {
     super.didUpdateWidget(oldWidget);
     final next = widget.metrics.fill ?? widget.metrics.partialFill;
-    if ((next - _shownFill).abs() > .001) {
+    final delta = next - _shownFill;
+    if (delta.abs() > .001) {
       _shownFill = next;
-      if (!LabMotion.reduced(context)) {
-        _surface
-          ..reset()
-          ..forward();
-      }
+      // Falling stock rocks the liquid the way a real vessel does when you draw
+      // from it. A restock pushes the surface up instead. Keeping the sign means
+      // the two read as different events, not the same animation twice.
+      _swingSign = delta > 0 ? 1 : -1;
+      _kick();
+    }
+
+    // An outward swing can arrive with the level already updated by the caller,
+    // so this is checked separately rather than folded into the branch above.
+    if (widget.pouredAt != oldWidget.pouredAt) {
+      _swingSign = 1;
+      _kick();
     }
 
     final becameEmpty =
@@ -114,6 +153,20 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
         if (mounted) _pulse.forward();
       });
     }
+  }
+
+  /// Starts the surface ringing.
+  ///
+  /// If it is already ringing, the controller is pushed back rather than reset:
+  /// a second pour lands on top of the first wave instead of erasing it, which is
+  /// what makes a fast sequence feel like one continuous liquid rather than a
+  /// gif replaying.
+  void _kick() {
+    if (LabMotion.reduced(context)) return;
+    final running = _surface.isAnimating;
+    _surface
+      ..reset()
+      ..forward(from: running ? .18 : 0);
   }
 
   @override
@@ -144,7 +197,12 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
             animation: Listenable.merge([_surface, _pulse]),
             builder: (context, _) {
               final t = _surface.value;
-              final amplitude = reduce ? 0.0 : math.sin(math.pi * t).clamp(0.0, 1.0);
+              // `sin(pi*t)` is zero at both ends, but this vessel is often
+              // *resting* with the controller left at its final value, so the
+              // resting surface has to be exactly flat rather than merely
+              // close. A sine already guarantees that; the clamp documents it.
+              final amplitude =
+                  reduce ? 0.0 : math.sin(math.pi * t).clamp(0.0, 1.0);
               final scale = 1 + .02 * (1 - _pulse.value);
 
               return Transform.scale(
@@ -169,6 +227,8 @@ class _VesselState extends State<Vessel> with TickerProviderStateMixin {
                                     180,
                       wavePhase: t * math.pi * 2.2,
                       waveAmplitude: (reduce ? 0.0 : amplitude) * .085,
+                      swingSign: reduce ? 0 : _swingSign,
+                      swingProgress: t,
                       dark: lab.canvas,
                       shape: widget.shape,
                     ),
@@ -195,6 +255,8 @@ class _VesselPainter extends CustomPainter {
     required this.waveAmplitude,
     required this.dark,
     required this.shape,
+    this.swingSign = 0,
+    this.swingProgress = 1,
   });
 
   final double fill;
@@ -276,12 +338,25 @@ class _VesselPainter extends CustomPainter {
 
       // Extend horizontally past the body so rotation can't reveal a gap.
       final reach = body.height * 1.2;
-      final path = Path()..moveTo(body.left - reach, surfaceY);
+
+      // A rocking component on top of the travelling ripples, and the part that
+      // makes a pour feel like a pour: the surface tilts as a whole, higher at
+      // the wall the liquid is being pushed toward, and comes back level.
+      //
+      // Amplitude is ~2x the ripple height so the body movement reads first and
+      // the ripples are a texture on top of it, rather than the other way round.
+      final rock =
+          swingSign * body.height * .13 * LabMotion.rockWave(swingProgress);
+
+      final path = Path()..moveTo(body.left - reach, surfaceY + rock);
       const steps = 16;
       for (var i = 0; i <= steps; i++) {
         final x = body.left - reach + (body.width + reach * 2) * (i / steps);
+        // The rock is centred on the body, so it tilts rather than slides.
+        final acrossWall = (i / steps) - .5;
         final y =
             surfaceY +
+            rock * (acrossWall * 2) +
             math.sin(wavePhase + i / steps * math.pi * 1.6) * wave +
             // A second, slower component keeps it from looking like a spring.
             math.sin(wavePhase * .6 + i / steps * math.pi * .9) * wave * .4;

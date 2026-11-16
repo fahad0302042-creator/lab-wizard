@@ -2,7 +2,6 @@ package com.labwizard.lab_wizard
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.util.TimeZone
 
@@ -20,9 +19,5 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // The app's signature gesture: tilt the phone, the liquid tips with it.
-        // Nothing is sampled until Flutter actually opens this stream.
-        EventChannel(messenger, "lab_wizard/tilt")
-            .setStreamHandler(TiltStreamHandler(applicationContext))
     }
 }

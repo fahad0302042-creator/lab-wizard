@@ -23,7 +23,7 @@ import 'vessel_tilt.dart';
 ///   angle — because a signature interaction with no readout is just an
 ///   animation.
 ///
-/// It leans through an enclosing [VesselTilt] scope, which the dashboard
+/// It leans through the enclosing lean scope, which the dashboard
 /// already provides, so the hero needs no provider of its own and stays
 /// testable and previewable without a platform channel.
 class VesselHero extends StatefulWidget {
@@ -173,9 +173,9 @@ class _VesselHeroState extends State<VesselHero>
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onHorizontalDragUpdate: (details) =>
-                        TiltNudge.handle(context, details.delta.dx),
-                    onHorizontalDragEnd: (_) => TiltNudge.release(context),
-                    onHorizontalDragCancel: () => TiltNudge.release(context),
+                        Lean.nudge(context, details.delta.dx),
+                    onHorizontalDragEnd: (_) => Lean.release(context),
+                    onHorizontalDragCancel: () => Lean.release(context),
                     child: TiltReadout(
                       builder: (context, lean) => AnimatedBuilder(
                         animation: _surface,

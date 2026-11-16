@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../app/providers.dart';
 import '../../../core/error_text.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/motion.dart';
 import '../../../core/widgets/glass_jar.dart';
 import '../../../core/widgets/vessel_tilt.dart';
 import '../../inventory/domain/item_view.dart';
@@ -59,9 +60,9 @@ class _ItemSheet extends ConsumerWidget {
     final lastRestock = restocks.isEmpty ? null : restocks.first;
 
     // The sheet previews the vessel at the top, so it needs the same lean the
-    // row had. A modal route does not inherit the shelf's tilt scope.
-    return VesselTilt(
-      enabled: ref.watch(preferencesProvider).tiltEnabled,
+    // row had. A modal route does not inherit the shelf's lean scope.
+    return LeanScope(
+      enabled: !LabMotion.reduced(context),
       child: DraggableScrollableSheet(
       expand: false,
       initialChildSize: .74,

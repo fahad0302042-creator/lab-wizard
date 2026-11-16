@@ -51,6 +51,26 @@ abstract final class LabMotion {
     final slow = math.sin(t * math.pi * 2.1) * .45;
     return (fast + slow) * envelope;
   }
+
+  /// The whole surface tilting one way and rocking back, as a multiplier in
+  /// -1..1. Nowhere near as fast as [settleWave] — this is the vessel's body
+  /// moving, not ripples crossing it.
+  ///
+  /// Two properties are deliberate:
+  ///
+  /// - **It is exactly zero at `t == 1`.** A surface left fractionally tilted
+  ///   would be a vessel at rest claiming the floor is sloped, and there is a
+  ///   test for it.
+  /// - **It peaks early**, around a fifth of the way in. A rock that wound up
+  ///   slowly would read as an animation starting rather than as a shove.
+  ///
+  /// The envelope tapers by `(1-t)^2` rather than an exponential, because an
+  /// exponential never quite reaches zero and would leave a permanent lean.
+  static double rockWave(double t) {
+    if (t <= 0 || t >= 1) return 0;
+    final envelope = math.pow(1 - t, 2).toDouble();
+    return envelope * math.sin(t * math.pi * 2.4);
+  }
 }
 
 /// Fades and lifts a row on first paint, offset by [index] so a shelf arrives
