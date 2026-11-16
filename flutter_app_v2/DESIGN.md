@@ -147,7 +147,7 @@ explains a change.
 
 | Moment | Motion | Timing |
 |---|---|---|
-| **Level changes** | Liquid surface does a damped sine wave that settles — drops with a slight overshoot, rises with a small splash | spring, ~450 ms, stiffness 180 / damping 18 |
+| **Level changes** | The surface rocks as a body (higher at the wall it is pushed toward) **and** ripples, then settles exactly flat. Direction carries meaning: falling stock rocks one way, a restock the other | ~460 ms |
 | **Crossing into low** | Colour lerps sage → clay; `order` writes itself in left-to-right like pen | 300 ms, easeOut |
 | **Hitting empty** | Single pulse 1.0 → 1.02 → 1.0. Not a shake, not a loop | 320 ms |
 | **Number change** | Count up/down, tabular numerals so nothing reflows | 260 ms, easeOut |
@@ -159,9 +159,36 @@ explains a change.
 | **Pull-to-sync** | Ink line stretches, then snaps back and leaves a brief "synced" tick | 400 ms |
 | **Report bars** | Grow with easeOutBack, staggered 55 ms | 400 ms + 55/bar |
 
+### Motion only ever happens because you did something
+
+There used to be a gyroscope here: tilt the phone, the liquid finds its level. It was
+removed, and the reason is worth keeping, because "add a sensor" looks like a good idea
+about twice a year.
+
+**It only moved when you tilted the phone — which is the moment you are not reading the
+app.** Nothing ever asked you to tilt, so it animated beautifully in a demo and did nothing
+in use. A decoration on a stock ledger makes the ledger feel like a toy, which is the
+opposite of what an instrument should do.
+
+What replaced it is driven by the two things a person actually does: **dragging** a vessel,
+and **logging** stock. The animation survived; it just got attached to hands.
+
+Two curves, and they are deliberately different:
+
+- `settleWave` — the ripples crossing the surface. Fast, several crossings, damped.
+- `rockWave` — the whole body tilting and rocking back. Slower, peaks around a fifth of the
+  way in, and is **exactly zero at both ends**. A vessel left fractionally tilted is a
+  vessel claiming the floor slopes, so there is a test for it.
+
+**Logging gets a confirmation.** A scan line sweeps the panel, the item is named, and the
+level change is stated in the same mono figures the shelf uses. It is drawn on the Overlay,
+never as a dialog: a dialog pushes a route — and stock is usually logged from a sheet that
+is closing at that exact moment — and its barrier would absorb touches while someone is
+logging five items in a row during a lesson. Feedback must never take the screen hostage.
+
 **Reduced motion is a real setting, not an afterthought.** With it on (or Android's own
-setting), every spring becomes a 0 ms cut, the wave stops, the stagger goes, and lists
-appear instantly. The existing app already reads this — v2 keeps the same contract.
+setting), every spring becomes a 0 ms cut, the wave stops, the stagger goes, the log
+confirmation is skipped entirely, and lists appear instantly. The existing app already reads this — v2 keeps the same contract.
 
 **Performance:** the wave only repaints while a level is actually animating, each row sits
 in its own `RepaintBoundary`, and off-screen tabs stay frozen — the tab shell already
